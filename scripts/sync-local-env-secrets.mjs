@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
  * Syncs local environment secrets (GEMINI_API_KEY, PAYPAL_SANDBOX_*) into
- * the dedicated Supabase project (dvzfesfvefggnunkjhom) via the one-time
- * SYNC_SETUP_NONCE on the paypal-billing Edge Function.
+ * the dedicated Supabase project (dvzfesfvefggnunkjhom) via the authenticated
+ * Provider Owner JWT + 256-bit SYNC_SETUP_NONCE on the paypal-billing Edge Function.
  *
- * Security invariant: Never prints or logs any secret values.
+ * Security invariant:
+ * - Anonymous callers are rejected (401 ANONYMOUS_SETUP_FORBIDDEN).
+ * - Non-owner authenticated callers are rejected (403 FORBIDDEN_NOT_OWNER).
+ * - Never prints or logs any secret values.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,33 +33,24 @@ function parseEnvFile(filePath) {
 
 async function main() {
   const kitEnvPath = path.resolve(process.cwd(), '.env');
-  const fallbackEnvPath = path.resolve(process.cwd(), '../health-erecords-app/.env');
-
   const kitEnv = parseEnvFile(kitEnvPath);
-  const fallbackEnv = parseEnvFile(fallbackEnvPath);
 
   const supabaseUrl =
     kitEnv.EXPO_PUBLIC_SUPABASE_URL || 'https://dvzfesfvefggnunkjhom.supabase.co';
   const anonKey = kitEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
   const setupNonce = kitEnv.SYNC_SETUP_NONCE || process.env.SYNC_SETUP_NONCE || '';
+
   if (!setupNonce) {
-    console.error('[sync-local-env-secrets] Missing SYNC_SETUP_NONCE in .env');
-    process.exit(1);
+    console.log('[sync-local-env-secrets] SYNC_SETUP_NONCE not set in .env; skipping local secret sync.');
+    return;
   }
 
   const secretsToSync = {};
 
-  // 1. Gemini API Key (check Billing Kit .env first, then authorized local fallback .env)
-  const geminiKey =
-    kitEnv.GEMINI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    fallbackEnv.GEMINI_API_KEY ||
-    '';
-  if (geminiKey) {
-    secretsToSync.GEMINI_API_KEY = geminiKey;
+  if (kitEnv.GEMINI_API_KEY || process.env.GEMINI_API_KEY) {
+    secretsToSync.GEMINI_API_KEY = kitEnv.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
   }
 
-  // 2. PayPal Sandbox credentials (support both PAYPAL_SANDBOX_* and PAYPAL_*)
   const paypalClientId =
     kitEnv.PAYPAL_SANDBOX_CLIENT_ID ||
     kitEnv.PAYPAL_CLIENT_ID ||
@@ -90,10 +84,31 @@ async function main() {
   }
 
   const keysFound = Object.keys(secretsToSync);
-  console.log(`[sync-local-env-secrets] Found ${keysFound.length} secret key(s) to sync: ${keysFound.join(', ')}`);
-
   if (keysFound.length === 0) {
-    console.error('[sync-local-env-secrets] No secrets found to sync.');
+    console.log('[sync-local-env-secrets] No new local secrets in .env to sync (managed secrets already in billing_platform_secrets).');
+    return;
+  }
+
+  console.log(`[sync-local-env-secrets] Authenticating as Provider Owner to sync ${keysFound.length} key(s): ${keysFound.join(', ')}`);
+
+  // Authenticate as Provider Owner (Dr. Sarah Jenkins)
+  const demoPassword = kitEnv.DEMO_ACCOUNT_PASSWORD || 'DemoPayPalKit2026!';
+  const authRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: anonKey,
+    },
+    body: JSON.stringify({
+      email: 'sarah.jenkins@demo.paypal-billing-kit.local',
+      password: demoPassword,
+    }),
+  });
+
+  const authData = await authRes.json().catch(() => ({}));
+  const ownerJwt = authData?.access_token;
+  if (!authRes.ok || !ownerJwt) {
+    console.error('[sync-local-env-secrets] Failed to authenticate provider owner session.');
     process.exit(1);
   }
 
@@ -102,23 +117,22 @@ async function main() {
     headers: {
       'Content-Type': 'application/json',
       apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
+      Authorization: `Bearer ${ownerJwt}`,
     },
     body: JSON.stringify({
       action: 'sync-platform-secrets',
       syncNonce: setupNonce,
-      setupNonce,
       secrets: secretsToSync,
     }),
   });
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error(`[sync-local-env-secrets] HTTP ${res.status}:`, data.error || data.message || 'Unknown error');
+    console.error(`[sync-local-env-secrets] HTTP ${res.status}:`, data.code || data.message || 'Unknown error');
     process.exit(1);
   }
 
-  console.log(`[sync-local-env-secrets] Successfully synced keys into billing_platform_secrets: ${(data.syncedKeys || data.updatedKeys || []).join(', ')}`);
+  console.log(`[sync-local-env-secrets] Successfully synced keys into billing_platform_secrets: ${(data.syncedKeys || []).join(', ')}`);
 }
 
 main().catch((err) => {

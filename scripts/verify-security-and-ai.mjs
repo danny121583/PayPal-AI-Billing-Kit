@@ -334,6 +334,95 @@ async function main() {
     `status=${webhookSpoof.status}, code=${webhookSpoof.data?.code}`
   );
 
+  // 2l. Public anon PostgREST read/write against billing_platform_secrets -> blocked
+  const anonSecretProbe = await fetch(`${SUPABASE_URL}/rest/v1/billing_platform_secrets?select=*`, {
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+    },
+  });
+  const anonSecretBody = await anonSecretProbe.json().catch(() => null);
+  assert(
+    anonSecretProbe.status === 401 ||
+      anonSecretProbe.status === 403 ||
+      (Array.isArray(anonSecretBody) && anonSecretBody.length === 0) ||
+      Boolean(anonSecretBody?.code),
+    'Public visitor / anon access to billing_platform_secrets table is blocked',
+    `HTTP ${anonSecretProbe.status}, code=${anonSecretBody?.code || '0 rows'}`
+  );
+
+  // 2m. Anonymous caller invoking sync-platform-secrets -> blocked (401 ANONYMOUS_SETUP_FORBIDDEN)
+  const anonSyncAttempt = await callEdgeFunction('paypal-billing', {
+    action: 'sync-platform-secrets',
+    syncNonce: 'forged-nonce',
+    secrets: { PAYPAL_SANDBOX_CLIENT_ID: 'forged' },
+  });
+  assert(
+    anonSyncAttempt.status === 401 && anonSyncAttempt.data?.code === 'ANONYMOUS_SETUP_FORBIDDEN',
+    'Anonymous caller cannot invoke credential setup (sync-platform-secrets)',
+    `status=${anonSyncAttempt.status}, code=${anonSyncAttempt.data?.code}`
+  );
+
+  // 2n. Authenticated non-owner customer (Alex Rivera) invoking sync-platform-secrets -> blocked (403 FORBIDDEN_NOT_OWNER)
+  const customerAuthRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: ANON_KEY },
+    body: JSON.stringify({
+      email: 'alex.rivera@demo.paypal-billing-kit.local',
+      password: env.DEMO_ACCOUNT_PASSWORD || 'DemoPayPalKit2026!',
+    }),
+  });
+  const customerAuthData = await customerAuthRes.json().catch(() => ({}));
+  const customerSyncRes = await fetch(`${SUPABASE_URL}/functions/v1/paypal-billing`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${customerAuthData.access_token || ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      action: 'sync-platform-secrets',
+      syncNonce: 'forged-nonce',
+      secrets: { PAYPAL_SANDBOX_CLIENT_ID: 'forged' },
+    }),
+  });
+  const customerSyncBody = await customerSyncRes.json().catch(() => ({}));
+  assert(
+    customerSyncRes.status === 403 && customerSyncBody?.code === 'FORBIDDEN_NOT_OWNER',
+    'Authenticated non-owner customer cannot invoke credential setup',
+    `status=${customerSyncRes.status}, code=${customerSyncBody?.code}`
+  );
+
+  // 2o. Authenticated provider owner invoking sync-platform-secrets with invalid nonce -> blocked (403 FORBIDDEN_SYNC)
+  const ownerAuthRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: ANON_KEY },
+    body: JSON.stringify({
+      email: 'sarah.jenkins@demo.paypal-billing-kit.local',
+      password: env.DEMO_ACCOUNT_PASSWORD || 'DemoPayPalKit2026!',
+    }),
+  });
+  const ownerAuthData = await ownerAuthRes.json().catch(() => ({}));
+  const ownerBadNonceRes = await fetch(`${SUPABASE_URL}/functions/v1/paypal-billing`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ownerAuthData.access_token || ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      action: 'sync-platform-secrets',
+      syncNonce: 'invalid-nonce-value',
+      secrets: { PAYPAL_SANDBOX_CLIENT_ID: 'forged' },
+    }),
+  });
+  const ownerBadNonceBody = await ownerBadNonceRes.json().catch(() => ({}));
+  assert(
+    ownerBadNonceRes.status === 403 && ownerBadNonceBody?.code === 'FORBIDDEN_SYNC',
+    'Authenticated owner without valid 256-bit setup nonce is blocked from credential sync',
+    `status=${ownerBadNonceRes.status}, code=${ownerBadNonceBody?.code}`
+  );
+
   // Cleanup test sessions
   await callEdgeFunction('billing-maas-mcp', {
     tool: 'reset_demo_session',

@@ -110,9 +110,32 @@ Deno.serve(async (req: Request) => {
     const dbSecrets = await loadPlatformSecrets(serviceClient);
 
     // -------------------------------------------------------------------------
-    // 0. SECURE PLATFORM SECRETS SYNC (Setup Nonce Protected)
+    // 0. SECURE PLATFORM SECRETS SYNC (Authenticated Owner JWT + Setup Nonce Required)
     // -------------------------------------------------------------------------
     if (action === 'sync-platform-secrets') {
+      const { data: syncAuthData } = await userClient.auth.getUser();
+      if (!syncAuthData?.user?.id) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'ANONYMOUS_SETUP_FORBIDDEN',
+            message: 'Anonymous users cannot invoke credential setup. Authenticated provider owner JWT required.',
+          }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (syncAuthData.user.id !== PROVIDER_ID) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'FORBIDDEN_NOT_OWNER',
+            message: 'Only the authenticated organization owner can invoke credential setup.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const expectedNonce = dbSecrets['SYNC_SETUP_NONCE'] || '';
       const providedNonce = String(body?.syncNonce || '').trim();
       if (!expectedNonce || !providedNonce || expectedNonce !== providedNonce) {

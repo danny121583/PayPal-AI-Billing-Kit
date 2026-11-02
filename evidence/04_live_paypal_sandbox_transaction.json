@@ -1,0 +1,17 @@
+{
+  "sandbox_oauth_status": {
+    "environment": "sandbox",
+    "api_base_url": "https://api-m.sandbox.paypal.com",
+    "credentials_configured": false,
+    "webhook_configured": false,
+    "oauth_reachable": false,
+    "app_id": null,
+    "token_expires_in": null,
+    "missing_secrets": [
+      "PAYPAL_SANDBOX_CLIENT_ID",
+      "PAYPAL_SANDBOX_CLIENT_SECRET",
+      "PAYPAL_SANDBOX_WEBHOOK_ID"
+    ]
+  },
+  "updated_at": "2026-11-02T20:07:21.564Z"
+}

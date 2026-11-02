@@ -1,0 +1,33 @@
+
+🔌 Running Independent MCP Agent Interface Verification against: https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp
+   Isolated Test Session ID: mcp-verify-mvzowotc
+
+  ✅ PASS: OpenAPI 3.1.0 specification endpoint returns valid schema with MCP Agent Interface branding
+  ✅ PASS: HTTP HEAD probe and /robots.txt return 200 OK for crawler/connector compatibility
+  ✅ PASS: MCP JSON-RPC 2.0 `initialize` handshake succeeds (protocol 2025-06-18, serverInfo=paypal-ai-billing-kit-mcp)
+  ✅ PASS: MCP JSON-RPC 2.0 `notifications/initialized` (notification without id) returns HTTP 202 Accepted
+  ✅ PASS: MCP standard methods (`ping`, `prompts/list`, `resources/list`) return valid JSON-RPC responses
+  ✅ PASS: MCP `tools/list` exposes all 15 tools with strict MCP schema compliance (count=15)
+  ✅ PASS: Tool 1 (`discover_billing_capabilities`): returns guardrails ($500/$2,500) & permission tiers
+  ✅ PASS: Tool 2 (`list_demo_customers`): lists Alex Rivera & Jordan Taylor under Dr. Sarah Jenkins
+  ✅ PASS: Tool 3 (`search_invoices`): returns canonical statements (count=6)
+  ✅ PASS: Tool 4 (`get_invoice_details`): explains #PPB-INV-2026-1003 line items, service date, and settlement status
+  ✅ PASS: Tool 5a (`create_invoice_proposal`): blocks $750.00 proposal exceeding $500.00 single-action guardrail
+  ✅ PASS: Tool 5b (`create_invoice_proposal`): creates pending $35.00 ADMIN-FORMS proposal requiring human approval
+  ✅ PASS: Security Guardrail: blocks caller-supplied bypass flags (`bypass_guardrail`), unproposed writes, and unapproved writes
+  ✅ PASS: Security Isolation: blocks cross-session header/arg mismatch, cross-session proposal execution, and canonical session mutation
+  ✅ PASS: Tool 6 (`create_approved_invoice`): executes approved proposal -> created #PPB-INV-2026-1049
+  ✅ PASS: Cross-Visitor Isolation: session "mcp-other-mvzowotc" sees only 6 canonical statements (zero leak of #PPB-INV-2026-1049)
+  ✅ PASS: Tool 7 (`explain_outstanding_balances`): computes Alex Rivera outstanding balance ($260.00)
+  ✅ PASS: Tool 8 (`get_transaction_history`): returns settlements & labels SAMPLE-DEMO-SETTLEMENT-1003 as non-live sample
+  ✅ PASS: Tool 9 (`prepare_payment_proposal`): prepares PayPal Sandbox checkout proposal without charging autonomously
+  ✅ PASS: Tool 10a (`void_unpaid_invoice`): enforces Payment-State Protection blocking void on paid #PPB-INV-2026-1003
+  ✅ PASS: Tool 10b (`void_unpaid_invoice`): voids unpaid session invoice #PPB-INV-2026-1049 ($0.00 balance due)
+  ✅ PASS: Tool 11 (`prepare_refund_proposal`): prepares $125.00 refund proposal for paid #PPB-INV-2026-1003
+  ✅ PASS: Tool 12 (`get_financial_audit_history`): returns 15 append-only financial audit events
+  ✅ PASS: Tool 13 (`get_paypal_sandbox_status`): reports PayPal Sandbox status & credential state accurately
+  ✅ PASS: Tool 14 (`get_business_metrics`): returns practice KPIs (Outstanding=$275.00)
+  ✅ PASS: Tool 15 (`reset_demo_session`): resets session "mcp-verify-mvzowotc" back to exactly 6 canonical seed invoices
+
+📊 MCP Agent Interface Verification Summary: 26 passed, 0 failed
+
