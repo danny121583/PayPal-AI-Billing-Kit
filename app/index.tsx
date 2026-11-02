@@ -18,6 +18,8 @@ import {
   Bell,
   ShieldAlert,
   UserCheck,
+  RotateCcw,
+  Cpu,
 } from 'lucide-react-native';
 import { supabase } from '../src/lib/supabase';
 import {
@@ -32,6 +34,7 @@ import BillingCreateInvoiceModal from '../components/billing/BillingCreateInvoic
 import BillingAIAssistantModal from '../components/billing/BillingAIAssistantModal';
 import BillingAISettingsModal from '../components/billing/BillingAISettingsModal';
 import BillingNotificationsModal from '../components/billing/BillingNotificationsModal';
+import BillingMaaSMcpModal from '../components/billing/BillingMaaSMcpModal';
 import type {
   BillingNotificationItem,
   BillingRoleScope,
@@ -45,13 +48,16 @@ import {
   DEFAULT_SERVICE_CATALOG,
   fetchBillingDashboardData,
   getDefaultBillingAISettings,
+  getOrCreateDemoSessionId,
   markBillingNotificationRead,
+  resetBillingDemoSession,
   type BillablePatientOption,
   type BillingAISettingsRecord,
   type BillingAuditEventItem,
   type BillingServiceCatalogItem,
   type PayPalAccountConnectionSummary,
 } from '../src/billing/api/billingService';
+import { clearBillingAIClientCacheForTests } from '../src/billing/api/billingAIClient';
 
 export default function BillingScreen() {
   const insets = useSafeAreaInsets();
@@ -99,6 +105,10 @@ export default function BillingScreen() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showMaasModal, setShowMaasModal] = useState(false);
+  const [demoSessionId, setDemoSessionId] = useState('canonical');
+  const [isResettingDemo, setIsResettingDemo] = useState(false);
+  const [resetBannerText, setResetBannerText] = useState<string | null>(null);
 
   const [liveInvoices, setLiveInvoices] = useState<
     SyntheticBillingInvoice[] | null
@@ -136,6 +146,8 @@ export default function BillingScreen() {
 
   const refreshBillingData = useCallback(async () => {
     try {
+      const sid = await getOrCreateDemoSessionId();
+      setDemoSessionId(sid);
       const dash = await fetchBillingDashboardData(roleScope);
       setLiveInvoices(dash.invoices);
       setCatalog(dash.catalog);
@@ -151,6 +163,28 @@ export default function BillingScreen() {
     }
   }, [roleScope]);
 
+  const handleResetDemoSession = useCallback(async () => {
+    if (isResettingDemo) return;
+    setIsResettingDemo(true);
+    setResetBannerText(null);
+    try {
+      await resetBillingDemoSession();
+      clearBillingAIClientCacheForTests();
+      setSelectedInvoice(null);
+      setFocusedAiInvoice(null);
+      await refreshBillingData();
+      setResetBannerText(
+        'Demo session reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).'
+      );
+    } catch (err: any) {
+      setResetBannerText(
+        err?.message || 'Could not reset demo session.'
+      );
+    } finally {
+      setIsResettingDemo(false);
+    }
+  }, [isResettingDemo, refreshBillingData]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -161,10 +195,12 @@ export default function BillingScreen() {
   }, [refreshBillingData]);
 
   useEffect(() => {
-    if (isSwitchingAccount) return;
     setLiveInvoices(null);
     setSelectedInvoice(null);
     setFocusedAiInvoice(null);
+    setResetBannerText(null);
+    setSearchQuery('');
+    if (isSwitchingAccount) return;
     void refreshBillingData();
   }, [activePreset.id, isSwitchingAccount, refreshBillingData]);
 
@@ -219,18 +255,18 @@ export default function BillingScreen() {
   }, [activePreset.id, refreshBillingData, roleScope]);
 
   const roleInvoices = useMemo(() => {
-    if (liveInvoices && liveInvoices.length > 0) {
-      return liveInvoices;
-    }
-    const base = getSyntheticInvoicesForRole(roleScope);
+    const source =
+      liveInvoices && liveInvoices.length > 0
+        ? liveInvoices
+        : getSyntheticInvoicesForRole(roleScope);
     if (roleScope === 'patient') {
-      return base.filter(
+      return source.filter(
         (inv) =>
           inv.patientDisplayName.toLowerCase() ===
           activePreset.fullName.toLowerCase()
       );
     }
-    return base;
+    return source;
   }, [activePreset.fullName, liveInvoices, roleScope]);
 
   const deepLinkResolution = useMemo(
@@ -262,12 +298,14 @@ export default function BillingScreen() {
       setShowAiModal(false);
       setShowCreateInvoiceModal(false);
       setShowNotificationsModal(false);
+      setShowMaasModal(false);
       return;
     }
     setShowSettingsModal(rawModal === 'settings');
     setShowAiModal(rawModal === 'ai');
     setShowCreateInvoiceModal(rawModal === 'create');
     setShowNotificationsModal(rawModal === 'notifications');
+    setShowMaasModal(rawModal === 'maas' || rawModal === 'mcp');
   }, [rawModal]);
 
   const unreadNotificationsCount = useMemo(
@@ -351,6 +389,31 @@ export default function BillingScreen() {
                 </Pressable>
               );
             })}
+            <Pressable
+              style={styles.demoActionChip}
+              onPress={() => setShowMaasModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Open MaaS and MCP API Interface"
+              testID="demo-open-maas-mcp-btn"
+            >
+              <Cpu size={12} color="#FEF3C7" />
+              <Text style={styles.demoActionChipText} numberOfLines={1}>
+                MaaS / MCP API
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.demoActionChip}
+              onPress={() => void handleResetDemoSession()}
+              disabled={isResettingDemo}
+              accessibilityRole="button"
+              accessibilityLabel="Reset Demo Session"
+              testID="demo-reset-session-btn"
+            >
+              <RotateCcw size={12} color="#FEF3C7" />
+              <Text style={styles.demoActionChipText} numberOfLines={1}>
+                {isResettingDemo ? 'Resetting...' : 'Reset Demo'}
+              </Text>
+            </Pressable>
           </View>
         </View>
 
@@ -369,7 +432,12 @@ export default function BillingScreen() {
           <View style={styles.headerIcons}>
             <Pressable
               style={styles.iconButton}
-              onPress={() => setSearchVisible((prev) => !prev)}
+              onPress={() =>
+                setSearchVisible((prev) => {
+                  if (prev) setSearchQuery('');
+                  return !prev;
+                })
+              }
               accessibilityRole="button"
               accessibilityLabel="Search invoices"
               testID="billing-header-search-btn"
@@ -436,6 +504,14 @@ export default function BillingScreen() {
         }
       >
         {/* Deep-Link Error / Unauthorized Banner */}
+        {resetBannerText ? (
+          <View
+            style={styles.deepLinkResolvedBanner}
+            testID="billing-demo-reset-banner"
+          >
+            <Text style={styles.deepLinkResolvedText}>{resetBannerText}</Text>
+          </View>
+        ) : null}
         {(deepLinkResolution.status === 'not_found' &&
           (hasLoadedLiveOnce ||
             !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(rawInvoiceId || ''))) ||
@@ -566,6 +642,14 @@ export default function BillingScreen() {
           onSelectNotification={(n) => void handleSelectNotification(n)}
         />
       ) : null}
+
+      {showMaasModal ? (
+        <BillingMaaSMcpModal
+          visible={showMaasModal}
+          demoSessionId={demoSessionId}
+          onClose={() => setShowMaasModal(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -625,6 +709,22 @@ const styles = StyleSheet.create({
   demoAccountChipTextActive: {
     color: '#B45309',
     fontWeight: '800',
+  },
+  demoActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 243, 199, 0.45)',
+  },
+  demoActionChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FEF3C7',
   },
   headerRow: {
     flexDirection: 'row',

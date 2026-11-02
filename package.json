@@ -12,6 +12,8 @@
     "test": "jest --runInBand",
     "verify:security": "node scripts/verify-security-and-rls.mjs",
     "verify:workflow": "node scripts/verify-e2e-billing-workflow.mjs",
+    "verify:maas": "node scripts/verify-maas-mcp.mjs",
+    "build:web": "EXPO_NO_TELEMETRY=1 npx expo export --platform web",
     "scan:secrets": "node scripts/scan-secrets.mjs"
   },
   "dependencies": {

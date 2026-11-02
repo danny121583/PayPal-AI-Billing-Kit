@@ -130,6 +130,8 @@ export default function BillingAIAssistantModal({
           sessionId,
           roleScope,
           focusedInvoiceId: activeInvoice?.id ?? focusedInvoice?.id ?? null,
+          focusedInvoiceNumber:
+            activeInvoice?.invoiceNumber ?? focusedInvoice?.invoiceNumber ?? null,
           recentMessages: messages,
         });
         setSessionId(res.sessionId);

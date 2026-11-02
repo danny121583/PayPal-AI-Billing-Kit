@@ -2,8 +2,11 @@
 
 **Workspace:** `/Users/danny/Desktop/PayPal-AI-Billing-Kit`  
 **Target Competition:** PayPal AI Hackathon 2026 & Reusable Developer Product  
+**Public Live Demo (Vercel Hobby):** [`https://paypal-ai-billing-kit.vercel.app`](https://paypal-ai-billing-kit.vercel.app)  
+**Public MaaS / MCP Endpoint (JSON-RPC 2.0 & REST):** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
+**Public OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-kit.vercel.app/api/openapi.json`  
 **Dedicated Supabase Project:** `paypal-ai-billing-kit` (`dvzfesfvefggnunkjhom` • `https://dvzfesfvefggnunkjhom.supabase.co`)  
-**Platforms:** Desktop Web (`npx expo start --web`) & Mobile (`Expo Go` on iOS / Android)
+**Platforms:** Public Web (`https://paypal-ai-billing-kit.vercel.app`), Local Web (`npx expo start --web`), & Mobile (`Expo Go` on iOS / Android)
 
 ---
 
@@ -41,7 +44,10 @@ npm test -- --watchAll=false
 npm run verify:security
 
 # Live 9-step Provider <-> Customer E2E workflow verification
-npm run verify:e2e
+npm run verify:workflow
+
+# Live 20-check MaaS / MCP JSON-RPC 2.0 & REST verification
+npm run verify:maas
 
 # Source secret & project-isolation scan
 npm run scan:secrets

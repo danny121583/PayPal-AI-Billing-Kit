@@ -12,8 +12,54 @@ import {
   createBillingInvoice,
   DEFAULT_SERVICE_CATALOG,
   fetchBillingDashboardData,
+  getOrCreateDemoSessionId,
+  sendBillingPaymentReminder,
+  simulateBillingDemoRefund,
   voidBillingInvoice,
 } from './billingService';
+
+function buildDetailedClientInvoiceExplanation(inv: SyntheticBillingInvoice): string {
+  const itemLines =
+    inv.lineItems.length > 0
+      ? inv.lineItems.map(
+          (li) =>
+            `• ${li.serviceCode}: ${li.description} (Qty ${li.quantity} × ${formatUsdCents(
+              li.unitAmountCents
+            )} = ${formatUsdCents(li.lineTotalCents)})`
+        )
+      : [`• ${inv.administrativeSummary} (${formatUsdCents(inv.totalCents)})`];
+
+  const effectiveBalance =
+    inv.status === 'void' || inv.status === 'refunded' || inv.status === 'paid'
+      ? 0
+      : inv.balanceDueCents;
+
+  return [
+    `Statement #${inv.invoiceNumber} (${inv.status.toUpperCase()})`,
+    `• Provider: ${inv.issuerDoctorName} (${inv.organizationName})`,
+    `• Customer: ${inv.patientDisplayName}`,
+    `• What this invoice is for (Services Provided):`,
+    ...itemLines,
+    `• When services were provided / statement issued: ${formatBillingDate(inv.issuedAt)}`,
+    `• Payment Due Date: ${formatBillingDate(inv.dueDate)}`,
+    inv.paidAt ? `• Paid Date: ${formatBillingDate(inv.paidAt)}` : null,
+    inv.refundedAt ? `• Refunded Date: ${formatBillingDate(inv.refundedAt)}` : null,
+    `• Financial Summary: Original Total ${formatUsdCents(
+      inv.totalCents
+    )} USD • Paid ${formatUsdCents(inv.amountPaidCents)} USD • Refunded ${formatUsdCents(
+      inv.amountRefundedCents
+    )} USD • Remaining Balance Due ${formatUsdCents(effectiveBalance)} USD`,
+    inv.receiptNumber
+      ? `• Settlement Reference: ${inv.receiptNumber} (${
+          inv.settlementVerificationStatus === 'paypal_verified'
+            ? 'Verified PayPal Sandbox Capture'
+            : 'Sample Demo Settlement — Not a Live PayPal Capture'
+        })`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 const sb = supabase as any;
 
@@ -618,6 +664,65 @@ async function buildDeterministicRlsBackedReply(params: {
       };
     }
 
+    const docExplicitMatch = prompt.match(/#?((?:PPB|HER)-INV-\d{4}-\d{4}|\b\d{4}\b)/i);
+    const docFocusedInvoice =
+      (docExplicitMatch
+        ? invoices.find(
+            (i) =>
+              i.invoiceNumber.toLowerCase().includes(docExplicitMatch[1].toLowerCase()) ||
+              i.invoiceNumber.endsWith(docExplicitMatch[1])
+          )
+        : null) ||
+      (params.focusedInvoiceId ? invoices.find((i) => i.id === params.focusedInvoiceId) : null);
+
+    if (lower.includes('refund') && docFocusedInvoice) {
+      if (docFocusedInvoice.status !== 'paid' && docFocusedInvoice.amountPaidCents <= 0) {
+        return {
+          content: `Statement #${docFocusedInvoice.invoiceNumber} has status ${docFocusedInvoice.status.toUpperCase()} ($0.00 captured). Refunds can only be prepared for paid statements.`,
+          proposal: null,
+          focusedInvoice: docFocusedInvoice,
+        };
+      }
+      const refundMinor = docFocusedInvoice.amountPaidCents || docFocusedInvoice.totalCents;
+      return {
+        content: `I have prepared a refund proposal of ${formatUsdCents(
+          refundMinor
+        )} USD for paid Statement #${docFocusedInvoice.invoiceNumber} (${docFocusedInvoice.patientDisplayName}). Tap Approve below to process the refund.`,
+        proposal: {
+          id: `local-prop-refund-${docFocusedInvoice.id}-${Date.now()}`,
+          kind: 'refund',
+          title: `Refund ${formatUsdCents(refundMinor)} for #${docFocusedInvoice.invoiceNumber}`,
+          summary: `Issue ${formatUsdCents(refundMinor)} USD refund to ${docFocusedInvoice.patientDisplayName} for Statement #${docFocusedInvoice.invoiceNumber}.`,
+          amountMinor: refundMinor,
+          currency: 'USD',
+          status: 'pending',
+          payload: {
+            action: 'refund',
+            invoice_id: docFocusedInvoice.id,
+            invoice_number: docFocusedInvoice.invoiceNumber,
+            amount_minor: refundMinor,
+            patient_name: docFocusedInvoice.patientDisplayName,
+          },
+        },
+        focusedInvoice: docFocusedInvoice,
+      };
+    }
+
+    if (
+      docFocusedInvoice &&
+      (Boolean(docExplicitMatch) ||
+        Boolean(params.focusedInvoiceId) ||
+        /\b(what\s+is\s+this|what\s+for|when\s+were|service|provided|detail|explain|about\s+this|line\s+item|issued|paid|status)\b/i.test(
+          prompt
+        ))
+    ) {
+      return {
+        content: buildDetailedClientInvoiceExplanation(docFocusedInvoice),
+        proposal: null,
+        focusedInvoice: docFocusedInvoice,
+      };
+    }
+
     return {
       content: [
         `Practice Billing Summary (Billing-only scope):`,
@@ -779,6 +884,24 @@ async function buildDeterministicRlsBackedReply(params: {
   }
 
   if (
+    targetInvoice &&
+    !lower.includes('pay') &&
+    !lower.includes('checkout') &&
+    !lower.includes('settle') &&
+    (Boolean(invNumMatch) ||
+      Boolean(params.focusedInvoiceId) ||
+      /\b(what\s+is\s+this|what\s+for|when\s+were|service|provided|detail|explain|about\s+this|line\s+item|issued)\b/i.test(
+        prompt
+      ))
+  ) {
+    return {
+      content: buildDetailedClientInvoiceExplanation(targetInvoice),
+      proposal: null,
+      focusedInvoice: targetInvoice,
+    };
+  }
+
+  if (
     lower.includes('pay') ||
     lower.includes('checkout') ||
     lower.includes('settle') ||
@@ -891,6 +1014,7 @@ export async function sendBillingAIMessage(params: {
   sessionId?: string | null;
   roleScope: BillingRoleScope;
   focusedInvoiceId?: string | null;
+  focusedInvoiceNumber?: string | null;
   recentMessages?: BillingAIChatMessage[];
 }): Promise<{
   sessionId: string;
@@ -918,12 +1042,15 @@ export async function sendBillingAIMessage(params: {
 
   try {
     if (sb?.functions?.invoke && process.env.NODE_ENV !== 'test') {
+      const demoSessionId = await getOrCreateDemoSessionId();
       const { data, error } = await sb.functions.invoke('billing-ai-assistant', {
         body: {
           message: cleanMessage,
           sessionId: effectiveSessionId,
           roleScope: params.roleScope,
           focusedInvoiceId: params.focusedInvoiceId ?? null,
+          focusedInvoiceNumber: params.focusedInvoiceNumber ?? null,
+          demoSessionId,
         },
       });
 
@@ -1051,6 +1178,27 @@ export async function decideBillingAIProposal(
         summary,
       };
     }
+    if (proposalPayload?.action === 'refund' && proposalPayload?.invoice_id) {
+      const refRes = await simulateBillingDemoRefund(
+        String(proposalPayload.invoice_id),
+        proposalPayload.amount_minor ? Number(proposalPayload.amount_minor) : undefined
+      );
+      const summary = `Refund ${refRes.refundId} processed for #${proposalPayload.invoice_number || ''}`;
+      await updateCachedProposalStatus('executed', summary);
+      return {
+        status: 'executed',
+        summary,
+      };
+    }
+    if (proposalPayload?.action === 'send_reminder' && proposalPayload?.invoice_id) {
+      await sendBillingPaymentReminder(String(proposalPayload.invoice_id));
+      const summary = `Payment reminder sent for #${proposalPayload.invoice_number || ''}`;
+      await updateCachedProposalStatus('executed', summary);
+      return {
+        status: 'executed',
+        summary,
+      };
+    }
     if (proposalPayload?.recipient_user_id) {
       const created = await createBillingInvoice({
         recipientUserId: String(proposalPayload.recipient_user_id),
@@ -1112,6 +1260,27 @@ export async function decideBillingAIProposal(
   if (decided.kind === 'void_invoice' && payload.invoice_id) {
     await voidBillingInvoice(String(payload.invoice_id));
     const summary = `Invoice #${payload.invoice_number || ''} voided successfully`;
+    await updateCachedProposalStatus('executed', summary);
+    return {
+      status: 'executed',
+      summary,
+    };
+  }
+  if (decided.kind === 'refund' && payload.invoice_id) {
+    const refRes = await simulateBillingDemoRefund(
+      String(payload.invoice_id),
+      payload.amount_minor ? Number(payload.amount_minor) : undefined
+    );
+    const summary = `Refund ${refRes.refundId} processed for #${payload.invoice_number || ''}`;
+    await updateCachedProposalStatus('executed', summary);
+    return {
+      status: 'executed',
+      summary,
+    };
+  }
+  if (decided.kind === 'send_reminder' && payload.invoice_id) {
+    await sendBillingPaymentReminder(String(payload.invoice_id));
+    const summary = `Payment reminder sent for #${payload.invoice_number || ''}`;
     await updateCachedProposalStatus('executed', summary);
     return {
       status: 'executed',

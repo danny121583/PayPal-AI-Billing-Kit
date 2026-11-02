@@ -1,3 +1,9 @@
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
+}));
+
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import {
@@ -21,6 +27,10 @@ import {
   type BillingAuditEventItem,
 } from '../src/billing/api/billingService';
 import { getSyntheticInvoicesForRole } from '../src/billing/data/syntheticBillingFixtures';
+import {
+  clearBillingAIClientCacheForTests,
+  sendBillingAIMessage,
+} from '../src/billing/api/billingAIClient';
 
 jest.mock('expo-linear-gradient', () => ({
   LinearGradient: ({ children }: any) => children,
@@ -360,5 +370,26 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     );
     expect(getPatientTestId('patient-open-billing-ai-btn')).toBeTruthy();
     expect(getPatientTestId('patient-failed-attempt-banner')).toBeTruthy();
+  });
+
+  it('Billing AI Focused Invoice Explanation: answers "what is this invoice for? when were services provided?" for #PPB-INV-2026-1003 with line items and service dates', async () => {
+    clearBillingAIClientCacheForTests();
+    const invoices = getSyntheticInvoicesForRole('doctor');
+    const inv1003 = invoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1003')!;
+
+    const res = await sendBillingAIMessage({
+      message: 'what is this invoice for? when were services provided?',
+      roleScope: 'doctor',
+      focusedInvoiceId: inv1003.id,
+      focusedInvoiceNumber: inv1003.invoiceNumber,
+    });
+
+    expect(res.reply.content).toContain('Statement #PPB-INV-2026-1003 (PAID)');
+    expect(res.reply.content).toContain('ADMIN-FOLLOWUP');
+    expect(res.reply.content).toContain(
+      'When services were provided / statement issued: Sep 12, 2026'
+    );
+    expect(res.reply.content).toContain('Original Total $125.00 USD');
+    expect(res.reply.content).toContain('Remaining Balance Due $0.00 USD');
   });
 });

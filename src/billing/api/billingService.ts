@@ -11,6 +11,75 @@ import { getSyntheticInvoicesForRole } from '../data/syntheticBillingFixtures';
 
 const sb = supabase as any;
 
+const DEMO_SESSION_STORAGE_KEY = '@ppb_demo_session_id_v1';
+let activeDemoSessionCache: string | null = null;
+
+function readWebStorage(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function writeWebStorage(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export async function getOrCreateDemoSessionId(): Promise<string> {
+  if (process.env.NODE_ENV === 'test') {
+    return 'canonical';
+  }
+  if (activeDemoSessionCache) {
+    return activeDemoSessionCache;
+  }
+  try {
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('demo_session_id') || params.get('session');
+      if (fromUrl && /^[a-zA-Z0-9_-]{3,64}$/.test(fromUrl)) {
+        activeDemoSessionCache = fromUrl;
+        writeWebStorage(DEMO_SESSION_STORAGE_KEY, fromUrl);
+        return fromUrl;
+      }
+    }
+    const stored = readWebStorage(DEMO_SESSION_STORAGE_KEY);
+    if (stored && /^[a-zA-Z0-9_-]{3,64}$/.test(stored)) {
+      activeDemoSessionCache = stored;
+      return stored;
+    }
+    const generated = `demo-sess-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    activeDemoSessionCache = generated;
+    writeWebStorage(DEMO_SESSION_STORAGE_KEY, generated);
+    return generated;
+  } catch {
+    if (!activeDemoSessionCache) {
+      activeDemoSessionCache = `demo-sess-${Date.now().toString(36)}`;
+    }
+    return activeDemoSessionCache;
+  }
+}
+
+export async function rotateDemoSessionId(): Promise<string> {
+  const generated = `demo-sess-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  activeDemoSessionCache = generated;
+  writeWebStorage(DEMO_SESSION_STORAGE_KEY, generated);
+  return generated;
+}
+
 export interface BillablePatientOption {
   patientId: string;
   fullName: string;
@@ -278,6 +347,10 @@ export async function fetchBillingDashboardData(
       // Best effort
     }
 
+    const demoSessionId = await getOrCreateDemoSessionId();
+    const sessionScope =
+      demoSessionId === 'canonical' ? ['canonical'] : ['canonical', demoSessionId];
+
     const [
       invRes,
       itemsRes,
@@ -290,10 +363,12 @@ export async function fetchBillingDashboardData(
       auditRes,
       patientsRes,
       notifRes,
+      overridesRes,
     ] = await Promise.all([
       sb
         .from('billing_invoices')
         .select('*')
+        .in('demo_session_id', sessionScope)
         .order('created_at', { ascending: false })
         .limit(100),
       sb.from('billing_invoice_items').select('*').order('position', { ascending: true }),
@@ -311,6 +386,7 @@ export async function fetchBillingDashboardData(
       sb
         .from('billing_audit_events')
         .select('id, event_type, actor_kind, created_at, details')
+        .in('demo_session_id', sessionScope)
         .order('created_at', { ascending: false })
         .limit(100),
       roleScope === 'doctor'
@@ -320,11 +396,41 @@ export async function fetchBillingDashboardData(
         .from('billing_notifications')
         .select('*')
         .eq('user_id', userId)
+        .in('demo_session_id', sessionScope)
         .order('created_at', { ascending: false })
         .limit(25),
+      demoSessionId !== 'canonical'
+        ? sb
+            .from('billing_demo_session_overrides')
+            .select('*')
+            .eq('demo_session_id', demoSessionId)
+        : Promise.resolve({ data: [] }),
     ]);
 
-    const dbInvoices: any[] = Array.isArray(invRes?.data) ? invRes.data : [];
+    const rawDbInvoices: any[] = Array.isArray(invRes?.data) ? invRes.data : [];
+    const dbOverrides: any[] = Array.isArray(overridesRes?.data) ? overridesRes.data : [];
+    const overrideMap = new Map<string, any>();
+    for (const ov of dbOverrides) {
+      if (ov?.invoice_id) {
+        overrideMap.set(String(ov.invoice_id), ov);
+      }
+    }
+
+    const dbInvoices: any[] = rawDbInvoices.map((raw) => {
+      const ov = overrideMap.get(String(raw.id));
+      if (!ov) return raw;
+      return {
+        ...raw,
+        status: ov.status ?? raw.status,
+        amount_paid_minor: ov.amount_paid_minor ?? raw.amount_paid_minor,
+        amount_refunded_minor: ov.amount_refunded_minor ?? raw.amount_refunded_minor,
+        balance_due_minor: ov.balance_due_minor ?? raw.balance_due_minor,
+        paid_at: ov.paid_at ?? raw.paid_at,
+        voided_at: ov.voided_at ?? raw.voided_at,
+        refunded_at: ov.refunded_at ?? raw.refunded_at,
+        _session_override: ov,
+      };
+    });
     const dbItems: any[] = Array.isArray(itemsRes?.data) ? itemsRes.data : [];
     const dbAttempts: any[] = Array.isArray(attemptsRes?.data) ? attemptsRes.data : [];
     const dbTx: any[] = Array.isArray(txRes?.data) ? txRes.data : [];
@@ -601,6 +707,7 @@ export async function createBillingInvoice(params: {
     unit_amount_minor: item.unitAmountMinor,
   }));
 
+  const demoSessionId = await getOrCreateDemoSessionId();
   const { data, error } = await sb.rpc('billing_create_invoice', {
     p_recipient: params.recipientUserId,
     p_items: rpcItems,
@@ -608,6 +715,7 @@ export async function createBillingInvoice(params: {
     p_send: params.sendImmediately,
     p_idempotency_key: params.idempotencyKey ?? `inv-${Date.now()}`,
     p_ai_proposal_id: params.aiProposalId ?? null,
+    p_demo_session_id: demoSessionId,
   });
 
   if (error || !data) {
@@ -631,11 +739,74 @@ export async function sendDraftBillingInvoice(invoiceId: string): Promise<void> 
 }
 
 export async function voidBillingInvoice(invoiceId: string): Promise<void> {
+  const demoSessionId = await getOrCreateDemoSessionId();
   const { error } = await sb.rpc('billing_void_invoice', {
     p_invoice: invoiceId,
+    p_demo_session_id: demoSessionId,
   });
   if (error) {
     throw new Error(error.message || 'Could not void invoice.');
+  }
+}
+
+export async function sendBillingPaymentReminder(invoiceId: string): Promise<void> {
+  const demoSessionId = await getOrCreateDemoSessionId();
+  const { error } = await sb.rpc('billing_send_reminder', {
+    p_invoice: invoiceId,
+    p_demo_session_id: demoSessionId,
+  });
+  if (error) {
+    throw new Error(error.message || 'Could not send payment reminder.');
+  }
+}
+
+export async function simulateBillingDemoSettlement(invoiceId: string): Promise<{
+  captureId: string;
+  invoiceNumber: string;
+}> {
+  const demoSessionId = await getOrCreateDemoSessionId();
+  const { data, error } = await sb.rpc('billing_simulate_demo_settlement', {
+    p_invoice: invoiceId,
+    p_demo_session_id: demoSessionId,
+  });
+  if (error || !data) {
+    throw new Error(error?.message || 'Could not simulate demo settlement.');
+  }
+  return {
+    captureId: String(data.capture_id || 'SAMPLE-DEMO-SETTLEMENT'),
+    invoiceNumber: String(data.invoice_number || ''),
+  };
+}
+
+export async function simulateBillingDemoRefund(
+  invoiceId: string,
+  amountMinor?: number
+): Promise<{
+  refundId: string;
+  invoiceNumber: string;
+}> {
+  const demoSessionId = await getOrCreateDemoSessionId();
+  const { data, error } = await sb.rpc('billing_simulate_demo_refund', {
+    p_invoice: invoiceId,
+    p_amount_minor: amountMinor ?? null,
+    p_demo_session_id: demoSessionId,
+  });
+  if (error || !data) {
+    throw new Error(error?.message || 'Could not process demo refund.');
+  }
+  return {
+    refundId: String(data.refund_id || 'DEMO-REFUND'),
+    invoiceNumber: String(data.invoice_number || ''),
+  };
+}
+
+export async function resetBillingDemoSession(): Promise<void> {
+  const demoSessionId = await getOrCreateDemoSessionId();
+  const { error } = await sb.rpc('billing_reset_demo_session', {
+    p_demo_session_id: demoSessionId,
+  });
+  if (error) {
+    throw new Error(error.message || 'Could not reset demo session.');
   }
 }
 

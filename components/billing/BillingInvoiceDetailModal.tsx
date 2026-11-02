@@ -28,7 +28,10 @@ import {
 } from '../../src/billing/data/syntheticBillingFixtures';
 import {
   invokePayPalBillingFunction,
+  sendBillingPaymentReminder,
   sendDraftBillingInvoice,
+  simulateBillingDemoRefund,
+  simulateBillingDemoSettlement,
   voidBillingInvoice,
 } from '../../src/billing/api/billingService';
 
@@ -67,6 +70,12 @@ export default function BillingInvoiceDetailModal({
       invoice.status === 'failed');
 
   const canDoctorSendDraft = isDoctor && invoice.status === 'draft';
+  const canDoctorSendReminder =
+    isDoctor &&
+    (invoice.status === 'pending' ||
+      invoice.status === 'sent' ||
+      invoice.status === 'overdue' ||
+      invoice.status === 'failed');
   const canDoctorVoid =
     isDoctor &&
     (invoice.status === 'draft' ||
@@ -214,32 +223,76 @@ export default function BillingInvoiceDetailModal({
     }
   };
 
-  const handleRefundInvoice = async () => {
+  const handleSendReminder = async () => {
     setBannerMessage(null);
-    setBusyAction('refund_invoice');
+    setBusyAction('send_reminder');
     try {
-      const res = await invokePayPalBillingFunction({
-        action: 'refund-capture',
-        invoice_id: invoice.id,
-        reason: 'Provider-initiated administrative refund',
-      });
-      if (!res.ok) {
-        setBannerMessage({
-          type: 'error',
-          text: res.message || 'PayPal Sandbox refund failed.',
-        });
-        return;
-      }
-      const refundId = res.data?.refund_id || res.data?.refundId || 'REFUNDED';
+      await sendBillingPaymentReminder(invoice.id);
       setBannerMessage({
         type: 'success',
-        text: `PayPal Refund ${refundId} processed ($0.00 remaining balance).`,
+        text: `Payment reminder notification sent to ${invoice.patientDisplayName}.`,
       });
       onInvoiceMutated?.();
     } catch (err: any) {
       setBannerMessage({
         type: 'error',
-        text: err?.message || 'PayPal Sandbox refund failed.',
+        text: err?.message || 'Failed to send payment reminder.',
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleSimulateDemoSettlement = async () => {
+    setBannerMessage(null);
+    setBusyAction('simulate_demo_settlement');
+    try {
+      const sim = await simulateBillingDemoSettlement(invoice.id);
+      setBannerMessage({
+        type: 'success',
+        text: `Demo Settlement Completed (${sim.captureId}) — Marked as Sample Demo Record (Not a Live PayPal Capture).`,
+      });
+      onInvoiceMutated?.();
+    } catch (err: any) {
+      setBannerMessage({
+        type: 'error',
+        text: err?.message || 'Failed to simulate demo settlement.',
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleRefundInvoice = async () => {
+    setBannerMessage(null);
+    setBusyAction('refund_invoice');
+    try {
+      if (isVerifiedPayPalCapture) {
+        const res = await invokePayPalBillingFunction({
+          action: 'refund-capture',
+          invoice_id: invoice.id,
+          reason: 'Provider-initiated administrative refund',
+        });
+        if (res.ok) {
+          const refundId = res.data?.refund_id || res.data?.refundId || 'REFUNDED';
+          setBannerMessage({
+            type: 'success',
+            text: `PayPal Refund ${refundId} processed ($0.00 remaining balance).`,
+          });
+          onInvoiceMutated?.();
+          return;
+        }
+      }
+      const demoRef = await simulateBillingDemoRefund(invoice.id);
+      setBannerMessage({
+        type: 'success',
+        text: `Refund ${demoRef.refundId} processed in Demo Session ($0.00 remaining balance).`,
+      });
+      onInvoiceMutated?.();
+    } catch (err: any) {
+      setBannerMessage({
+        type: 'error',
+        text: err?.message || 'Refund failed.',
       });
     } finally {
       setBusyAction(null);
@@ -397,7 +450,11 @@ export default function BillingInvoiceDetailModal({
       </View>
 
       {/* Provider Quick Actions */}
-      {isDoctor && (canDoctorSendDraft || canDoctorVoid || canDoctorRefund) ? (
+      {isDoctor &&
+      (canDoctorSendDraft ||
+        canDoctorSendReminder ||
+        canDoctorVoid ||
+        canDoctorRefund) ? (
         <View style={styles.providerActionsBox}>
           <Text style={styles.sectionTitle}>Provider Invoice Actions</Text>
           <View style={styles.providerButtonsRow}>
@@ -413,6 +470,22 @@ export default function BillingInvoiceDetailModal({
                   {busyAction === 'send_draft'
                     ? 'Sending...'
                     : 'Send Draft to Customer'}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {canDoctorSendReminder ? (
+              <Pressable
+                style={[billingModalStyles.primaryButton, styles.providerBtnFlex]}
+                onPress={handleSendReminder}
+                disabled={Boolean(busyAction)}
+                accessibilityRole="button"
+                testID="billing-detail-send-reminder-btn"
+              >
+                <Text style={billingModalStyles.primaryButtonText}>
+                  {busyAction === 'send_reminder'
+                    ? 'Sending...'
+                    : 'Send Payment Reminder'}
                 </Text>
               </Pressable>
             ) : null}
@@ -442,11 +515,41 @@ export default function BillingInvoiceDetailModal({
                 <Text style={styles.providerRefundBtnText}>
                   {busyAction === 'refund_invoice'
                     ? 'Refunding...'
-                    : 'Issue PayPal Refund'}
+                    : 'Issue Refund'}
                 </Text>
               </Pressable>
             ) : null}
           </View>
+        </View>
+      ) : null}
+
+      {/* Customer Demo Settlement Option */}
+      {canCustomerPay ? (
+        <View style={styles.providerActionsBox}>
+          <Text style={styles.sectionTitle}>Sandbox & Demo Settlement Options</Text>
+          <Text
+            style={{
+              fontSize: 12,
+              lineHeight: 17,
+              color: '#475569',
+              marginBottom: 8,
+            }}
+          >
+            Use &ldquo;Pay with PayPal Sandbox&rdquo; below to test the PayPal Sandbox REST API order flow, or simulate an immediate demo settlement in your isolated visitor session (explicitly labeled as a Sample Demo Record).
+          </Text>
+          <Pressable
+            style={[billingModalStyles.secondaryButton, { alignSelf: 'flex-start' }]}
+            onPress={handleSimulateDemoSettlement}
+            disabled={Boolean(busyAction)}
+            accessibilityRole="button"
+            testID="billing-detail-simulate-demo-settlement-btn"
+          >
+            <Text style={billingModalStyles.secondaryButtonText}>
+              {busyAction === 'simulate_demo_settlement'
+                ? 'Simulating Settlement...'
+                : 'Simulate Demo Settlement (Sample Record)'}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
