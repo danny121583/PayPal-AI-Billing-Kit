@@ -2,7 +2,7 @@
 
 ## 1. Source Code Security & Isolation Audit (Section 9)
 
-Before recommending any code extraction from `/Users/danny/Desktop/health-erecords-app`, we audited the billing modules (`app/billing.tsx`, `components/billing/*`, `src/billing/*`, `packages/paypal-agent-kit/*`, `supabase/functions/paypal-*`, `supabase/functions/billing-ai-assistant`) for sensitive or proprietary references:
+Before recommending any code extraction from `health-erecords-app`, we audited the billing modules (`app/billing.tsx`, `components/billing/*`, `src/billing/*`, `packages/paypal-agent-kit/*`, `supabase/functions/paypal-*`, `supabase/functions/billing-ai-assistant`) for sensitive or proprietary references:
 
 | Audit Category | Findings in `health-erecords-app` Billing Modules | Mitigation for `PayPal-AI-Billing-Kit` |
 | :--- | :--- | :--- |
@@ -65,7 +65,7 @@ Core Principle: **`AI Proposes → Human Approves → PayPal Confirms`**
 
 ## 5. Recommended Implementation Sequence (After Your Approval)
 
-Once you approve this architecture plan, we will execute implementation inside `/Users/danny/Desktop/PayPal-AI-Billing-Kit` in one continuous, phase-free build:
+Once you approve this architecture plan, we will execute implementation inside `PayPal-AI-Billing-Kit` in one continuous, phase-free build:
 1. **Package Extraction (`packages/paypal-billing-kit`):** Extract and generalize the PayPal Orders v2, Webhooks v1, Guardrails, and Outbound Sanitizer SDK with unit tests.
 2. **Standalone Database & Edge Functions (`supabase/`):** Author `0001_paypal_ai_billing_kit.sql` (with `billing_accounts`, `billing_customer_links`, unified `billing_service_catalog` with `title`, and voided-invoice `balance_due_minor = 0` fix) + standalone `paypal-billing`, `paypal-webhook`, and `billing-ai-assistant` functions.
 3. **Standalone Orange Billing Dashboard (`app/` & `components/billing/`):** Build the Expo Universal (Web + Mobile) app opening directly into the Orange Billing Dashboard with the **Provider / Customer Demo Switcher**, header Search/Settings/`+` navigation (no Home button, no duplicate `Add Invoice` bar), and all Section 7 UI fixes (Settings audit trail deduplication + readable event names, Create Invoice `$35` service sync + Date Picker + `KeyboardAvoidingView`, and Invoice Card voided `$0.00` balance + typography upgrades).
@@ -77,5 +77,5 @@ Once you approve this architecture plan, we will execute implementation inside `
 
 Please review and confirm the following decisions so we can proceed to implementation:
 1. **New Supabase Project Creation:** Do you approve creating a **new, dedicated Supabase project** (`paypal-ai-billing-kit`) under your Supabase organization (or providing a new project ref) so the standalone kit has 100% physical database and auth isolation from Health eRecords?
-2. **Frontend Stack Confirmation:** Do you approve the **Expo Universal (React Native Web + Expo Go Mobile)** architecture so `/Users/danny/Desktop/PayPal-AI-Billing-Kit` preserves 100% pixel-identical parity with the approved Orange Billing Dashboard while running in both desktop web browsers (`http://localhost:4040` / hosted URL for judges) and Expo Go?
+2. **Frontend Stack Confirmation:** Do you approve the **Expo Universal (React Native Web + Expo Go Mobile)** architecture so `PayPal-AI-Billing-Kit` preserves 100% pixel-identical parity with the approved Orange Billing Dashboard while running in both desktop web browsers (`http://localhost:4040` / hosted URL for judges) and Expo Go?
 3. **Demo Persona Naming:** Do you approve replacing `Daniel Lozano (Environment Owner)` in the standalone kit's synthetic demo data with generic personas (`Dr. Sarah Jenkins` as Provider/Merchant, and `Alex Rivera` & `Jordan Taylor` as Customers/Payers)?

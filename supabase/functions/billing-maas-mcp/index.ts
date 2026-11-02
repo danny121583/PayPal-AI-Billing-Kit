@@ -653,6 +653,41 @@ async function executeTool(
 ): Promise<Record<string, any>> {
   const demoSessionId = sanitizeDemoSessionId(args?.demo_session_id || defaultSessionId);
 
+  const FORBIDDEN_BYPASS_KEYS = [
+    'bypass_guardrail',
+    'skip_approval',
+    'force',
+    'auto_approve',
+    'ignore_limits',
+    'override_guardrail',
+  ];
+  for (const key of FORBIDDEN_BYPASS_KEYS) {
+    if (args && key in args && args[key] !== false && args[key] !== null && args[key] !== undefined) {
+      return {
+        ok: false,
+        error_code: 'GUARDRAIL_BYPASS_REJECTED',
+        message: `Security Guardrail Violation: Parameter "${key}" is prohibited. Financial guardrails ($500 single-action / $2,500 daily) and explicit human approval cannot be bypassed.`,
+      };
+    }
+  }
+
+  const MUTATING_TOOLS = new Set([
+    'create_invoice_proposal',
+    'create_approved_invoice',
+    'prepare_payment_proposal',
+    'void_unpaid_invoice',
+    'prepare_refund_proposal',
+    'reset_demo_session',
+  ]);
+  if (MUTATING_TOOLS.has(toolName) && demoSessionId.toLowerCase() === 'canonical') {
+    return {
+      ok: false,
+      error_code: 'CANONICAL_MUTATION_FORBIDDEN',
+      message:
+        'Canonical seed data is read-only. Provide a visitor or evaluator demo_session_id (e.g., "chatgpt-eval-session") to execute mutations.',
+    };
+  }
+
   switch (toolName) {
     case 'discover_billing_capabilities': {
       const { data: catalog } = await admin
@@ -945,67 +980,90 @@ async function executeTool(
     }
 
     case 'create_approved_invoice': {
-      if (args?.explicit_human_approval !== true && !args?.proposal_id) {
+      if (args?.explicit_human_approval !== true) {
         return {
           ok: false,
           error_code: 'HUMAN_APPROVAL_REQUIRED',
           message:
-            'Creating an invoice requires either a valid `proposal_id` or `explicit_human_approval: true`.',
+            'Creating an invoice requires `explicit_human_approval: true` and a valid `proposal_id` from `create_invoice_proposal`.',
         };
       }
 
-      let recipientId = '';
-      let recipientName = '';
-      let serviceCode = 'ADMIN-TELEHEALTH';
-      let amountMinor = 15000;
-      let dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-      let sendImmediately = args?.send_immediately ?? true;
-      let proposalId: string | null = null;
-
-      if (args?.proposal_id) {
-        const { data: prop } = await admin
-          .from('billing_ai_proposals')
-          .select('*')
-          .eq('id', String(args.proposal_id))
-          .maybeSingle();
-
-        if (!prop) {
-          return {
-            ok: false,
-            error_code: 'PROPOSAL_NOT_FOUND',
-            message: `Proposal ${args.proposal_id} was not found.`,
-          };
-        }
-        if (prop.status === 'executed') {
-          return {
-            ok: false,
-            error_code: 'DUPLICATE_APPROVAL_BLOCKED',
-            message: `Proposal ${args.proposal_id} has already been executed.`,
-          };
-        }
-        proposalId = String(prop.id);
-        recipientId = String(prop.payload?.recipient_user_id || ALEX_ID);
-        recipientName = String(prop.payload?.recipient_name || 'Alex Rivera');
-        serviceCode = String(prop.payload?.service_code || 'ADMIN-TELEHEALTH');
-        amountMinor = Number(prop.payload?.unit_amount_minor || prop.amount_minor || 15000);
-        dueDate = String(prop.payload?.due_date || dueDate);
-      } else {
-        const custName = String(args?.customer_name || 'Alex Rivera').trim();
-        const targetCustomer = DEMO_ACCOUNTS.slice(1).find((c) =>
-          c.fullName.toLowerCase().includes(custName.toLowerCase())
-        );
-        if (!targetCustomer) {
-          return {
-            ok: false,
-            error_code: 'RECIPIENT_NOT_AUTHORIZED',
-            message: `Customer "${custName}" is not an authorized demo customer. Choose Alex Rivera or Jordan Taylor.`,
-          };
-        }
-        recipientId = targetCustomer.id;
-        recipientName = targetCustomer.fullName;
-        serviceCode = String(args?.service_code || 'ADMIN-FORMS').toUpperCase();
-        amountMinor = Number(args?.amount_minor || 3500);
+      const rawPropArg = String(args?.proposal_id || '').trim();
+      if (!rawPropArg) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_ID_REQUIRED',
+          message:
+            'Security Policy: `create_approved_invoice` requires a pending `proposal_id` created via `create_invoice_proposal` in the same `demo_session_id`.',
+        };
       }
+
+      // Strip optional Cloudflare Worker HMAC suffix (<uuid>.<sig>)
+      const rawProposalId = rawPropArg.includes('.') ? rawPropArg.split('.')[0] : rawPropArg;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawProposalId)) {
+        return {
+          ok: false,
+          error_code: 'INVALID_PROPOSAL_TOKEN',
+          message: `Proposal ID "${rawPropArg}" is malformed or invalid.`,
+        };
+      }
+
+      const { data: prop } = await admin
+        .from('billing_ai_proposals')
+        .select('*')
+        .eq('id', rawProposalId)
+        .maybeSingle();
+
+      if (!prop) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_NOT_FOUND',
+          message: `Proposal ${rawProposalId} was not found.`,
+        };
+      }
+
+      if (String(prop.demo_session_id || '') !== demoSessionId) {
+        return {
+          ok: false,
+          error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+          message: `Security Isolation: Proposal ${rawProposalId} belongs to a different demo_session_id and cannot be approved from session "${demoSessionId}".`,
+        };
+      }
+
+      if (prop.kind !== 'create_invoice') {
+        return {
+          ok: false,
+          error_code: 'INVALID_PROPOSAL_KIND',
+          message: `Proposal ${rawProposalId} has kind "${prop.kind}" and cannot be executed by create_approved_invoice.`,
+        };
+      }
+
+      if (prop.status === 'executed') {
+        return {
+          ok: false,
+          error_code: 'DUPLICATE_APPROVAL_BLOCKED',
+          message: `Proposal ${rawProposalId} has already been executed. Duplicate invoice creation blocked.`,
+        };
+      }
+
+      if (prop.status !== 'pending') {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_NOT_PENDING',
+          message: `Proposal ${rawProposalId} is in status "${prop.status}" and cannot be executed.`,
+        };
+      }
+
+      const proposalId = String(prop.id);
+      const recipientId = String(prop.payload?.recipient_user_id || ALEX_ID);
+      const recipientName = String(prop.payload?.recipient_name || 'Alex Rivera');
+      const serviceCode = String(prop.payload?.service_code || 'ADMIN-TELEHEALTH');
+      const amountMinor = Number(prop.payload?.unit_amount_minor || prop.amount_minor || 15000);
+      const dueDate = String(
+        prop.payload?.due_date || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+      );
+      const sendImmediately = args?.send_immediately ?? true;
 
       if (amountMinor > 50000) {
         return {
@@ -1026,7 +1084,7 @@ async function executeTool(
         ],
         p_due_date: dueDate,
         p_send: Boolean(sendImmediately),
-        p_idempotency_key: `maas-inv-${demoSessionId}-${proposalId || Date.now()}`,
+        p_idempotency_key: `maas-inv-${demoSessionId}-${proposalId}`,
         p_ai_proposal_id: proposalId,
         p_demo_session_id: demoSessionId,
       });
@@ -1038,6 +1096,14 @@ async function executeTool(
           message: createErr?.message || 'Could not create invoice.',
         };
       }
+
+      await admin
+        .from('billing_ai_proposals')
+        .update({
+          status: 'executed',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('id', proposalId);
 
       return {
         ok: true,
@@ -1474,9 +1540,44 @@ async function executeTool(
     case 'get_paypal_sandbox_status': {
       const { data: conns } = await admin
         .from('billing_account_connections')
-        .select('user_id, connection_type, paypal_env, paypal_payer_id, paypal_email_masked, status, connected_at');
+        .select('user_id, connection_type, environment, paypal_payer_id, paypal_email_masked, status, connected_at');
 
-      const liveCredentialsConfigured = Boolean(PAYPAL_CLIENT_ID && PAYPAL_CLIENT_SECRET);
+      let dbClientId = '';
+      let dbClientSecret = '';
+      try {
+        const { data: secRows } = await admin
+          .from('billing_platform_secrets')
+          .select('secret_key, secret_value')
+          .in('secret_key', [
+            'PAYPAL_SANDBOX_CLIENT_ID',
+            'PAYPAL_CLIENT_ID',
+            'PAYPAL_SANDBOX_CLIENT_SECRET',
+            'PAYPAL_CLIENT_SECRET',
+          ]);
+        if (Array.isArray(secRows)) {
+          for (const r of secRows) {
+            if (
+              (r.secret_key === 'PAYPAL_SANDBOX_CLIENT_ID' || r.secret_key === 'PAYPAL_CLIENT_ID') &&
+              r.secret_value
+            ) {
+              dbClientId = String(r.secret_value).trim();
+            }
+            if (
+              (r.secret_key === 'PAYPAL_SANDBOX_CLIENT_SECRET' ||
+                r.secret_key === 'PAYPAL_CLIENT_SECRET') &&
+              r.secret_value
+            ) {
+              dbClientSecret = String(r.secret_value).trim();
+            }
+          }
+        }
+      } catch {
+        // Ignore if table not present
+      }
+
+      const liveCredentialsConfigured = Boolean(
+        (PAYPAL_CLIENT_ID || dbClientId) && (PAYPAL_CLIENT_SECRET || dbClientSecret)
+      );
 
       return {
         ok: true,

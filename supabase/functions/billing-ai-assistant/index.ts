@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') ?? '';
+    let geminiApiKey = (Deno.env.get('GEMINI_API_KEY') ?? '').trim();
 
     const authHeader = req.headers.get('Authorization') ?? '';
     if (!authHeader.startsWith('Bearer ')) {
@@ -168,6 +168,21 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     });
     const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    if (!geminiApiKey) {
+      try {
+        const { data: secRow } = await serviceClient
+          .from('billing_platform_secrets')
+          .select('secret_value')
+          .eq('secret_key', 'GEMINI_API_KEY')
+          .maybeSingle();
+        if (secRow?.secret_value) {
+          geminiApiKey = String(secRow.secret_value).trim();
+        }
+      } catch {
+        // Ignore if table not present
+      }
+    }
 
     const body = await req.json().catch(() => ({}));
     let userId: string = '';
@@ -218,11 +233,12 @@ Deno.serve(async (req: Request) => {
 
     let sessionId = requestedSessionId;
     if (sessionId) {
-      const { data: existingSession } = await userClient
+      const { data: existingSession } = await serviceClient
         .from('billing_ai_sessions')
         .select('id')
         .eq('id', sessionId)
         .eq('user_id', userId)
+        .eq('demo_session_id', demoSessionId)
         .maybeSingle();
       if (!existingSession?.id) {
         sessionId = null;
@@ -311,10 +327,12 @@ Deno.serve(async (req: Request) => {
       roleScope === 'doctor'
         ? userClient.rpc('billing_list_billable_patients')
         : Promise.resolve({ data: [] }),
-      userClient
+      serviceClient
         .from('billing_ai_proposals')
         .select('*')
         .eq('session_id', sessionId)
+        .eq('user_id', userId)
+        .eq('demo_session_id', demoSessionId)
         .order('created_at', { ascending: false })
         .limit(10),
     ]);
@@ -1079,15 +1097,33 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Provider role: draft/create/issue an invoice (with service-catalog matching)
+    // Provider role: draft/create/issue an invoice or conversational correction of a recent proposal
+    const lastCreateProposal = recentProposals.find((p: any) => p.kind === 'create_invoice');
+    const isCorrectionIntent =
+      Boolean(lastCreateProposal) &&
+      /\b(?:change|update|correct|fix|make|adjust|switch|instead)\b/i.test(message) &&
+      !/\b(?:void|refund|cancel)\b/i.test(message);
+    const isNaturalCreateIntent =
+      /\b(?:draft|create|issue|prepare|bill|send|charge)\b.*\b(?:invoice|statement|alex|jordan|forms?|paperwork|telehealth|copay|records?|office|visit|\$\s*\d+)/i.test(
+        message
+      );
+
     if (
       roleScope === 'doctor' &&
       !proposalRow &&
       !conversationalRefusalOrRecoveryText &&
-      /\b(?:draft|create|issue|prepare|bill|send)\b.*\b(?:invoice|statement)\b/i.test(message)
+      (isNaturalCreateIntent || isCorrectionIntent)
     ) {
+      const explicitCatalogMatch = SERVICE_CATALOG_MATCHERS.find((s) => s.keywords.test(message));
+      const fallbackPreviousCatalog =
+        isCorrectionIntent && lastCreateProposal?.payload?.service_code
+          ? SERVICE_CATALOG_MATCHERS.find(
+              (s) => s.code === String(lastCreateProposal.payload.service_code)
+            )
+          : null;
       const matchedCatalogService =
-        SERVICE_CATALOG_MATCHERS.find((s) => s.keywords.test(message)) ||
+        explicitCatalogMatch ||
+        fallbackPreviousCatalog ||
         SERVICE_CATALOG_MATCHERS[SERVICE_CATALOG_MATCHERS.length - 1];
 
       const explicitDollarMatch = message.match(
@@ -1099,12 +1135,16 @@ Deno.serve(async (req: Request) => {
       const amountMinor =
         explicitDollars !== null && Number.isFinite(explicitDollars)
           ? Math.round(explicitDollars * 100)
-          : matchedCatalogService.defaultMinor;
+          : explicitCatalogMatch
+            ? explicitCatalogMatch.defaultMinor
+            : isCorrectionIntent && lastCreateProposal?.amount_minor
+              ? Number(lastCreateProposal.amount_minor)
+              : matchedCatalogService.defaultMinor;
 
       const { data: guard } = await serviceClient.rpc('billing_ai_guardrail_check', {
         p_user: userId,
         p_amount_minor: amountMinor,
-        p_exclude_proposal: null,
+        p_exclude_proposal: isCorrectionIntent && lastCreateProposal?.id ? lastCreateProposal.id : null,
       });
 
       if (guard && guard.passed === false) {
@@ -1161,6 +1201,9 @@ Deno.serve(async (req: Request) => {
           'records',
           'package',
           'copay',
+          'his',
+          'her',
+          'their',
         ]);
 
         if (nameMatch) {
@@ -1184,6 +1227,13 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        if (!targetPatient && isCorrectionIntent && lastCreateProposal?.payload?.recipient_user_id) {
+          targetPatient =
+            billablePatients.find(
+              (p: any) => p.patient_id === lastCreateProposal.payload.recipient_user_id
+            ) || null;
+        }
+
         if (!targetPatient && !conversationalRefusalOrRecoveryText) {
           if (billablePatients.length === 1) {
             targetPatient = billablePatients[0];
@@ -1196,6 +1246,13 @@ Deno.serve(async (req: Request) => {
         }
 
         if (targetPatient && !conversationalRefusalOrRecoveryText) {
+          if (isCorrectionIntent && lastCreateProposal?.id && lastCreateProposal.status === 'pending') {
+            await serviceClient
+              .from('billing_ai_proposals')
+              .update({ status: 'dismissed', decided_at: new Date().toISOString() })
+              .eq('id', lastCreateProposal.id);
+          }
+
           const dueDate = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
           const payload = {
             title: `Send ${formatUsd(amountMinor)} Administrative Invoice`,
@@ -1271,7 +1328,26 @@ Deno.serve(async (req: Request) => {
       assistantReply = buildDetailedInvoiceExplanation(focusedOrMatchedSummary);
     }
 
+    let usedGemini = false;
+
     if (!assistantReply && geminiApiKey) {
+      const { data: recentChatRows } = await serviceClient
+        .from('billing_ai_messages')
+        .select('role, content')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      const historyParts = Array.isArray(recentChatRows)
+        ? recentChatRows
+            .slice()
+            .reverse()
+            .map((m: any) => ({
+              role: m.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: String(m.content || '').slice(0, 600) }],
+            }))
+        : [{ role: 'user', parts: [{ text: message }] }];
+
       const systemPrompt = [
         'You are the dedicated PayPal AI Billing Kit Assistant.',
         `Active user role: ${roleScope.toUpperCase()}.`,
@@ -1283,10 +1359,12 @@ Deno.serve(async (req: Request) => {
         'STRICT DOMAIN ISOLATION RULES:',
         '1. You only have access to administrative billing records (invoices, line items, service dates, balances, due dates, payment attempts, receipts, and AI financial guardrails).',
         '2. You NEVER have access to clinical notes, diagnoses, labs, vitals, or medical records. Never invent medical advice.',
-        '3. Answer concisely and accurately using ONLY the JSON billing context below.',
-        `4. Configured guardrails: Single-action limit ${formatUsd(
+        '3. Answer concisely and accurately using ONLY the JSON billing context below. Always cite exact invoice numbers (e.g., #PPB-INV-2026-1003) and exact USD amounts.',
+        '4. Distinguish clearly between sample demo settlements ("Sample Demo Settlement — Not a Live PayPal Capture") and verified PayPal Sandbox captures.',
+        `5. Configured guardrails: Single-action limit ${formatUsd(
           settings.max_single_action_minor
-        )}, Daily limit ${formatUsd(settings.daily_limit_minor)}.`,
+        )}, Daily limit ${formatUsd(settings.daily_limit_minor)}. AI proposes actions; humans approve; PayPal confirms settlement.`,
+        `AUTHORIZED CUSTOMERS: ${billablePatients.map((p: any) => p.full_name).join(', ') || 'Alex Rivera, Jordan Taylor'}`,
         `BILLING CONTEXT JSON:\n${JSON.stringify(invoiceSummaries, null, 2)}`,
       ].join('\n');
 
@@ -1297,10 +1375,11 @@ Deno.serve(async (req: Request) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: message }] }],
+            contents: historyParts.length > 0 ? historyParts : [{ role: 'user', parts: [{ text: message }] }],
             generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 500,
+              temperature: 0.1,
+              maxOutputTokens: 350,
+              thinkingConfig: { thinkingBudget: 0 },
             },
           }),
         }
@@ -1308,8 +1387,12 @@ Deno.serve(async (req: Request) => {
 
       if (geminiRes.ok) {
         const geminiJson = await geminiRes.json();
-        assistantReply =
+        const candidateText =
           geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        if (candidateText) {
+          assistantReply = candidateText;
+          usedGemini = true;
+        }
       }
     }
 
@@ -1431,12 +1514,15 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         sessionId,
+        aiEngine: usedGemini ? 'gemini-2.5-flash' : 'deterministic-guardrail-router',
+        geminiConfigured: Boolean(geminiApiKey),
         reply: {
           id: savedAssistantMsg?.id || crypto.randomUUID(),
           role: 'assistant',
           content: assistantReply,
           createdAt: savedAssistantMsg?.created_at || new Date().toISOString(),
           proposal: proposalRow,
+          aiEngine: usedGemini ? 'gemini-2.5-flash' : 'deterministic-guardrail-router',
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

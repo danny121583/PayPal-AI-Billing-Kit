@@ -2,7 +2,7 @@
 
 ## 1. Product Objectives
 
-**PayPal AI Billing Kit** (`/Users/danny/Desktop/PayPal-AI-Billing-Kit`) serves two aligned goals:
+**PayPal AI Billing Kit** (`PayPal-AI-Billing-Kit`) serves two aligned goals:
 1. **Flagship PayPal AI Hackathon 2026 Submission:** Deliver a polished, self-contained application that looks and behaves like the approved Health eRecords 2.0 Orange Billing Dashboard—allowing judges to experience both the **Provider (Merchant)** and **Customer (Payer)** sides of AI-assisted invoicing, conversational mistake recovery, and real PayPal Sandbox checkout.
 2. **Reusable Open-Source Billing Product:** Package the PayPal Orders v2, Captures v2, Refunds v2, Webhooks v1, OAuth 2.0 Account Linking, and AI Guardrail Engine (`AI Proposes -> Human Approves -> PayPal Confirms`) into a clean, domain-agnostic library (`packages/paypal-billing-kit`) and drop-in UI kit that any developer can integrate without healthcare-specific coupling.
 

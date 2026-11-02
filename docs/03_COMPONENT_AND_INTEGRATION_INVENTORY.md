@@ -2,7 +2,7 @@
 
 ## 1. Inventory of Existing Projects (`health-erecords-app` vs `paypal-ai-billing-hackathon`)
 
-### A. `/Users/danny/Desktop/health-erecords-app` (Authoritative Visual & Functional Reference)
+### A. `health-erecords-app` (Authoritative Visual & Functional Reference)
 
 | Source File / Directory | Lines | Disposition | Adaptation / Isolation Notes |
 | :--- | :---: | :---: | :--- |
@@ -23,7 +23,7 @@
 
 ---
 
-### B. `/Users/danny/Desktop/paypal-ai-billing-hackathon` (Lightweight Node Prototype)
+### B. `paypal-ai-billing-hackathon` (Lightweight Node Prototype)
 
 | Source File | Disposition | Notes |
 | :--- | :---: | :--- |

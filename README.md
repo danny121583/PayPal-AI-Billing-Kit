@@ -1,7 +1,7 @@
-# PayPal AI Billing Kit — AI-Powered Invoicing, PayPal Sandbox Payments & MCP Agent Integration (`@paypal-ai/billing-kit`)
+# PayPal AI Billing Kit — AI-Powered Invoicing, PayPal Sandbox Payments & MCP Agent Interface (`@paypal-ai/billing-kit`)
 
-**Workspace:** `/Users/danny/Desktop/PayPal-AI-Billing-Kit`  
-**Target Competition:** PayPal AI Hackathon 2026 & Reusable Developer Product  
+**Repository:** `PayPal-AI-Billing-Kit`  
+**Target Competition:** PayPal AI Hackathon 2026 (Verified Hackathon Demonstration & Open-Source Developer Kit)  
 **Public Live Demo (Vercel Hobby):** [`https://paypal-ai-billing-kit.vercel.app`](https://paypal-ai-billing-kit.vercel.app)  
 **Dedicated Cloudflare Worker MCP Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`  
 **Public Web App MCP Endpoint (JSON-RPC 2.0 & REST):** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
@@ -13,20 +13,30 @@
 
 ## 1. Overview & Architecture
 
-**PayPal AI Billing Kit** is a standalone, zero-PHI, full-stack conversational billing and PayPal Sandbox invoicing platform built with **Expo Universal (React Native Web + iOS/Android)**, **Supabase PostgreSQL + Edge Functions**, and the reusable **`packages/paypal-billing-kit` TypeScript SDK**.
+**PayPal AI Billing Kit** is a standalone, zero-PHI, full-stack conversational billing and PayPal Sandbox invoicing demonstration and developer kit built with **Expo Universal (React Native Web + iOS/Android)**, **Supabase PostgreSQL + Edge Functions**, **Google Gemini 2.5 Flash**, a dedicated **Cloudflare Worker MCP Agent Interface**, and the reusable **`packages/paypal-billing-kit` TypeScript SDK**.
+
+### Origin & Pre-Existing Work Disclosure
+- **Adapted UI Foundation:** Foundational administrative billing UI card layouts and React Native component patterns originated in the owner's *Health eRecords 2.0* project and were extracted, decoupled from clinical/health modules, and refactored into a standalone administrative billing interface.
+- **Newly Built for the PayPal AI Hackathon:** All standalone PayPal AI Billing Kit infrastructure was newly architected and implemented during the hackathon period, including:
+  - The standalone multi-persona Expo Web/iOS application (`app/index.tsx`) with instant, zero-flicker preloaded persona switching (`Dr. Sarah Jenkins`, `Alex Rivera`, `Jordan Taylor`) and one-tap session reset.
+  - The independent 20-table Supabase PostgreSQL database (`dvzfesfvefggnunkjhom`) with `FORCE ROW LEVEL SECURITY` and per-visitor `demo_session_id` copy-on-write isolation (`billing_demo_session_overrides`).
+  - Four dedicated Supabase Edge Functions (`paypal-billing`, `paypal-webhook`, `billing-ai-assistant` powered by live `gemini-2.5-flash`, and `billing-maas-mcp` with database-backed proposal verification).
+  - The dedicated Cloudflare Worker **MCP Agent Interface** (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`) exposing 15 MCP JSON-RPC 2.0 (`2025-06-18` / `2025-03-26`) and REST tools with HMAC-SHA256 proposal binding.
+  - The reusable `@paypal-ai/billing-kit` TypeScript package (`packages/paypal-billing-kit`) enforcing `AI Proposes → Human Approves → PayPal Confirms`.
 
 ### Core Safety & Financial Invariants (`AI Proposes -> Human Approves -> PayPal Confirms`)
 1. **Strict Administrative Scope (`block_clinical_data = true`):** All PayPal Orders v2 payloads, webhook processors, and Billing AI prompts enforce an administrative allowlist (`ADMIN-*` service codes only) and reject any clinical or sensitive fields.
-2. **Mandatory Human-in-the-Loop Approval (`require_human_approval = true`):** Billing AI never creates invoices, voids statements, or initiates PayPal checkouts without explicit human approval (`Approve` button or conversational confirmation).
+2. **Mandatory Human-in-the-Loop Approval (`require_human_approval = true`):** Billing AI never creates invoices, voids statements, or initiates PayPal checkouts without explicit human approval (`Approve` button or validated database `proposal_id`).
 3. **Monetary Velocity Guardrails:** Enforced both in the SDK and server-side via PostgreSQL `CHECK` constraints (`max_single_action_minor <= 50000` [`$500.00`], `daily_limit_minor <= 250000` [`$2,500.00`]).
-4. **Cryptographic Settlement Verification (`paypal_confirmation_required = true`):** Only the server-side `service_role` RPCs (`billing_apply_verified_capture`, `billing_apply_refund_result`) can mark an invoice `paid` or `refunded` after PayPal Orders v2 / Webhook signature verification. Sample demonstration records are explicitly badged as `Sample Demo Record — Not a Live PayPal Capture`.
+4. **Cryptographic Settlement Verification (`paypal_confirmation_required = true`):** Only the server-side `service_role` RPCs (`billing_apply_verified_capture`, `billing_apply_refund_result`) can mark an invoice `paid` or `refunded` after PayPal Orders v2 / Webhook signature verification. Sample demonstration records are explicitly badged as `Sample Demo Settlement — Not a Live PayPal Capture`.
 
 ---
 
 ## 2. Quick Start
 
 ```bash
-cd /Users/danny/Desktop/PayPal-AI-Billing-Kit
+git clone <repository-url>
+cd PayPal-AI-Billing-Kit
 npm install
 
 # Run Desktop Web & Mobile (Expo Go) server on port 8081
@@ -41,14 +51,14 @@ npm run typecheck
 # Jest unit & component test suite
 npm test -- --watchAll=false
 
-# Live 28-check Supabase RLS, zero-anon, & AI guardrail verification
-npm run verify:security
+# Live 26-check MCP Agent Interface (JSON-RPC 2.0 & REST) verification
+node scripts/verify-maas-mcp.mjs
 
-# Live 9-step Provider <-> Customer E2E workflow verification
-npm run verify:workflow
+# Live 16-check Gemini 2.5 Flash AI & Backend Security verification
+node scripts/verify-security-and-ai.mjs
 
-# Live 26-check MCP JSON-RPC 2.0 & REST verification
-npm run verify:mcp
+# Live PayPal Sandbox OAuth, Orders v2 Checkout, Capture & Refund verifier
+node scripts/verify-live-paypal-sandbox.mjs
 
 # Source secret & project-isolation scan
 npm run scan:secrets

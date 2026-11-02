@@ -13,6 +13,25 @@ function resolvePayPalBaseUrl(envName: string): string {
     : 'https://api-m.sandbox.paypal.com';
 }
 
+async function loadPlatformSecrets(serviceClient: any): Promise<Record<string, string>> {
+  const map: Record<string, string> = {};
+  try {
+    const { data } = await serviceClient
+      .from('billing_platform_secrets')
+      .select('secret_key, secret_value');
+    if (Array.isArray(data)) {
+      for (const row of data) {
+        if (row?.secret_key && typeof row?.secret_value === 'string') {
+          map[String(row.secret_key)] = row.secret_value.trim();
+        }
+      }
+    }
+  } catch {
+    // Fall back to Deno.env
+  }
+  return map;
+}
+
 async function fetchPayPalAccessToken(
   baseUrl: string,
   clientId: string,
@@ -42,19 +61,29 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const dbSecrets = await loadPlatformSecrets(serviceClient);
+
     const paypalClientId = (
       Deno.env.get('PAYPAL_SANDBOX_CLIENT_ID') ??
       Deno.env.get('PAYPAL_CLIENT_ID') ??
+      dbSecrets['PAYPAL_SANDBOX_CLIENT_ID'] ??
+      dbSecrets['PAYPAL_CLIENT_ID'] ??
       ''
     ).trim();
     const paypalClientSecret = (
       Deno.env.get('PAYPAL_SANDBOX_CLIENT_SECRET') ??
       Deno.env.get('PAYPAL_CLIENT_SECRET') ??
+      dbSecrets['PAYPAL_SANDBOX_CLIENT_SECRET'] ??
+      dbSecrets['PAYPAL_CLIENT_SECRET'] ??
       ''
     ).trim();
     const paypalWebhookId = (
       Deno.env.get('PAYPAL_SANDBOX_WEBHOOK_ID') ??
       Deno.env.get('PAYPAL_WEBHOOK_ID') ??
+      dbSecrets['PAYPAL_SANDBOX_WEBHOOK_ID'] ??
+      dbSecrets['PAYPAL_WEBHOOK_ID'] ??
       ''
     ).trim();
     const paypalEnv = (Deno.env.get('PAYPAL_ENV') ?? 'sandbox').toLowerCase();
@@ -99,11 +128,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-
     const { data: existingEvent } = await serviceClient
       .from('billing_webhook_events')
-      .select('id, processing_status, signature_verified')
+      .select('id, processing_status, verification_status')
       .eq('paypal_event_id', eventId)
       .maybeSingle();
 
@@ -159,9 +186,14 @@ Deno.serve(async (req: Request) => {
           paypal_event_id: eventId,
           event_type: eventType,
           resource_id: resourceId,
-          signature_verified: false,
-          processing_status: 'rejected_signature',
-          summary: { reason: 'Signature verification failed' },
+          verification_status: 'FAILURE',
+          processing_status: 'rejected',
+          processing_error: 'Signature verification failed',
+          payload: {
+            event_type: eventType,
+            resource_id: resourceId,
+            reason: 'Signature verification failed',
+          },
           processed_at: new Date().toISOString(),
         },
         { onConflict: 'paypal_event_id' }
@@ -182,9 +214,9 @@ Deno.serve(async (req: Request) => {
         paypal_event_id: eventId,
         event_type: eventType,
         resource_id: resourceId,
-        signature_verified: true,
-        processing_status: 'processing',
-        summary: {
+        verification_status: 'SUCCESS',
+        processing_status: 'received',
+        payload: {
           event_type: eventType,
           resource_id: resourceId,
         },
