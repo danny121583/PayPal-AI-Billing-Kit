@@ -485,15 +485,65 @@ Deno.serve(async (req: Request) => {
     let proposalGuardrailBlockedText: string | null = null;
     let conversationalRefusalOrRecoveryText: string | null = null;
     const isAffirmative =
-      /^(?:yes|yep|yeah|confirm|proceed|approve|void\s+it|pay|pay\s+now|ok|okay|sure|do\s+it)\b/i.test(
+      /^(?:yes|yep|yeah|confirm|proceed|approve|void\s+it|pay|pay\s+now|ok|okay|sure|do\s+it|yes,\s*go\s+ahead)/i.test(
         message
       );
     const isNegative =
       /^(?:no|nope|decline|reject|cancel\s+proposal|don'?t|do\s+not)\b/i.test(message);
 
+    // Context-aware Conversational Authorization Guard:
+    // Capability questions ("Are you able to issue refunds?", "Can you pay invoice 1002?")
+    // and hypothetical questions ("What would happen if I refunded it?") must NOT execute or create proposals.
+    const isHypotheticalQuestion =
+      /\bwhat\s+would\s+happen\b/i.test(message) ||
+      /\bif\s+i\s+(?:refunded|voided|paid|created|canceled)\b/i.test(message) ||
+      /\bsuppose\s+(?:i|we)\b/i.test(message) ||
+      /\bhypothetically\b/i.test(message);
+
+    const isCapabilityInquiry =
+      /^\s*(?:are\s+you\s+able\s+to|can\s+you|could\s+you|do\s+you\s+support|is\s+it\s+possible\s+to|how\s+do\s+(?:i|you))\b/i.test(
+        message
+      );
+
+    if (isHypotheticalQuestion) {
+      if (lower.includes('refund')) {
+        const target =
+          focusedOrMatchedSummary ||
+          invoiceSummaries.find((i) => i.rawStatus === 'paid' && i.amountPaidMinor > 0);
+        conversationalRefusalOrRecoveryText = target
+          ? `Hypothetical Preview (No Changes Applied): If you refunded Statement #${target.invoiceNumber} (${target.customerName}, ${target.amountPaidUsd} USD captured), the statement status would transition to REFUNDED, the refunded total would become ${target.amountPaidUsd} USD, Remaining Balance Due would remain $0.00 USD, and an immutable refund audit event would be recorded. No refund was executed.`
+          : 'Hypothetical Preview (No Changes Applied): Refunding a paid statement returns the captured funds via PayPal Sandbox Captures v2 (`POST /v2/payments/captures/{id}/refund`), transitions the statement to REFUNDED with $0.00 remaining balance due, and logs an immutable audit event. No refund was executed.';
+      } else if (lower.includes('void')) {
+        conversationalRefusalOrRecoveryText =
+          'Hypothetical Preview (No Changes Applied): Voiding an unpaid Draft, Sent, or Overdue statement transitions its status to VOID, sets its remaining balance due to $0.00 USD, and permanently prevents future checkout. Paid or refunded statements are protected by Payment-State Protection and cannot be voided. No statement was voided.';
+      } else {
+        conversationalRefusalOrRecoveryText =
+          'Hypothetical Preview (No Changes Applied): I can explain the exact financial outcome of creating, paying, voiding, or refunding any statement without modifying your ledger.';
+      }
+    } else if (isCapabilityInquiry) {
+      if (lower.includes('refund')) {
+        conversationalRefusalOrRecoveryText =
+          'Capability Explanation (No Action Executed): Yes — in Provider (Dr. Sarah Jenkins) mode, I can prepare and execute full or partial refunds for settled/paid statements (such as #PPB-INV-2026-1003) within the $500.00 single-action and $2,500.00 daily guardrails. To execute a refund, issue a direct instruction such as "Refund the $125 payment on #PPB-INV-2026-1003".';
+      } else if (lower.includes('pay')) {
+        const target = focusedOrMatchedSummary;
+        conversationalRefusalOrRecoveryText = target
+          ? `Capability Explanation (No Action Executed): Yes — I can prepare a PayPal Sandbox checkout proposal for Statement #${target.invoiceNumber} (${target.balanceDueUsd} USD). Because Billing AI cannot autonomously withdraw customer funds, you will complete buyer authorization in PayPal Sandbox before capture completes. Say "Pay invoice #${target.invoiceNumber}" when you are ready to start.`
+          : 'Capability Explanation (No Action Executed): Yes — I can prepare a PayPal Sandbox checkout order for any unpaid statement. Buyer approval in PayPal Sandbox is always required before capture completes.';
+      } else if (lower.includes('void')) {
+        conversationalRefusalOrRecoveryText =
+          'Capability Explanation (No Action Executed): Yes — in Provider mode, I can void unpaid Draft, Sent, or Overdue statements (setting their remaining balance to $0.00 USD). Paid statements cannot be voided and require a refund instead.';
+      } else if (lower.includes('create') || lower.includes('invoice')) {
+        conversationalRefusalOrRecoveryText =
+          'Capability Explanation (No Action Executed): Yes — in Provider mode, I can draft and issue administrative invoices for authorized customers (Alex Rivera and Jordan Taylor) up to the $500.00 single-action and $2,500.00 daily AI guardrails.';
+      }
+    }
+
     // Provider role: void confirmation, refund proposal, reminder proposal, discrepancy recovery, or invoice drafting
-    if (roleScope === 'doctor') {
+    if (roleScope === 'doctor' && !conversationalRefusalOrRecoveryText) {
       const latestDocProp = recentProposals[0] || null;
+      const pendingCreateProp = recentProposals.find(
+        (p: any) => p.kind === 'create_invoice' && p.status === 'pending'
+      );
       const pendingVoidProp = recentProposals.find(
         (p: any) => p.kind === 'void_invoice' && p.status === 'pending'
       );
@@ -504,8 +554,8 @@ Deno.serve(async (req: Request) => {
         (p: any) => p.kind === 'send_reminder' && p.status === 'pending'
       );
 
-      if (isNegative && (pendingVoidProp || pendingRefundProp || pendingReminderProp)) {
-        const activeProp = pendingVoidProp || pendingRefundProp || pendingReminderProp;
+      if (isNegative && (pendingCreateProp || pendingVoidProp || pendingRefundProp || pendingReminderProp)) {
+        const activeProp = pendingCreateProp || pendingVoidProp || pendingRefundProp || pendingReminderProp;
         const { data: updatedProp } = await serviceClient
           .from('billing_ai_proposals')
           .update({
@@ -528,6 +578,7 @@ Deno.serve(async (req: Request) => {
         isAffirmative &&
         latestDocProp &&
         (latestDocProp.status === 'executed' || latestDocProp.status === 'approved') &&
+        !pendingCreateProp &&
         !pendingVoidProp &&
         !pendingRefundProp &&
         !pendingReminderProp
@@ -537,6 +588,54 @@ Deno.serve(async (req: Request) => {
             ? ` for #${latestDocProp.payload.invoice_number}`
             : ''
         } has already been executed.`;
+      } else if (isAffirmative && pendingCreateProp && pendingCreateProp.payload?.recipient_user_id) {
+        const expStr = pendingCreateProp.expires_at || pendingCreateProp.payload?.expires_at;
+        if (expStr && new Date(String(expStr)).getTime() < Date.now()) {
+          await serviceClient
+            .from('billing_ai_proposals')
+            .update({ status: 'expired', result_summary: 'Expired — Request fresh proposal' })
+            .eq('id', pendingCreateProp.id);
+          conversationalRefusalOrRecoveryText =
+            'Approval Token Expired: This invoice proposal has expired. Please ask Billing AI to prepare a fresh proposal.';
+        } else {
+          const { data: createdInv, error: createErr } = await serviceClient.rpc('billing_create_invoice', {
+            p_recipient: pendingCreateProp.payload.recipient_user_id,
+            p_items: [
+              {
+                service_code: pendingCreateProp.payload.service_code || 'ADMIN-TELEHEALTH',
+                quantity: 1,
+                unit_amount_minor: Number(pendingCreateProp.amount_minor || 15000),
+              },
+            ],
+            p_due_date:
+              pendingCreateProp.payload.due_date ||
+              new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+            p_send: true,
+            p_idempotency_key: `ai-confirm-${demoSessionId}-${pendingCreateProp.id}`,
+            p_ai_proposal_id: pendingCreateProp.id,
+            p_demo_session_id: demoSessionId,
+          });
+          if (createErr || !createdInv) {
+            conversationalRefusalOrRecoveryText = `Could not create invoice: ${createErr?.message || 'Unknown error'}`;
+          } else {
+            const { data: updatedProp } = await serviceClient
+              .from('billing_ai_proposals')
+              .update({
+                status: 'executed',
+                decided_at: new Date().toISOString(),
+                result_summary: `Created #${createdInv.invoice_number} (${formatUsd(createdInv.total_minor)})`,
+              })
+              .eq('id', pendingCreateProp.id)
+              .select('*')
+              .single();
+            proposalRow = updatedProp;
+            conversationalRefusalOrRecoveryText = `Invoice #${createdInv.invoice_number} (${formatUsd(
+              createdInv.total_minor
+            )} USD) has been created and sent to ${
+              pendingCreateProp.payload.recipient_name || 'Customer'
+            }.`;
+          }
+        }
       } else if (isAffirmative && pendingVoidProp && pendingVoidProp.payload?.invoice_id) {
         const expStr = pendingVoidProp.expires_at || pendingVoidProp.payload?.expires_at;
         if (expStr && new Date(String(expStr)).getTime() < Date.now()) {

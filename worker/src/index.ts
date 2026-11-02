@@ -17,7 +17,7 @@
  *
  * Target Database:
  * - Exclusively connects to dedicated Supabase project `dvzfesfvefggnunkjhom`.
- * - ZERO access to Health eRecords staging or production databases.
+ * - ZERO access to any external staging or production databases.
  */
 
 export interface Env {
@@ -267,11 +267,32 @@ const MCP_TOOLS_CATALOG = [
     },
     inputSchema: {
       type: 'object',
-      required: ['proposal_id', 'explicit_human_approval'],
       properties: {
         proposal_id: {
           type: 'string',
           description: 'One-time session-bound proposal_id returned by create_invoice_proposal.',
+        },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing invoice creation (e.g., "Create an invoice for Alex for $150.").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (must be doctor/provider to create invoices).',
+        },
+        customer_name: {
+          type: 'string',
+          description: 'Authorized customer name ("Alex Rivera" or "Jordan Taylor") if creating via user_instruction.',
+        },
+        service_code: {
+          type: 'string',
+          description: 'Service code (e.g., ADMIN-FORMS, ADMIN-TELEHEALTH).',
+        },
+        amount_minor: {
+          type: 'integer',
+          description: 'Unit amount in USD cents (Max 50000).',
         },
         explicit_human_approval: {
           type: 'boolean',
@@ -381,7 +402,7 @@ const MCP_TOOLS_CATALOG = [
     },
     inputSchema: {
       type: 'object',
-      required: ['invoice_number', 'reason'],
+      required: ['invoice_number'],
       properties: {
         invoice_number: {
           type: 'string',
@@ -390,6 +411,16 @@ const MCP_TOOLS_CATALOG = [
         reason: {
           type: 'string',
           description: 'Administrative reason for voiding.',
+        },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing the void (e.g., "Void invoice 1004.").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (must be doctor/provider to void invoices).',
         },
         explicit_human_approval: {
           type: 'boolean',
@@ -543,6 +574,16 @@ const MCP_TOOLS_CATALOG = [
           type: 'string',
           description: 'Optional session-bound proposal_id prepared by prepare_payment_proposal.',
         },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing payment checkout initiation (e.g., "Pay invoice 1002.").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role.',
+        },
         invoice_number: {
           type: 'string',
           description: 'Unpaid invoice number (e.g., PPB-INV-2026-1001 or PPB-INV-2026-1004).',
@@ -643,6 +684,16 @@ const MCP_TOOLS_CATALOG = [
           type: 'string',
           description: 'UUID or session-bound proposal_id of a pending refund proposal created by prepare_refund_proposal.',
         },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing this refund (e.g., "Refund the $125 payment on invoice 1003").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (must be doctor/provider to issue refunds).',
+        },
         invoice_number: {
           type: 'string',
           description: 'Paid invoice number to refund (e.g., PPB-INV-2026-1003).',
@@ -658,6 +709,196 @@ const MCP_TOOLS_CATALOG = [
         demo_session_id: {
           type: 'string',
           description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'execute_conversational_instruction',
+    description:
+      '[CONFIRMED_WRITE] Context-aware Conversational Authorization router: evaluates a natural-language user instruction ("Create an invoice for Alex for $150.", "Void invoice 1004.", "Refund the $50 payment.", "Pay invoice 1002.", "Reset the demo.", "Yes, go ahead.", "Are you able to issue refunds?", "Can you pay invoice 1002?", "What would happen if I refunded it?") and executes explicit authorized commands within role and $500/$2,500 guardrails while explaining capability or hypothetical questions without mutating state.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Execute Conversational Billing Instruction',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['instruction'],
+      properties: {
+        instruction: {
+          type: 'string',
+          description: 'Exact natural-language user instruction or question.',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (default: doctor/provider).',
+        },
+        prior_execution_intent: {
+          type: 'boolean',
+          description: 'True only if prior conversation turns already established execution intent.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_discover_official_mcp',
+    description:
+      '[OFFICIAL_PAYPAL_MCP] Connect server-side to PayPal’s official Sandbox MCP server (https://mcp.sandbox.paypal.com/sse and /.well-known/oauth-authorization-server, plus probe /http) using the merchant Sandbox OAuth token, returning live serverInfo (PayPal MCP Agent v1.0.0), the 46 upstream official PayPal MCP tools, and transport status.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'Discover Official PayPal MCP Server Capabilities',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_get_order',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `get_order` capability: retrieve live order details directly from PayPal Sandbox Orders v2 API (`GET /v2/checkout/orders/{order_id}`), returning order status, intent, payer, purchase units, and capture IDs.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Get Order Details (Orders v2)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['order_id'],
+      properties: {
+        order_id: {
+          type: 'string',
+          description: 'PayPal Sandbox Order ID (e.g., "7FA47897KM5938009").',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_get_refund',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `get_refund` capability: retrieve live refund details directly from PayPal Sandbox Captures v2 API (`GET /v2/payments/refunds/{refund_id}`), returning refund status, amount, note_to_payer, and seller payable breakdown.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Get Refund Details (Captures v2)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['refund_id'],
+      properties: {
+        refund_id: {
+          type: 'string',
+          description: 'PayPal Sandbox Refund ID (e.g., "2EM77813GU330222M").',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_list_invoices',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `list_invoices` capability: query PayPal Sandbox Invoicing v2 API (`GET /v2/invoicing/invoices`) alongside synchronized application statements.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: List Merchant Invoices (Invoicing v2)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'integer',
+          description: 'Page number (default: 1).',
+        },
+        page_size: {
+          type: 'integer',
+          description: 'Page size (default: 10).',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_generate_invoice_number',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `generate_invoice_number` capability: call PayPal Sandbox Invoicing v2 API (`POST /v2/invoicing/generate-next-invoice-number`) to allocate the next official PayPal merchant invoice number.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Generate Next Invoice Number',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_list_disputes',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `list_disputes` capability: query PayPal Sandbox Customer Disputes API (`GET /v1/customer/disputes`) to inspect open merchant disputes.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: List Customer Disputes',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page_size: {
+          type: 'integer',
+          description: 'Number of disputes to return (1-50, default 10).',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
         },
       },
     },
@@ -770,6 +1011,7 @@ const MUTATING_TOOLS = new Set([
   'create_paypal_checkout_order',
   'capture_paypal_checkout_order',
   'execute_approved_refund',
+  'execute_conversational_instruction',
 ]);
 
 const FORBIDDEN_BYPASS_KEYS = [
@@ -1013,7 +1255,7 @@ export default {
     <h1>⚡ PayPal AI Billing Kit — MCP Agent Interface Gateway</h1>
     <p class="subtitle">Dedicated Cloudflare Worker Gateway for PayPal AI Hackathon 2026</p>
     <div style="margin-bottom: 20px;">
-      <span class="badge">19 MCP Tools</span>
+      <span class="badge">26 MCP Tools (Unified)</span>
       <span class="badge">OpenAPI 3.1.0</span>
       <span class="badge">Dual Protocol: 2026-07-28 & 2025-06-18</span>
       <span class="badge">$500 Guardrail</span>
@@ -1045,7 +1287,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
   }'</code></pre>
     </div>
 
-    <h2>Available Tools Catalog (19 Total)</h2>
+    <h2>Available Tools Catalog (26 Total — Unified PayPal MCP Gateway)</h2>
     ${MCP_TOOLS_CATALOG.map(
       (t) => `
     <div class="card">
@@ -1192,7 +1434,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
                   version: '2.0.0',
                 },
                 instructions:
-                  'Standalone PayPal AI Billing Kit MCP Server. Provides 19 billing tools across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.',
+                  'Standalone PayPal AI Billing Kit Unified MCP Server. Provides 26 billing tools (20 Native Application tools + 1 Official PayPal MCP Discovery tool + 5 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.',
               },
             }),
             {
@@ -1345,7 +1587,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
                 securitySchemes: tools[0]?.securitySchemes || [],
                 tools,
                 instructions:
-                  'Standalone PayPal AI Billing Kit MCP Server. Provides 19 billing tools across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.',
+                  'Standalone PayPal AI Billing Kit Unified MCP Server. Provides 26 billing tools (20 Native Application tools + 1 Official PayPal MCP Discovery tool + 5 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.',
               },
             }),
             {
@@ -1466,17 +1708,21 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
         }
 
         // Invariant 4: `create_approved_invoice`, `create_paypal_checkout_order`, and `execute_approved_refund`
-        // require BOTH a valid session-bound `proposal_id` AND `explicit_human_approval: true`
+        // require EITHER a valid session-bound `proposal_id` (with `explicit_human_approval: true`)
+        // OR an explicit `user_instruction` evaluated by the server-side conversational authorization engine.
         if (
           toolName === 'create_approved_invoice' ||
           toolName === 'create_paypal_checkout_order' ||
           toolName === 'execute_approved_refund'
         ) {
-          if (args.explicit_human_approval !== true) {
+          const suppliedProposalId = String(args.proposal_id || '').trim();
+          const suppliedUserInstruction = String(args.user_instruction || '').trim();
+
+          if (args.explicit_human_approval !== true && !suppliedUserInstruction) {
             const errPayload = {
               ok: false,
               error_code: 'HUMAN_APPROVAL_REQUIRED',
-              message: `Executing \`${toolName}\` requires \`explicit_human_approval: true\`.`,
+              message: `Executing \`${toolName}\` requires \`explicit_human_approval: true\` (or an explicit \`user_instruction\`).`,
             };
             return new Response(
               JSON.stringify(
@@ -1488,12 +1734,11 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
             );
           }
 
-          const suppliedProposalId = String(args.proposal_id || '').trim();
-          if (!suppliedProposalId) {
+          if (!suppliedProposalId && !suppliedUserInstruction) {
             const errPayload = {
               ok: false,
               error_code: 'PROPOSAL_REQUIRED_FOR_WRITE',
-              message: `Direct execution of \`${toolName}\` without a prior proposal is blocked. First call the corresponding proposal tool to obtain a session-bound \`proposal_id\`.`,
+              message: `Direct execution of \`${toolName}\` without a prior proposal or explicit \`user_instruction\` is blocked. First call the corresponding proposal tool to obtain a session-bound \`proposal_id\`, or pass the user's explicit command in \`user_instruction\`.`,
             };
             return new Response(
               JSON.stringify(
@@ -1505,66 +1750,68 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
             );
           }
 
-          // Verify cryptographic session binding (`<uuid>.<sig16>`) or isolate cache
-          let rawUuid = suppliedProposalId;
-          let sigValid = false;
+          if (suppliedProposalId) {
+            // Verify cryptographic session binding (`<uuid>.<sig16>`) or isolate cache
+            let rawUuid = suppliedProposalId;
+            let sigValid = false;
 
-          if (suppliedProposalId.includes('.')) {
-            const [uuidPart, sigPart] = suppliedProposalId.split('.');
-            rawUuid = uuidPart;
-            const expectedSig = await computeProposalSessionSig(
-              activeSessionId,
-              rawUuid,
-              supabaseAnonKey
-            );
-            if (sigPart === expectedSig) {
-              sigValid = true;
-            } else {
-              const errPayload = {
-                ok: false,
-                error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
-                message: `Cross-session proposal execution denied: proposal "${suppliedProposalId}" does not belong to demo_session_id "${activeSessionId}".`,
-              };
-              return new Response(
-                JSON.stringify(
-                  isToolsCall
-                    ? {
-                        jsonrpc: '2.0',
-                        id: jsonRpcId,
-                        result: buildMcpToolResult(errPayload, true),
-                      }
-                    : errPayload
-                ),
-                { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+            if (suppliedProposalId.includes('.')) {
+              const [uuidPart, sigPart] = suppliedProposalId.split('.');
+              rawUuid = uuidPart;
+              const expectedSig = await computeProposalSessionSig(
+                activeSessionId,
+                rawUuid,
+                supabaseAnonKey
               );
-            }
-          } else {
-            const cachedOwner = proposalSessionCache.get(rawUuid);
-            if (cachedOwner && cachedOwner === activeSessionId) {
-              sigValid = true;
+              if (sigPart === expectedSig) {
+                sigValid = true;
+              } else {
+                const errPayload = {
+                  ok: false,
+                  error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+                  message: `Cross-session proposal execution denied: proposal "${suppliedProposalId}" does not belong to demo_session_id "${activeSessionId}".`,
+                };
+                return new Response(
+                  JSON.stringify(
+                    isToolsCall
+                      ? {
+                          jsonrpc: '2.0',
+                          id: jsonRpcId,
+                          result: buildMcpToolResult(errPayload, true),
+                        }
+                      : errPayload
+                  ),
+                  { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+                );
+              }
             } else {
-              const errPayload = {
-                ok: false,
-                error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
-                message: `Proposal "${suppliedProposalId}" is not bound to demo_session_id "${activeSessionId}". Obtain a session-bound proposal_id in the same session.`,
-              };
-              return new Response(
-                JSON.stringify(
-                  isToolsCall
-                    ? {
-                        jsonrpc: '2.0',
-                        id: jsonRpcId,
-                        result: buildMcpToolResult(errPayload, true),
-                      }
-                    : errPayload
-                ),
-                { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-              );
+              const cachedOwner = proposalSessionCache.get(rawUuid);
+              if (cachedOwner && cachedOwner === activeSessionId) {
+                sigValid = true;
+              } else {
+                const errPayload = {
+                  ok: false,
+                  error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+                  message: `Proposal "${suppliedProposalId}" is not bound to demo_session_id "${activeSessionId}". Obtain a session-bound proposal_id in the same session.`,
+                };
+                return new Response(
+                  JSON.stringify(
+                    isToolsCall
+                      ? {
+                          jsonrpc: '2.0',
+                          id: jsonRpcId,
+                          result: buildMcpToolResult(errPayload, true),
+                        }
+                      : errPayload
+                  ),
+                  { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+                );
+              }
             }
-          }
 
-          if (sigValid) {
-            args.proposal_id = rawUuid;
+            if (sigValid) {
+              args.proposal_id = rawUuid;
+            }
           }
         }
 
@@ -1701,7 +1948,61 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
       );
     }
 
-    // 11. REST Tool Execution Endpoints (`/api/tools/:toolName`)
+    // 11. Downloadable PDF Receipt Endpoint (`GET /api/receipts/:invoice_number.pdf`)
+    const pdfMatch = url.pathname.match(/^\/api\/receipts\/([^/]+?)(?:\.pdf)?$/i);
+    if (pdfMatch && (request.method === 'GET' || isHead)) {
+      const invoiceNumber = decodeURIComponent(pdfMatch[1]).replace(/\.pdf$/i, '');
+      const sessionParam = sanitizeSessionId(
+        url.searchParams.get('session') ||
+          url.searchParams.get('demo_session_id') ||
+          request.headers.get('X-Demo-Session-Id') ||
+          'maas-public-demo'
+      );
+      const supabaseEndpoint = `${supabaseUrl}/functions/v1/billing-maas-mcp`;
+      const upstreamRes = await fetch(supabaseEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          'X-Demo-Session-Id': sessionParam,
+          'Mcp-Session-Id': sessionParam,
+        },
+        body: JSON.stringify({
+          tool: 'get_payment_receipt',
+          demo_session_id: sessionParam,
+          arguments: {
+            invoice_number: invoiceNumber,
+            demo_session_id: sessionParam,
+          },
+        }),
+      });
+      const data: any = await upstreamRes.json().catch(() => ({}));
+      if (!data?.ok || !data?.receipt?.pdf_base64) {
+        return new Response(JSON.stringify(data || { ok: false, error: 'Receipt not found' }), {
+          status: 404,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
+      const binaryStr = atob(String(data.receipt.pdf_base64));
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const downloadDisposition =
+        url.searchParams.get('download') === '1' ? 'attachment' : 'inline';
+      return new Response(isHead ? null : bytes, {
+        status: 200,
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': 'application/pdf',
+          'Content-Length': String(bytes.byteLength),
+          'Content-Disposition': `${downloadDisposition}; filename="Receipt-${data.receipt.invoice_number}.pdf"`,
+        },
+      });
+    }
+
+    // 12. REST Tool Execution Endpoints (`/api/tools/:toolName`)
     const toolMatch = url.pathname.match(/^\/api\/tools\/([a-zA-Z0-9_-]+)$/);
     if (toolMatch && request.method === 'POST') {
       const toolName = toolMatch[1];

@@ -1,0 +1,26 @@
+
+🌐 Running 12-Step Public Demo E2E Verification against: https://paypal-ai-billing-kit.vercel.app
+  ✅ PASS: Step 1: Public URL opens directly to Billing dashboard with reusable Brand Icon, Favicon link, and zero login prompt (Dr. Sarah Jenkins Provider dashboard + Brand Icon + Favicon verified)
+  ✅ PASS: Step 1b (Section 8 Regression): Clicking Disconnect PayPal Sandbox switches badge to DISCONNECTED and shows Connect PayPal Sandbox CTA
+  ✅ PASS: Step 1c (Section 8 Regression): Reconnecting PayPal Sandbox restores SANDBOX AUTHENTICATED badge, shows Account Linked summary, and hides setup form
+  ✅ PASS: Step 2a: Instant switch to Customer #1 (Alex Rivera) scopes statements to Alex only (Alex cards=4)
+  ✅ PASS: Step 2b: Instant switch to Customer #2 (Jordan Taylor) scopes statements to Jordan only (Jordan cards=2)
+  ✅ PASS: Step 2c (Section 9 Regression): Clicking Retry with PayPal Sandbox on Jordan Taylor #PPB-INV-2026-1004 ($50.00) creates a real PayPal Sandbox Order without "Invoice not found."
+   [DEBUG Step 3] hasForms=true, outstandingVal=$310.00
+  ✅ PASS: Step 3: Provider creates & sends $35.00 Forms Completion invoice for Alex Rivera (Outstanding updated to $310.00)
+   [DEBUG Step 4] hasAlexForms=true, balanceDueVal=$260.00
+  ✅ PASS: Step 4: Customer (Alex Rivera) immediately sees the newly sent $35.00 Forms Completion invoice (Alex open balance updated to $260.00)
+  ✅ PASS: Step 5: Search input narrows statement list to #PPB-INV-2026-1003
+  ✅ PASS: Step 6: Asking Billing AI "what is this invoice for? when were services provided?" on #PPB-INV-2026-1003 returns detailed line items & service date (Includes line items, service date, and $125.00 PAID status)
+  ✅ PASS: Step 7: Customer Billing AI prepares a payment checkout proposal requiring human approval
+  ✅ PASS: Step 8: Customer Demo Settlement Simulation settles #PPB-INV-2026-1002, shows Sample Demo Record badge, and exposes Download PDF Receipt button
+  ✅ PASS: Step 9a: Billing Notifications modal displays real-time alerts with deep links
+  ✅ PASS: Step 9b: Guardrails & Audit modal displays locked $500/$2,500 caps and full financial audit history
+  ✅ PASS: Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 26 tools, source badges, PDF receipt endpoint, and zero MaaS branding
+  ✅ PASS: Step 10b: MCP Agent Interface modal executes live MCP JSON-RPC `get_invoice_details` call
+  ✅ PASS: Step 11a: Reset Demo button restores canonical 6 statements ($275.00 Outstanding)
+  ✅ PASS: Step 11b: 21 rapid consecutive demo account switches complete synchronously from memory with 0 blank states and 0 Supabase network calls (switches=21, blankFrames=0, networkCalls=0)
+  ✅ PASS: Step 12: Zero browser console errors and zero uncaught page errors across all 12 steps (0 console errors, 0 page errors)
+
+📊 12-Step Public Demo E2E Summary: 19 passed, 0 failed
+

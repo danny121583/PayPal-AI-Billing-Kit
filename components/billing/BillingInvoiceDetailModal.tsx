@@ -12,6 +12,7 @@ import {
   Sparkles,
   CheckCircle2,
   FlaskConical,
+  FileDown,
 } from 'lucide-react-native';
 import {
   ModalActionButtons,
@@ -27,6 +28,7 @@ import {
   formatUsdCents,
 } from '../../src/billing/data/syntheticBillingFixtures';
 import {
+  getOrCreateDemoSessionIdSync,
   invokePayPalBillingFunction,
   sendBillingPaymentReminder,
   sendDraftBillingInvoice,
@@ -58,8 +60,20 @@ export default function BillingInvoiceDetailModal({
     text: string;
   } | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [localSettledReceipt, setLocalSettledReceipt] = useState<{
+    invoiceId: string;
+    receiptNumber: string;
+    isSample: boolean;
+  } | null>(null);
 
   if (!visible || !invoice) return null;
+
+  const activeLocalReceipt =
+    localSettledReceipt && localSettledReceipt.invoiceId === invoice.id
+      ? localSettledReceipt
+      : null;
+  const effectiveReceiptNumber =
+    invoice.receiptNumber || activeLocalReceipt?.receiptNumber || null;
 
   const isDoctor = roleScope === 'doctor';
   const canCustomerPay =
@@ -88,13 +102,17 @@ export default function BillingInvoiceDetailModal({
   const effectiveBalanceCents =
     invoice.status === 'void' ||
     invoice.status === 'refunded' ||
-    invoice.status === 'paid'
+    invoice.status === 'paid' ||
+    Boolean(activeLocalReceipt)
       ? 0
       : invoice.balanceDueCents;
 
-  const isSampleRecord = invoice.settlementVerificationStatus === 'sample_demo';
+  const isSampleRecord =
+    invoice.settlementVerificationStatus === 'sample_demo' ||
+    Boolean(activeLocalReceipt?.isSample);
   const isVerifiedPayPalCapture =
-    invoice.settlementVerificationStatus === 'paypal_verified';
+    invoice.settlementVerificationStatus === 'paypal_verified' ||
+    (Boolean(activeLocalReceipt) && !activeLocalReceipt?.isSample);
   const primaryServiceCode = invoice.lineItems[0]?.serviceCode || 'ADMIN-SERVICE';
   const latestFailure = invoice.paymentAttempts.find(
     (a) => a.status === 'failed_demo' && a.failureReason
@@ -183,6 +201,11 @@ export default function BillingInvoiceDetailModal({
         return;
       }
       const captureId = res.data?.capture_id || res.data?.captureId || 'COMPLETED';
+      setLocalSettledReceipt({
+        invoiceId: invoice.id,
+        receiptNumber: String(captureId),
+        isSample: false,
+      });
       setBannerMessage({
         type: 'success',
         text: `Payment settled! Verified PayPal Sandbox Capture ID: ${captureId}.`,
@@ -264,6 +287,11 @@ export default function BillingInvoiceDetailModal({
     setBusyAction('simulate_demo_settlement');
     try {
       const sim = await simulateBillingDemoSettlement(invoice.id);
+      setLocalSettledReceipt({
+        invoiceId: invoice.id,
+        receiptNumber: String(sim.captureId || 'SAMPLE-DEMO-SETTLEMENT'),
+        isSample: true,
+      });
       setBannerMessage({
         type: 'success',
         text: `Demo Settlement Completed (${sim.captureId}) — Marked as Sample Demo Record (Not a Live PayPal Capture).`,
@@ -406,7 +434,7 @@ export default function BillingInvoiceDetailModal({
       ) : null}
 
       {/* Sample Demo Record vs Verified PayPal Capture Notice */}
-      {invoice.receiptNumber ? (
+      {effectiveReceiptNumber ? (
         <View
           style={[
             styles.settlementNoticeBox,
@@ -424,7 +452,7 @@ export default function BillingInvoiceDetailModal({
                   Sample Demo Settlement Record (Not a Live PayPal Capture)
                 </Text>
                 <Text style={styles.sampleSettlementSub}>
-                  Reference ID {invoice.receiptNumber} is a seeded demonstration
+                  Reference ID {effectiveReceiptNumber} is a seeded demonstration
                   fixture. Live PayPal Sandbox captures display verified PayPal
                   capture IDs.
                 </Text>
@@ -438,11 +466,31 @@ export default function BillingInvoiceDetailModal({
                   Verified PayPal Sandbox Settlement
                 </Text>
                 <Text style={styles.liveSettlementSub}>
-                  Capture ID: {invoice.receiptNumber}
+                  Capture ID: {effectiveReceiptNumber}
                 </Text>
               </View>
             </>
           )}
+          <Pressable
+            style={styles.downloadPdfBtn}
+            onPress={() => {
+              const sid = getOrCreateDemoSessionIdSync();
+              const pdfUrl = `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/${encodeURIComponent(
+                invoice.invoiceNumber
+              )}.pdf?session=${encodeURIComponent(sid)}`;
+              if (typeof window !== 'undefined' && typeof window.open === 'function') {
+                window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+              } else {
+                void Linking.openURL(pdfUrl);
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Download PDF Receipt for ${invoice.invoiceNumber}`}
+            testID="billing-download-pdf-receipt-btn"
+          >
+            <FileDown size={14} color="#1E40AF" />
+            <Text style={styles.downloadPdfBtnText}>Download PDF Receipt</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -750,6 +798,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#065F46',
+  },
+  downloadPdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  downloadPdfBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E40AF',
   },
   liveSettlementSub: {
     fontSize: 12,

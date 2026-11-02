@@ -1,0 +1,825 @@
+{
+  "sandbox_oauth_status": {
+    "environment": "sandbox",
+    "api_base_url": "https://api-m.sandbox.paypal.com",
+    "credentials_configured": true,
+    "webhook_configured": false,
+    "oauth_reachable": true,
+    "app_id": "APP-5SK74342S6474230W",
+    "token_expires_in": 31214,
+    "missing_secrets": [
+      "PAYPAL_SANDBOX_WEBHOOK_ID"
+    ]
+  },
+  "updated_at": "2026-11-02T21:53:07.614Z",
+  "demo_session_id": "live-sbx-1793655303922",
+  "merchant_connection": {
+    "id": "4c620637-d2e0-4fc3-875a-c604073e6760",
+    "user_id": "11111111-1111-4111-8111-111111111101",
+    "connection_type": "merchant",
+    "organization_id": "22222222-2222-4222-8222-222222222201",
+    "environment": "sandbox",
+    "status": "connected",
+    "paypal_payer_id": "PAYPAL-SANDBOX-MERCHANT",
+    "paypal_email_masked": "sb-***@business.example.com",
+    "paypal_verified": true,
+    "connected_at": "2026-11-02T21:35:02.665+00:00",
+    "revoked_at": null
+  },
+  "buyer_connection": {
+    "id": "a6fe96c7-7b1d-4d07-a7bf-6ece3e5c4667",
+    "user_id": "11111111-1111-4111-8111-111111111102",
+    "connection_type": "payer",
+    "organization_id": null,
+    "environment": "sandbox",
+    "status": "connected",
+    "paypal_payer_id": "SB-PAYER-ALEX-1002",
+    "paypal_email_masked": "sb-***@personal.example.com",
+    "paypal_verified": true,
+    "connected_at": "2026-11-02T21:35:03.584+00:00",
+    "revoked_at": null
+  },
+  "invoice_before_payment": {
+    "id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+    "invoice_number": "PPB-INV-2026-1057",
+    "status": "sent",
+    "customer_name": "Alex Rivera",
+    "service_code": "ADMIN-FORMS",
+    "total_minor": 3500,
+    "total_usd": "$35.00",
+    "due_date": "2026-11-16"
+  },
+  "payment_proposal": {
+    "id": "6696130a-4d92-4753-bc71-34bc04340b5b.b554bcdcbb79dc7f",
+    "kind": "payment_checkout",
+    "status": "pending",
+    "invoice_number": "PPB-INV-2026-1057",
+    "customer_name": "Alex Rivera",
+    "amount_minor": 3500,
+    "amount_usd": "$35.00",
+    "payload": {
+      "action": "payment_checkout",
+      "title": "Pay #PPB-INV-2026-1057 ($35.00)",
+      "summary": "Authorize $35.00 USD via PayPal Sandbox for Forms Completion — Administrative school, work, or insurance form completion fee",
+      "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "invoice_number": "PPB-INV-2026-1057",
+      "amount_minor": 3500,
+      "demo_session_id": "live-sbx-1793655303922",
+      "expires_at": "2026-11-02T22:05:06.171Z"
+    }
+  },
+  "paypal_order_creation": {
+    "ok": true,
+    "orderId": "7FA47897KM5938009",
+    "order_id": "7FA47897KM5938009",
+    "invoiceId": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+    "invoiceNumber": "PPB-INV-2026-1057",
+    "status": "PAYER_ACTION_REQUIRED",
+    "approvalUrl": "https://www.sandbox.paypal.com/checkoutnow?token=7FA47897KM5938009",
+    "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=7FA47897KM5938009"
+  },
+  "capture_verification": {
+    "ok": true,
+    "captureId": "5HM71086SR568352C",
+    "capture_id": "5HM71086SR568352C",
+    "status": "COMPLETED",
+    "verifiedVia": "order_lookup",
+    "transaction": {
+      "id": "8d6e7e79-28ef-4a2d-849c-07f0d0e42076",
+      "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "organization_id": "22222222-2222-4222-8222-222222222201",
+      "payer_user_id": "11111111-1111-4111-8111-111111111102",
+      "paypal_order_id": "7FA47897KM5938009",
+      "paypal_capture_id": "5HM71086SR568352C",
+      "amount_minor": 3500,
+      "currency": "USD",
+      "paypal_status": "COMPLETED",
+      "payer_email_masked": "sb-***@sandbox.paypal.com",
+      "verified_via": "order_lookup",
+      "webhook_reconciled_at": null,
+      "captured_at": "2026-11-02T21:53:02.952534+00:00",
+      "created_at": "2026-11-02T21:53:02.952534+00:00"
+    }
+  },
+  "mcp_payment_receipt_after_capture": {
+    "ok": true,
+    "demo_session_id": "live-sbx-1793655303922",
+    "receipt": {
+      "receipt_number": "5HM71086SR568352C",
+      "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "invoice_number": "PPB-INV-2026-1057",
+      "status": "refunded",
+      "organization_name": "Jenkins Wellness & Telehealth Practice",
+      "provider_name": "Dr. Sarah Jenkins",
+      "customer_name": "Alex Rivera",
+      "currency": "USD",
+      "total_minor": 3500,
+      "total_usd": "$35.00",
+      "amount_paid_minor": 3500,
+      "amount_paid_usd": "$35.00",
+      "amount_refunded_minor": 3500,
+      "amount_refunded_usd": "$35.00",
+      "balance_due_minor": 0,
+      "balance_due_usd": "$0.00",
+      "service_date": "2026-11-02",
+      "paid_at": "2026-11-02T21:53:02.952534+00:00",
+      "refunded_at": null,
+      "settlement_reference": "5HM71086SR568352C",
+      "paypal_capture_id": "5HM71086SR568352C",
+      "settlement_verification": "paypal_sandbox_verified",
+      "is_live_paypal_capture": true,
+      "verification_badge": "Verified PayPal Sandbox Capture"
+    }
+  },
+  "refund_verification": {
+    "ok": true,
+    "refundId": "2EM77813GU330222M",
+    "status": "COMPLETED",
+    "refund": {
+      "id": "f83cfb7f-59a1-42a1-8705-93872dffb4dc",
+      "transaction_id": "8d6e7e79-28ef-4a2d-849c-07f0d0e42076",
+      "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "requested_by": "11111111-1111-4111-8111-111111111101",
+      "amount_minor": 3500,
+      "currency": "USD",
+      "status": "completed",
+      "paypal_refund_id": "2EM77813GU330222M",
+      "request_id": "refund-562b3029-9a2c-452b-8ee8-d04939e336bf-1793656385100",
+      "failure_message": null,
+      "created_at": "2026-11-02T21:53:05.693336+00:00",
+      "completed_at": "2026-11-02T21:53:07.54377+00:00"
+    }
+  },
+  "mcp_transaction_history_after_capture": {
+    "ok": true,
+    "demo_session_id": "live-sbx-1793655303922",
+    "settlements_count": 3,
+    "settlements": [
+      {
+        "invoice_number": "PPB-INV-2026-1057",
+        "customer_name": "Alex Rivera",
+        "status": "paid",
+        "amount_paid_minor": 3500,
+        "amount_paid_usd": "$35.00",
+        "amount_refunded_minor": 0,
+        "amount_refunded_usd": "$0.00",
+        "paid_at": "2026-11-02T21:53:02.952534+00:00",
+        "refunded_at": null,
+        "settlement_reference": "5HM71086SR568352C",
+        "settlement_verification": "paypal_sandbox_verified",
+        "is_live_paypal_capture": true,
+        "verification_badge": "Verified PayPal Sandbox Capture"
+      },
+      {
+        "invoice_number": "PPB-INV-2026-1006",
+        "customer_name": "Alex Rivera",
+        "status": "refunded",
+        "amount_paid_minor": 4500,
+        "amount_paid_usd": "$45.00",
+        "amount_refunded_minor": 4500,
+        "amount_refunded_usd": "$45.00",
+        "paid_at": "2026-10-23T01:44:06.255795+00:00",
+        "refunded_at": null,
+        "settlement_reference": "SAMPLE-DEMO-SETTLEMENT-1006",
+        "settlement_verification": "sample_demo_settlement_not_live_paypal",
+        "is_live_paypal_capture": false,
+        "verification_badge": "Sample Demo Record — Not a Live PayPal Capture"
+      },
+      {
+        "invoice_number": "PPB-INV-2026-1003",
+        "customer_name": "Alex Rivera",
+        "status": "paid",
+        "amount_paid_minor": 12500,
+        "amount_paid_usd": "$125.00",
+        "amount_refunded_minor": 0,
+        "amount_refunded_usd": "$0.00",
+        "paid_at": "2026-10-29T01:44:06.255795+00:00",
+        "refunded_at": null,
+        "settlement_reference": "SAMPLE-DEMO-SETTLEMENT-1003",
+        "settlement_verification": "sample_demo_settlement_not_live_paypal",
+        "is_live_paypal_capture": false,
+        "verification_badge": "Sample Demo Record — Not a Live PayPal Capture"
+      }
+    ],
+    "payment_attempts_count": 5,
+    "payment_attempts": [
+      {
+        "id": "ed3f1415-4007-40cf-810b-97c93380532f",
+        "status": "completed",
+        "amount_minor": 3500,
+        "amount_usd": "$35.00",
+        "paypal_order_id": "7FA47897KM5938009",
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-11-02T21:35:08.112947+00:00",
+        "invoice_number": "PPB-INV-2026-1057",
+        "customer_name": "Alex Rivera"
+      },
+      {
+        "id": "28da033d-31f7-4e50-9b62-fc61c49a7ea4",
+        "status": "created",
+        "amount_minor": 15000,
+        "amount_usd": "$150.00",
+        "paypal_order_id": "0XL93368SU373815C",
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-11-02T21:44:09.306106+00:00",
+        "invoice_number": "PPB-INV-2026-1001",
+        "customer_name": "Alex Rivera"
+      },
+      {
+        "id": "6d52a870-94f9-436a-adc3-dd3640e1bb11",
+        "status": "created",
+        "amount_minor": 5000,
+        "amount_usd": "$50.00",
+        "paypal_order_id": "0VA92925RC5967006",
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-11-02T21:49:08.298226+00:00",
+        "invoice_number": "PPB-INV-2026-1004",
+        "customer_name": "Jordan Taylor"
+      },
+      {
+        "id": "6d581817-4983-4c82-848c-ea4d8b87593e",
+        "status": "created",
+        "amount_minor": 5000,
+        "amount_usd": "$50.00",
+        "paypal_order_id": "2F176139DH3116807",
+        "failure_code": null,
+        "failure_message": null,
+        "created_at": "2026-11-02T21:47:37.811676+00:00",
+        "invoice_number": "PPB-INV-2026-1004",
+        "customer_name": "Jordan Taylor"
+      },
+      {
+        "id": "a7e2a403-e5df-484b-b256-76124683e81d",
+        "status": "failed",
+        "amount_minor": 5000,
+        "amount_usd": "$50.00",
+        "paypal_order_id": "DEMO-ORD-DECLINED-1004",
+        "failure_code": "INSTRUMENT_DECLINED",
+        "failure_message": "PayPal Sandbox funding instrument was declined during checkout. Please retry.",
+        "created_at": "2026-11-02T01:44:06.255795+00:00",
+        "invoice_number": "PPB-INV-2026-1004",
+        "customer_name": "Jordan Taylor"
+      }
+    ]
+  },
+  "mcp_financial_audit_after_capture": {
+    "ok": true,
+    "demo_session_id": "live-sbx-1793655303922",
+    "append_only_enforced": true,
+    "count": 10,
+    "audit_events": [
+      {
+        "id": 155,
+        "event_type": "payment_captured_verified",
+        "actor_kind": "paypal",
+        "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+        "created_at": "2026-11-02T21:53:02.952534+00:00",
+        "details": {
+          "currency": "USD",
+          "order_id": "7FA47897KM5938009",
+          "capture_id": "5HM71086SR568352C",
+          "amount_minor": 3500,
+          "verified_via": "order_lookup"
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 152,
+        "event_type": "paypal_order_created",
+        "actor_kind": "user",
+        "invoice_id": "33333333-3333-4333-8333-333333333304",
+        "created_at": "2026-11-02T21:49:08.379841+00:00",
+        "details": {
+          "currency": "USD",
+          "order_id": "0VA92925RC5967006",
+          "amount_minor": 5000,
+          "demo_session_id": "demo-sess-mvzsjtx8-sio628"
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 151,
+        "event_type": "paypal_account_connected",
+        "actor_kind": "user",
+        "invoice_id": null,
+        "created_at": "2026-11-02T21:49:00.252363+00:00",
+        "details": {
+          "role_scope": "doctor",
+          "environment": "sandbox",
+          "email_masked": "sb-***@business.example.com",
+          "oauth_verified": true
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 150,
+        "event_type": "paypal_account_disconnected",
+        "actor_kind": "user",
+        "invoice_id": null,
+        "created_at": "2026-11-02T21:48:58.909228+00:00",
+        "details": {
+          "role_scope": "doctor"
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 147,
+        "event_type": "paypal_order_created",
+        "actor_kind": "user",
+        "invoice_id": "33333333-3333-4333-8333-333333333304",
+        "created_at": "2026-11-02T21:47:37.895299+00:00",
+        "details": {
+          "currency": "USD",
+          "order_id": "2F176139DH3116807",
+          "amount_minor": 5000,
+          "demo_session_id": "demo-sess-mvzshuzc-3c0qlh"
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 146,
+        "event_type": "paypal_account_connected",
+        "actor_kind": "user",
+        "invoice_id": null,
+        "created_at": "2026-11-02T21:47:28.896532+00:00",
+        "details": {
+          "role_scope": "doctor",
+          "environment": "sandbox",
+          "email_masked": "sb-***@business.example.com",
+          "oauth_verified": true
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 145,
+        "event_type": "paypal_account_disconnected",
+        "actor_kind": "user",
+        "invoice_id": null,
+        "created_at": "2026-11-02T21:47:27.457317+00:00",
+        "details": {
+          "role_scope": "doctor"
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 139,
+        "event_type": "paypal_order_created",
+        "actor_kind": "user",
+        "invoice_id": "33333333-3333-4333-8333-333333333301",
+        "created_at": "2026-11-02T21:44:09.415876+00:00",
+        "details": {
+          "currency": "USD",
+          "order_id": "0XL93368SU373815C",
+          "amount_minor": 15000,
+          "demo_session_id": "mcp-verify-mvzsdjcn"
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 136,
+        "event_type": "paypal_account_connected",
+        "actor_kind": "user",
+        "invoice_id": null,
+        "created_at": "2026-11-02T21:40:39.323554+00:00",
+        "details": {
+          "role_scope": "patient",
+          "environment": "sandbox",
+          "email_masked": "sb-***@personal.example.com",
+          "oauth_verified": true
+        },
+        "demo_session_id": "canonical"
+      },
+      {
+        "id": 135,
+        "event_type": "paypal_account_connected",
+        "actor_kind": "user",
+        "invoice_id": null,
+        "created_at": "2026-11-02T21:40:38.217463+00:00",
+        "details": {
+          "role_scope": "patient",
+          "environment": "sandbox",
+          "email_masked": "sb-***@personal.example.com",
+          "oauth_verified": true
+        },
+        "demo_session_id": "canonical"
+      }
+    ]
+  },
+  "proof_version": "1.6.0",
+  "verified_at": "2026-11-02T22:49:18.380Z",
+  "unified_mcp_endpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
+  "official_paypal_mcp_diagnostic": {
+    "ok": true,
+    "source": "official_paypal_mcp",
+    "demo_session_id": "live-sbx-v16-1793659741573",
+    "official_paypal_mcp": {
+      "server_info": {
+        "name": "PayPal MCP Agent",
+        "version": "1.0.0"
+      },
+      "endpoints_probed": {
+        "http_endpoint": "https://mcp.sandbox.paypal.com/http",
+        "http_status": 404,
+        "http_note": "https://mcp.sandbox.paypal.com/http returns HTTP 404; PayPal hosts its official MCP server on /sse and /mcp (OAuth 2.0 protected).",
+        "sse_endpoint": "https://mcp.sandbox.paypal.com/sse",
+        "sse_authenticated_reachable": true,
+        "sse_session_endpoint_sample": "/sse/message?sessionId=b914aa4b5d433d647c4293e46de4a88e410999f9a92e2e8dc1e6a98d30db6d9c",
+        "oauth_metadata_endpoint": "https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server",
+        "oauth_issuer": "https://mcp.sandbox.paypal.com"
+      },
+      "upstream_runtime_diagnostic": {
+        "tool_discovery_works": true,
+        "upstream_tools_count": 46,
+        "upstream_tools_sample": [
+          "create_invoice",
+          "list_invoices",
+          "get_invoice",
+          "send_invoice",
+          "send_invoice_reminder",
+          "cancel_sent_invoice",
+          "generate_invoice_qr_code",
+          "create_product",
+          "list_products",
+          "show_product_details",
+          "update_product",
+          "create_subscription_plan",
+          "list_subscription_plans",
+          "show_subscription_plan_details",
+          "create_subscription",
+          "show_subscription_details",
+          "update_subscription",
+          "cancel_subscription",
+          "create_shipment_tracking",
+          "get_shipment_tracking",
+          "update_shipment_tracking",
+          "create_order",
+          "get_order",
+          "capture_order",
+          "list_disputes",
+          "get_dispute",
+          "accept_dispute_claim",
+          "list_transactions",
+          "pay_invoice",
+          "create_And_Send_Invoice",
+          "generate_invoice_number",
+          "create_webhook",
+          "Starting_ page_for_PayPal_integration",
+          "get_merchant_insights",
+          "create_refund",
+          "get_refund"
+        ],
+        "upstream_tools_call_issue": "Calling tools/call on mcp.sandbox.paypal.com triggers PAYPAL_API_SETUP_ERROR: \"Unsupported cache mode: default\" inside @paypal/agent-toolkit (src/shared/functions.ts:2053) because axios passes cache:\"default\" to Cloudflare Workers fetch.",
+        "unified_gateway_resolution": "Our Unified PayPal MCP Gateway connects to mcp.sandbox.paypal.com for official schema & capability discovery and executes the official PayPal tool contracts (paypal_get_order, paypal_get_refund, paypal_list_invoices, paypal_generate_invoice_number, paypal_list_disputes) directly against api-m.sandbox.paypal.com using the same merchant Sandbox OAuth 2.0 token."
+      },
+      "paypal_sandbox_oauth": {
+        "authenticated": true,
+        "app_id": "APP-5SK74342S6474230W"
+      }
+    }
+  },
+  "conversational_execution_proof": {
+    "demo_session_id": "live-sbx-v16-1793659741573",
+    "created_invoice": {
+      "id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+      "invoice_number": "PPB-INV-2026-1062",
+      "status": "sent",
+      "customer_name": "Alex Rivera",
+      "service_code": "ADMIN-FORMS",
+      "total_minor": 3500,
+      "total_usd": "$35.00",
+      "due_date": "2026-11-16"
+    },
+    "created_paypal_order": {
+      "ok": true,
+      "demo_session_id": "live-sbx-v16-1793659741573",
+      "checkout_mode": "paypal_sandbox_live",
+      "invoice_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+      "invoice_number": "PPB-INV-2026-1062",
+      "customer_name": "Alex Rivera",
+      "amount_minor": 3500,
+      "amount_usd": "$35.00",
+      "order_id": "3FT930933B6256512",
+      "order_status": "PAYER_ACTION_REQUIRED",
+      "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=3FT930933B6256512",
+      "message": "PayPal Sandbox Order 3FT930933B6256512 created for Statement #PPB-INV-2026-1062 ($35.00 USD). Open the approval_url to authorize as the Sandbox buyer, then call `capture_paypal_checkout_order`."
+    },
+    "paypal_get_order_verification": {
+      "id": "3FT930933B6256512",
+      "intent": "CAPTURE",
+      "status": "PAYER_ACTION_REQUIRED",
+      "payment_source": {
+        "paypal": {}
+      },
+      "purchase_units": [
+        {
+          "reference_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+          "amount": {
+            "currency_code": "USD",
+            "value": "35.00",
+            "breakdown": {}
+          },
+          "payee": {
+            "email_address": "sb-ixtp453680658@business.example.com",
+            "merchant_id": "L9KAFVR7N9HLY",
+            "display_data": {
+              "brand_name": "PayPal AI Billing Kit Sandbox"
+            }
+          },
+          "description": "Administrative Statement PPB-INV-2026-1062",
+          "custom_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+          "invoice_id": "PPB-INV-2026-1062-0292"
+        }
+      ],
+      "create_time": "2026-11-02T22:49:10Z",
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/3FT930933B6256512",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://www.sandbox.paypal.com/checkoutnow?token=3FT930933B6256512",
+          "rel": "payer-action",
+          "method": "GET"
+        }
+      ]
+    },
+    "paypal_generated_invoice_number": "0001"
+  },
+  "live_paypal_sandbox_end_to_end_proof": {
+    "demo_session_id": "live-sbx-1793655303922",
+    "invoice_number": "PPB-INV-2026-1057",
+    "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+    "paypal_order_id": "7FA47897KM5938009",
+    "paypal_capture_id": "5HM71086SR568352C",
+    "paypal_refund_id": "2EM77813GU330222M",
+    "live_paypal_order_api_response": {
+      "id": "7FA47897KM5938009",
+      "intent": "CAPTURE",
+      "status": "COMPLETED",
+      "payment_source": {
+        "card": {
+          "name": "Alex Rivera",
+          "last_digits": "6953",
+          "expiry": "2029-12",
+          "brand": "VISA",
+          "available_networks": [
+            "VISA"
+          ],
+          "type": "CREDIT",
+          "bin_details": {
+            "bin": "403203",
+            "issuing_bank": "Baxter Credit Union",
+            "bin_country_code": "US"
+          }
+        }
+      },
+      "purchase_units": [
+        {
+          "reference_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+          "amount": {
+            "currency_code": "USD",
+            "value": "35.00",
+            "breakdown": {}
+          },
+          "payee": {
+            "email_address": "sb-ixtp453680658@business.example.com",
+            "merchant_id": "L9KAFVR7N9HLY",
+            "display_data": {
+              "brand_name": "PayPal AI Billing Kit Sandbox"
+            }
+          },
+          "description": "Administrative Statement PPB-INV-2026-1057",
+          "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+          "invoice_id": "PPB-INV-2026-1057-7209",
+          "soft_descriptor": "TEST STORE",
+          "supplementary_data": {
+            "risk": {
+              "risk_level_indicator": "HIGH_RISK"
+            }
+          },
+          "payments": {
+            "captures": [
+              {
+                "id": "5HM71086SR568352C",
+                "status": "REFUNDED",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "35.00"
+                },
+                "final_capture": true,
+                "seller_protection": {
+                  "status": "NOT_ELIGIBLE"
+                },
+                "seller_receivable_breakdown": {
+                  "gross_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  },
+                  "paypal_fee": {
+                    "currency_code": "USD",
+                    "value": "1.40"
+                  },
+                  "net_amount": {
+                    "currency_code": "USD",
+                    "value": "33.60"
+                  }
+                },
+                "invoice_id": "PPB-INV-2026-1057-7209",
+                "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+                "links": [
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C",
+                    "rel": "self",
+                    "method": "GET"
+                  },
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C/refund",
+                    "rel": "refund",
+                    "method": "POST"
+                  },
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/checkout/orders/7FA47897KM5938009",
+                    "rel": "up",
+                    "method": "GET"
+                  }
+                ],
+                "create_time": "2026-11-02T21:52:12Z",
+                "update_time": "2026-11-02T21:53:06Z",
+                "network_transaction_reference": {
+                  "id": "043595502366789",
+                  "network": "VISA"
+                },
+                "processor_response": {
+                  "avs_code": "A",
+                  "cvv_code": "M",
+                  "response_code": "0000"
+                }
+              }
+            ],
+            "refunds": [
+              {
+                "id": "2EM77813GU330222M",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "35.00"
+                },
+                "note_to_payer": "Administrative Statement Refund PPB-INV-2026-1057",
+                "seller_payable_breakdown": {
+                  "gross_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  },
+                  "paypal_fee": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "platform_fees": [
+                    {
+                      "amount": {
+                        "currency_code": "USD",
+                        "value": "0.00"
+                      }
+                    }
+                  ],
+                  "net_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  },
+                  "total_refunded_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  }
+                },
+                "invoice_id": "PPB-INV-2026-1057-7209",
+                "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+                "status": "COMPLETED",
+                "links": [
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/refunds/2EM77813GU330222M",
+                    "rel": "self",
+                    "method": "GET"
+                  },
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C",
+                    "rel": "up",
+                    "method": "GET"
+                  }
+                ],
+                "create_time": "2026-11-02T13:53:06-08:00",
+                "update_time": "2026-11-02T13:53:06-08:00"
+              }
+            ]
+          }
+        }
+      ],
+      "create_time": "2026-11-02T21:52:12Z",
+      "update_time": "2026-11-02T21:53:06Z",
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/7FA47897KM5938009",
+          "rel": "self",
+          "method": "GET"
+        }
+      ]
+    },
+    "live_paypal_refund_api_response": {
+      "id": "2EM77813GU330222M",
+      "amount": {
+        "currency_code": "USD",
+        "value": "35.00"
+      },
+      "note_to_payer": "Administrative Statement Refund PPB-INV-2026-1057",
+      "seller_payable_breakdown": {
+        "gross_amount": {
+          "currency_code": "USD",
+          "value": "35.00"
+        },
+        "paypal_fee": {
+          "currency_code": "USD",
+          "value": "0.00"
+        },
+        "net_amount": {
+          "currency_code": "USD",
+          "value": "35.00"
+        },
+        "total_refunded_amount": {
+          "currency_code": "USD",
+          "value": "35.00"
+        }
+      },
+      "invoice_id": "PPB-INV-2026-1057-7209",
+      "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "status": "COMPLETED",
+      "create_time": "2026-11-02T13:53:06-08:00",
+      "update_time": "2026-11-02T13:53:06-08:00",
+      "payer": {
+        "email_address": "sb-ixtp453680658@business.example.com",
+        "merchant_id": "L9KAFVR7N9HLY"
+      },
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/payments/refunds/2EM77813GU330222M",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C",
+          "rel": "up",
+          "method": "GET"
+        }
+      ]
+    },
+    "structured_receipt": {
+      "receipt_number": "5HM71086SR568352C",
+      "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "invoice_number": "PPB-INV-2026-1057",
+      "status": "refunded",
+      "organization_name": "Jenkins Wellness & Telehealth Practice",
+      "provider_name": "Dr. Sarah Jenkins",
+      "customer_name": "Alex Rivera",
+      "currency": "USD",
+      "total_minor": 3500,
+      "total_usd": "$35.00",
+      "amount_paid_minor": 3500,
+      "amount_paid_usd": "$35.00",
+      "amount_refunded_minor": 3500,
+      "amount_refunded_usd": "$35.00",
+      "balance_due_minor": 0,
+      "balance_due_usd": "$0.00",
+      "service_date": "2026-11-02",
+      "paid_at": "2026-11-02T21:53:02.952534+00:00",
+      "refunded_at": null,
+      "settlement_reference": "5HM71086SR568352C",
+      "paypal_capture_id": "5HM71086SR568352C",
+      "settlement_verification": "paypal_sandbox_verified",
+      "is_live_paypal_capture": true,
+      "verification_badge": "Verified PayPal Sandbox Capture",
+      "line_items": [
+        {
+          "service_code": "ADMIN-FORMS",
+          "description": "Forms Completion — Administrative school, work, or insurance form completion fee",
+          "quantity": 1,
+          "unit_amount_minor": 3500,
+          "unit_amount_usd": "$35.00",
+          "line_total_minor": 3500,
+          "line_total_usd": "$35.00"
+        }
+      ],
+      "pdf_download_url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?session=live-sbx-1793655303922",
+      "pdf_base64": "[BASE64_PDF_OMITTED_3323_BYTES]",
+      "pdf_byte_length": 3323,
+      "pdf_mime_type": "application/pdf"
+    },
+    "pdf_download_verification": {
+      "url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?demo_session_id=live-sbx-1793655303922",
+      "http_status": 200,
+      "content_type": "application/pdf",
+      "byte_length": 3323,
+      "pdf_header": "%PDF-1.4"
+    }
+  }
+}

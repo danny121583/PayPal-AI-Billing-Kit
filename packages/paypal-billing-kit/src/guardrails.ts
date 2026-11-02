@@ -3,6 +3,8 @@ import { inspectForClinicalData } from './phiAllowlist';
 
 export const HARD_MAX_SINGLE_ACTION_MINOR = 50_000; // $500.00 USD
 export const HARD_MAX_DAILY_LIMIT_MINOR = 250_000; // $2,500.00 USD
+export const AI_MAX_SINGLE_ACTION_MINOR = HARD_MAX_SINGLE_ACTION_MINOR;
+export const AI_MAX_DAILY_LIMIT_MINOR = HARD_MAX_DAILY_LIMIT_MINOR;
 
 export function clampGuardrailPolicy(partial?: Partial<GuardrailPolicy>): GuardrailPolicy {
   const rawSingle = partial?.maxSingleActionMinor ?? HARD_MAX_SINGLE_ACTION_MINOR;

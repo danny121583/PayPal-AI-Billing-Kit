@@ -12,6 +12,11 @@ import {
   evaluateAiFinancialGuardrail,
   extractPayPalWebhookHeaders,
   normalizePayPalWebhookEvent,
+  evaluateConversationalAuthorization,
+  generateReceiptPdfString,
+  generateReceiptPdfBytes,
+  UNIFIED_MCP_TOOL_REGISTRY,
+  UNIFIED_MCP_REGISTRY_SUMMARY,
 } from '../packages/paypal-billing-kit/src';
 import BillingAISettingsModal, {
   formatAuditEventLabel,
@@ -19,6 +24,7 @@ import BillingAISettingsModal, {
 import BillingCreateInvoiceModal from '../components/billing/BillingCreateInvoiceModal';
 import BillingInvoiceCard from '../components/billing/BillingInvoiceCard';
 import BillingInvoiceDetailModal from '../components/billing/BillingInvoiceDetailModal';
+import BillingMaaSMcpModal from '../components/billing/BillingMaaSMcpModal';
 import PayPalConnectCard from '../components/billing/PayPalConnectCard';
 import DoctorBillingView from '../components/billing/DoctorBillingView';
 import PatientBillingView from '../components/billing/PatientBillingView';
@@ -501,5 +507,168 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     });
 
     expect(queryByText(/Invoice not found/i)).toBeNull();
+  });
+
+  it('Section 6 & 14: Conversational Authorization evaluates all 9 command, capability, hypothetical, guardrail, and confirmation cases', () => {
+    // 1. Capability question -> NOT authorized to execute
+    const capQ = evaluateConversationalAuthorization({
+      instruction: 'Can you refund invoices?',
+    });
+    expect(capQ.authorizedToExecute).toBe(false);
+    expect(capQ.reasonCode).toBe('CAPABILITY_INQUIRY_NO_EXECUTION');
+
+    // 2. Hypothetical question -> NOT authorized to execute
+    const hypQ = evaluateConversationalAuthorization({
+      instruction: "What would happen if I paid Alex Rivera's invoice?",
+    });
+    expect(hypQ.authorizedToExecute).toBe(false);
+    expect(hypQ.reasonCode).toBe('HYPOTHETICAL_PREVIEW_ONLY');
+
+    // 3. Read / explanation request -> read-only query, NOT a mutating write
+    const readQ = evaluateConversationalAuthorization({
+      instruction: "Show me Alex Rivera's invoices.",
+    });
+    expect(readQ.intent).toBe('read_query');
+    expect(readQ.operation).toBe('search_invoices');
+
+    // 4. Explicit create invoice instruction -> authorized to execute create_invoice
+    const createCmd = evaluateConversationalAuthorization({
+      instruction: 'Create a $35 invoice for Alex Rivera for forms.',
+      actorRole: 'doctor',
+    });
+    expect(createCmd.authorizedToExecute).toBe(true);
+    expect(createCmd.operation).toBe('create_invoice');
+    expect(createCmd.extractedParams.amountMinor).toBe(3500);
+    expect(createCmd.extractedParams.serviceCode).toBe('ADMIN-FORMS');
+
+    // 5. Explicit payment instruction -> authorized to create PayPal Sandbox checkout order, requires PayPal buyer auth
+    const payCmd = evaluateConversationalAuthorization({
+      instruction: "Pay Alex Rivera's $35 invoice PPB-INV-2026-1002.",
+      actorRole: 'patient',
+    });
+    expect(payCmd.authorizedToExecute).toBe(true);
+    expect(payCmd.operation).toBe('pay_invoice');
+    expect(payCmd.requiresExternalPayPalBuyerApproval).toBe(true);
+
+    // 6. Explicit refund instruction within $500 limit -> authorized to execute refund_payment
+    const refundCmd = evaluateConversationalAuthorization({
+      instruction: 'Refund $20 on invoice PPB-INV-2026-1003.',
+      actorRole: 'doctor',
+    });
+    expect(refundCmd.authorizedToExecute).toBe(true);
+    expect(refundCmd.operation).toBe('refund_payment');
+    expect(refundCmd.extractedParams.amountMinor).toBe(2000);
+
+    // 7. Over-limit refund ($600 > $500 single-action limit) -> blocked by guardrail
+    const overLimitRefund = evaluateConversationalAuthorization({
+      instruction: 'Refund $600 on invoice PPB-INV-2026-1003.',
+      actorRole: 'doctor',
+    });
+    expect(overLimitRefund.authorizedToExecute).toBe(false);
+    expect(overLimitRefund.reasonCode).toBe('GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED');
+
+    // 8. Explicit void unpaid invoice -> authorized to execute void_invoice
+    const voidCmd = evaluateConversationalAuthorization({
+      instruction: 'Void unpaid invoice PPB-INV-2026-1001.',
+      actorRole: 'doctor',
+    });
+    expect(voidCmd.authorizedToExecute).toBe(true);
+    expect(voidCmd.operation).toBe('void_invoice');
+
+    // 9. Prior proposal confirmation ("Yes, confirm that.") -> authorized when pending proposal exists
+    const confirmCmd = evaluateConversationalAuthorization({
+      instruction: 'Yes, confirm that.',
+      hasPendingProposal: true,
+      pendingProposalId: 'prop-123',
+      pendingProposalKind: 'invoice_create',
+    });
+    expect(confirmCmd.authorizedToExecute).toBe(true);
+    expect(confirmCmd.reasonCode).toBe('AUTHORIZED_FOLLOW_UP_CONFIRMATION');
+  });
+
+  it('Section 8, 9 & 11: Unified 26-Tool MCP Registry, PDF 1.4 Receipt Generator, and UI Modal integration', () => {
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.totalTools).toBe(26);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.read_only).toBe(16);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.proposal_only).toBe(3);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.confirmed_write).toBe(7);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.native_app).toBe(20);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp).toBe(1);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter).toBe(5);
+    expect(UNIFIED_MCP_TOOL_REGISTRY.length).toBe(26);
+
+    const sampleReceiptPayload = {
+      receipt_number: '5HM71086SR568352C',
+      invoice_id: '562b3029-9a2c-452b-8ee8-d04939e336bf',
+      invoice_number: 'PPB-INV-2026-1057',
+      status: 'paid',
+      organization_name: 'Jenkins Wellness & Telehealth Practice',
+      provider_name: 'Dr. Sarah Jenkins',
+      customer_name: 'Alex Rivera',
+      currency: 'USD',
+      total_minor: 3500,
+      total_usd: '$35.00',
+      amount_paid_minor: 3500,
+      amount_paid_usd: '$35.00',
+      amount_refunded_minor: 0,
+      amount_refunded_usd: '$0.00',
+      balance_due_minor: 0,
+      balance_due_usd: '$0.00',
+      service_date: '2026-11-02',
+      paid_at: '2026-11-02T21:53:02Z',
+      refunded_at: null,
+      settlement_reference: '5HM71086SR568352C',
+      paypal_order_id: '7FA47897KM5938009',
+      paypal_capture_id: '5HM71086SR568352C',
+      settlement_verification: 'paypal_sandbox_verified' as const,
+      is_live_paypal_capture: true,
+      verification_badge: 'Verified PayPal Sandbox Capture',
+      line_items: [
+        {
+          service_code: 'ADMIN-FORMS',
+          description: 'Forms Completion',
+          quantity: 1,
+          unit_amount_minor: 3500,
+          unit_amount_usd: '$35.00',
+          line_total_minor: 3500,
+          line_total_usd: '$35.00',
+        },
+      ],
+    };
+
+    // Verify PDF 1.4 Receipt generation
+    const pdfStr = generateReceiptPdfString(sampleReceiptPayload);
+    expect(pdfStr.startsWith('%PDF-1.4')).toBe(true);
+    expect(pdfStr).toContain('PPB-INV-2026-1057');
+    expect(pdfStr).toContain('5HM71086SR568352C');
+    expect(pdfStr.trim().endsWith('%%EOF')).toBe(true);
+    expect(generateReceiptPdfBytes(sampleReceiptPayload).byteLength).toBeGreaterThan(1000);
+
+    // Render Unified MCP Modal and verify 26 tools + brand icon + PDF receipt endpoint
+    const { getByTestId, getByText } = render(
+      <BillingMaaSMcpModal
+        visible={true}
+        demoSessionId="test-session-123"
+        onClose={jest.fn()}
+      />
+    );
+    expect(getByTestId('maas-modal-brand-icon')).toBeTruthy();
+    expect(getByTestId('maas-tool-count-title')).toBeTruthy();
+    expect(getByText('26 Exposed Tools by Permission Tier')).toBeTruthy();
+    expect(getByTestId('maas-pdf-receipt-endpoint')).toBeTruthy();
+
+    // Render Invoice Detail Modal for paid invoice #PPB-INV-2026-1003 and verify Download PDF Receipt button
+    const paidInv = getSyntheticInvoicesForRole('doctor').find(
+      (i) => i.invoiceNumber === 'PPB-INV-2026-1003'
+    )!;
+    const { getByTestId: getDetailByTestId } = render(
+      <BillingInvoiceDetailModal
+        visible={true}
+        invoice={paidInv}
+        roleScope="doctor"
+        onClose={jest.fn()}
+        onAskBillingAI={jest.fn()}
+      />
+    );
+    expect(getDetailByTestId('billing-download-pdf-receipt-btn')).toBeTruthy();
   });
 });

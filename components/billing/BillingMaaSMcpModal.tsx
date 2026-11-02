@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -14,7 +12,13 @@ import {
   Terminal,
 } from 'lucide-react-native';
 import BillingModalShell from './BillingModalShell';
+import BillingBrandIcon from './BillingBrandIcon';
 import { ModalActionButtons } from '../ui/ModalActionButtons';
+import {
+  UNIFIED_MCP_TOOL_REGISTRY,
+  UNIFIED_MCP_REGISTRY_SUMMARY,
+  type UnifiedMcpToolMetadata,
+} from '../../packages/paypal-billing-kit/src/mcpRegistry';
 
 export interface BillingMaaSMcpModalProps {
   visible: boolean;
@@ -25,36 +29,21 @@ export interface BillingMaaSMcpModalProps {
 const MAAS_CLOUDFLARE_ENDPOINT =
   'https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp';
 
-const MAAS_SUPABASE_ENDPOINT =
-  'https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp';
+const READ_ONLY_TOOLS = UNIFIED_MCP_TOOL_REGISTRY.filter(
+  (t) => t.classification === 'read_only'
+);
+const PROPOSAL_ONLY_TOOLS = UNIFIED_MCP_TOOL_REGISTRY.filter(
+  (t) => t.classification === 'proposal_only'
+);
+const CONFIRMED_WRITE_TOOLS = UNIFIED_MCP_TOOL_REGISTRY.filter(
+  (t) => t.classification === 'confirmed_demo_write'
+);
 
-const READ_ONLY_TOOLS = [
-  'discover_billing_capabilities',
-  'list_demo_customers',
-  'search_invoices',
-  'get_invoice_details',
-  'explain_outstanding_balances',
-  'get_transaction_history',
-  'get_payment_receipt',
-  'get_financial_audit_history',
-  'get_paypal_sandbox_status',
-  'get_business_metrics',
-];
-
-const PROPOSAL_ONLY_TOOLS = [
-  'create_invoice_proposal',
-  'prepare_payment_proposal',
-  'prepare_refund_proposal',
-];
-
-const CONFIRMED_WRITE_TOOLS = [
-  'create_approved_invoice',
-  'create_paypal_checkout_order',
-  'capture_paypal_checkout_order',
-  'execute_approved_refund',
-  'void_unpaid_invoice',
-  'reset_demo_session',
-];
+function getSourceBadgeLabel(source: UnifiedMcpToolMetadata['source']): string {
+  if (source === 'official_paypal_mcp') return 'OFFICIAL MCP';
+  if (source === 'paypal_rest_adapter') return 'PAYPAL REST';
+  return 'APP';
+}
 
 export default function BillingMaaSMcpModal({
   visible,
@@ -115,8 +104,8 @@ export default function BillingMaaSMcpModal({
     <BillingModalShell
       visible={visible}
       onClose={onClose}
-      title="MCP Agent Interface"
-      subtitle="Connect AI agents to billing tools through Model Context Protocol (MCP)."
+      title="Unified MCP Agent Interface"
+      subtitle="Connect AI agents to 26 unified application & PayPal Sandbox tools through Model Context Protocol (MCP)."
       testID="billing-maas-mcp-modal"
       closeTestID="billing-maas-mcp-close-btn"
       closeAccessibilityLabel="Close MCP Agent Interface modal"
@@ -145,11 +134,12 @@ export default function BillingMaaSMcpModal({
       }
     >
       <View style={styles.guardrailBanner}>
+        <BillingBrandIcon size={20} testID="maas-modal-brand-icon" />
         <ShieldCheck size={16} color="#065F46" />
         <Text style={styles.guardrailBannerText}>
           Zero secrets exposed. Every external agent call is scoped to an
           isolated demo_session_id with $500 single-action and $2,500 daily
-          guardrails.
+          guardrails + conversational authorization.
         </Text>
       </View>
 
@@ -163,7 +153,7 @@ export default function BillingMaaSMcpModal({
           {demoSessionId}
         </Text>
 
-        <Text style={styles.label}>Dedicated Cloudflare Worker MCP Gateway (Global Edge)</Text>
+        <Text style={styles.label}>Dedicated Cloudflare Worker Unified MCP Gateway (Global Edge)</Text>
         <Text style={styles.codeBox} selectable testID="maas-cloudflare-endpoint">
           {MAAS_CLOUDFLARE_ENDPOINT}
         </Text>
@@ -182,45 +172,74 @@ export default function BillingMaaSMcpModal({
         <Text style={styles.codeBox} selectable testID="maas-docs-endpoint">
           {`https://paypal-ai-billing-mcp.apd1034.workers.dev/docs/mcp`}
         </Text>
+
+        <Text style={styles.label}>Downloadable PDF Receipt Endpoint (Paid/Refunded Invoices)</Text>
+        <Text style={styles.codeBox} selectable testID="maas-pdf-receipt-endpoint">
+          {`https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1003.pdf`}
+        </Text>
       </View>
 
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeaderRow}>
           <Terminal size={15} color="#1D4ED8" />
-          <Text style={styles.sectionTitle}>
-            19 Exposed Tools by Permission Tier
+          <Text style={styles.sectionTitle} testID="maas-tool-count-title">
+            {`${UNIFIED_MCP_REGISTRY_SUMMARY.totalTools} Exposed Tools by Permission Tier`}
           </Text>
         </View>
 
+        <View style={styles.sourceSummaryRow} testID="maas-source-summary-row">
+          <View style={[styles.sourcePill, styles.sourcePillApp]}>
+            <Text style={styles.sourcePillAppText}>
+              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.native_app} Native Application`}
+            </Text>
+          </View>
+          <View style={[styles.sourcePill, styles.sourcePillOfficial]}>
+            <Text style={styles.sourcePillOfficialText}>
+              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp} Official PayPal MCP`}
+            </Text>
+          </View>
+          <View style={[styles.sourcePill, styles.sourcePillAdapter]}>
+            <Text style={styles.sourcePillAdapterText}>
+              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter} PayPal REST Adapter`}
+            </Text>
+          </View>
+        </View>
+
         <Text style={styles.tierLabel}>
-          1. Read-Only Discovery, Receipts & Inspection (10 Tools)
+          {`1. Read-Only Discovery, Receipts & PayPal Sandbox Inspection (${READ_ONLY_TOOLS.length} Tools)`}
         </Text>
         <View style={styles.chipWrap}>
           {READ_ONLY_TOOLS.map((t) => (
-            <View key={t} style={[styles.toolChip, styles.toolChipRead]}>
-              <Text style={styles.toolChipReadText}>{t}</Text>
+            <View key={t.name} style={[styles.toolChip, styles.toolChipRead]}>
+              <Text style={styles.toolChipReadText}>
+                {`${t.name} [${getSourceBadgeLabel(t.source)}]`}
+              </Text>
             </View>
           ))}
         </View>
 
         <Text style={styles.tierLabel}>
-          2. Proposal-Only — Human Approval Required (3 Tools)
+          {`2. Proposal-Only — Human Approval or Conversational Instruction (${PROPOSAL_ONLY_TOOLS.length} Tools)`}
         </Text>
         <View style={styles.chipWrap}>
           {PROPOSAL_ONLY_TOOLS.map((t) => (
-            <View key={t} style={[styles.toolChip, styles.toolChipProposal]}>
-              <Text style={styles.toolChipProposalText}>{t}</Text>
+            <View key={t.name} style={[styles.toolChip, styles.toolChipProposal]}>
+              <Text style={styles.toolChipProposalText}>
+                {`${t.name} [${getSourceBadgeLabel(t.source)}]`}
+              </Text>
             </View>
           ))}
         </View>
 
         <Text style={styles.tierLabel}>
-          3. Confirmed Financial Workflows & Demo Session Writes (6 Tools)
+          {`3. Confirmed Financial Workflows & Conversational Writes (${CONFIRMED_WRITE_TOOLS.length} Tools)`}
         </Text>
         <View style={styles.chipWrap}>
           {CONFIRMED_WRITE_TOOLS.map((t) => (
-            <View key={t} style={[styles.toolChip, styles.toolChipWrite]}>
-              <Text style={styles.toolChipWriteText}>{t}</Text>
+            <View key={t.name} style={[styles.toolChip, styles.toolChipWrite]}>
+              <Text style={styles.toolChipWriteText}>
+                {`${t.name} [${getSourceBadgeLabel(t.source)}]`}
+              </Text>
             </View>
           ))}
         </View>
@@ -283,6 +302,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  sourceSummaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  sourcePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  sourcePillApp: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  sourcePillAppText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1D4ED8',
+  },
+  sourcePillOfficial: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#DDD6FE',
+  },
+  sourcePillOfficialText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#6D28D9',
+  },
+  sourcePillAdapter: {
+    backgroundColor: '#ECFEFF',
+    borderColor: '#A5F3FC',
+  },
+  sourcePillAdapterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0E7490',
   },
   label: {
     fontSize: 11,

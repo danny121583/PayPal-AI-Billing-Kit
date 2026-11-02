@@ -2,7 +2,7 @@
 -- 20261101000000_paypal_ai_billing_kit.sql
 -- Standalone PayPal AI Billing Kit — Dedicated Supabase Schema, RLS & Demo Seed
 -- Project: paypal-ai-billing-kit (dvzfesfvefggnunkjhom)
--- Zero Health eRecords Dependencies • Zero PHI • Strict Row-Level Security
+-- Zero External Dependencies • Zero PHI • Strict Row-Level Security
 -- =============================================================================
 
 set search_path = public, extensions;

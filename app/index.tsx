@@ -35,6 +35,7 @@ import BillingAIAssistantModal from '../components/billing/BillingAIAssistantMod
 import BillingAISettingsModal from '../components/billing/BillingAISettingsModal';
 import BillingNotificationsModal from '../components/billing/BillingNotificationsModal';
 import BillingMaaSMcpModal from '../components/billing/BillingMaaSMcpModal';
+import BillingBrandIcon from '../components/billing/BillingBrandIcon';
 import type {
   BillingNotificationItem,
   BillingRoleScope,
@@ -473,9 +474,12 @@ export default function BillingScreen() {
 
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
-            <Text style={styles.title} testID="billing-header-title">
-              {isDoctorRole ? 'Provider Billing' : 'Customer Billing'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <BillingBrandIcon size={28} />
+              <Text style={styles.title} testID="billing-header-title">
+                {isDoctorRole ? 'Provider Billing' : 'Customer Billing'}
+              </Text>
+            </View>
             <Text
               style={styles.subtitle}
               numberOfLines={1}

@@ -140,11 +140,11 @@ async function main() {
     '_meta',
   ]);
   const strictSchemaValid =
-    tools.length === 19 &&
+    tools.length === 26 &&
     tools.every((t) => Object.keys(t).every((k) => allowedTopKeys.has(k)) && t._meta?.permissionTier);
   assert(
     strictSchemaValid,
-    `MCP \`tools/list\` exposes all 19 tools with strict MCP schema compliance (count=${tools.length})`
+    `MCP \`tools/list\` exposes all 26 Unified MCP tools with strict MCP schema compliance (count=${tools.length})`
   );
 
   // 7. Tool 1: discover_billing_capabilities
@@ -446,7 +446,65 @@ async function main() {
     `Tool 14 (\`get_business_metrics\`): returns practice KPIs (Outstanding=${metrics.data?.provider_metrics?.outstanding_balance_usd})`
   );
 
-  // 23. Tool 15: reset_demo_session
+  // 23. Tool 20: execute_conversational_instruction (Capability Inquiry blocked vs Explicit Command executed)
+  const convCapability = await callTool('execute_conversational_instruction', {
+    instruction: 'Can you refund invoices?',
+    actor_role: 'doctor',
+  });
+  const convCreate = await callTool('execute_conversational_instruction', {
+    instruction: 'Create a $35 invoice for Alex Rivera for forms',
+    actor_role: 'doctor',
+  });
+  assert(
+    convCapability.data?.ok === true &&
+      convCapability.data?.executed === false &&
+      convCreate.data?.ok === true &&
+      convCreate.data?.executed === true &&
+      Boolean(convCreate.data?.invoice?.invoice_number),
+    `Tool 20 (\`execute_conversational_instruction\`): blocks capability question and executes explicit $35 invoice creation (#${convCreate.data?.invoice?.invoice_number})`
+  );
+
+  // 24. Tool 21: paypal_discover_official_mcp
+  const officialMcp = await callTool('paypal_discover_official_mcp');
+  assert(
+    officialMcp.data?.ok === true &&
+      officialMcp.data?.source === 'official_paypal_mcp' &&
+      officialMcp.data?.official_paypal_mcp?.endpoints_probed?.sse_authenticated_reachable === true &&
+      officialMcp.data?.official_paypal_mcp?.upstream_runtime_diagnostic?.upstream_tools_count === 46,
+    'Tool 21 (`paypal_discover_official_mcp`): verifies live connection to https://mcp.sandbox.paypal.com/sse (46 official PayPal tools discovered)'
+  );
+
+  // 25. Tools 22-26: Official PayPal REST Adapter Tools (`paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`)
+  const ppGetOrder = await callTool('paypal_get_order', { order_id: '7FA47897KM5938009' });
+  const ppGetRefund = await callTool('paypal_get_refund', { refund_id: '2EM77813GU330222M' });
+  const ppListInvoices = await callTool('paypal_list_invoices', { page: 1, page_size: 5 });
+  const ppGenInvNum = await callTool('paypal_generate_invoice_number');
+  const ppListDisputes = await callTool('paypal_list_disputes', { page_size: 5 });
+  assert(
+    ppGetOrder.data?.ok === true &&
+      ppGetOrder.data?.order_id === '7FA47897KM5938009' &&
+      ppGetRefund.data?.ok === true &&
+      ppGetRefund.data?.refund_id === '2EM77813GU330222M' &&
+      ppListInvoices.data?.ok === true &&
+      ppGenInvNum.data?.ok === true &&
+      Boolean(ppGenInvNum.data?.paypal_invoice_number) &&
+      ppListDisputes.data?.ok === true,
+    `Tools 22–26 (PayPal REST Adapters): verified live PayPal Order (7FA47897KM5938009), Refund (2EM77813GU330222M), Invoicing v2 number (${ppGenInvNum.data?.paypal_invoice_number}), and Disputes API`
+  );
+
+  // 26. Binary PDF Receipt Endpoint (`GET /api/receipts/PPB-INV-2026-1003.pdf`)
+  const pdfRes = await fetch(`${BASE_ORIGIN}/api/receipts/PPB-INV-2026-1003.pdf`);
+  const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
+  const pdfHeader = Buffer.from(pdfBytes.slice(0, 8)).toString('utf8');
+  assert(
+    pdfRes.status === 200 &&
+      (pdfRes.headers.get('content-type') || '').includes('application/pdf') &&
+      pdfHeader.startsWith('%PDF-1.4') &&
+      pdfBytes.byteLength > 2000,
+    `Binary PDF 1.4 Receipt Endpoint (\`/api/receipts/PPB-INV-2026-1003.pdf\`): HTTP 200, application/pdf (${pdfBytes.byteLength} bytes, %PDF-1.4)`
+  );
+
+  // 27. Tool 15: reset_demo_session
   const reset = await callTool('reset_demo_session');
   const afterReset = await callTool('search_invoices', { status: 'all' });
   assert(

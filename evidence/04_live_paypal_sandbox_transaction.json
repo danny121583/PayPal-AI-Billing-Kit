@@ -407,5 +407,419 @@
         "demo_session_id": "canonical"
       }
     ]
+  },
+  "proof_version": "1.6.0",
+  "verified_at": "2026-11-02T22:49:18.380Z",
+  "unified_mcp_endpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
+  "official_paypal_mcp_diagnostic": {
+    "ok": true,
+    "source": "official_paypal_mcp",
+    "demo_session_id": "live-sbx-v16-1793659741573",
+    "official_paypal_mcp": {
+      "server_info": {
+        "name": "PayPal MCP Agent",
+        "version": "1.0.0"
+      },
+      "endpoints_probed": {
+        "http_endpoint": "https://mcp.sandbox.paypal.com/http",
+        "http_status": 404,
+        "http_note": "https://mcp.sandbox.paypal.com/http returns HTTP 404; PayPal hosts its official MCP server on /sse and /mcp (OAuth 2.0 protected).",
+        "sse_endpoint": "https://mcp.sandbox.paypal.com/sse",
+        "sse_authenticated_reachable": true,
+        "sse_session_endpoint_sample": "/sse/message?sessionId=b914aa4b5d433d647c4293e46de4a88e410999f9a92e2e8dc1e6a98d30db6d9c",
+        "oauth_metadata_endpoint": "https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server",
+        "oauth_issuer": "https://mcp.sandbox.paypal.com"
+      },
+      "upstream_runtime_diagnostic": {
+        "tool_discovery_works": true,
+        "upstream_tools_count": 46,
+        "upstream_tools_sample": [
+          "create_invoice",
+          "list_invoices",
+          "get_invoice",
+          "send_invoice",
+          "send_invoice_reminder",
+          "cancel_sent_invoice",
+          "generate_invoice_qr_code",
+          "create_product",
+          "list_products",
+          "show_product_details",
+          "update_product",
+          "create_subscription_plan",
+          "list_subscription_plans",
+          "show_subscription_plan_details",
+          "create_subscription",
+          "show_subscription_details",
+          "update_subscription",
+          "cancel_subscription",
+          "create_shipment_tracking",
+          "get_shipment_tracking",
+          "update_shipment_tracking",
+          "create_order",
+          "get_order",
+          "capture_order",
+          "list_disputes",
+          "get_dispute",
+          "accept_dispute_claim",
+          "list_transactions",
+          "pay_invoice",
+          "create_And_Send_Invoice",
+          "generate_invoice_number",
+          "create_webhook",
+          "Starting_ page_for_PayPal_integration",
+          "get_merchant_insights",
+          "create_refund",
+          "get_refund"
+        ],
+        "upstream_tools_call_issue": "Calling tools/call on mcp.sandbox.paypal.com triggers PAYPAL_API_SETUP_ERROR: \"Unsupported cache mode: default\" inside @paypal/agent-toolkit (src/shared/functions.ts:2053) because axios passes cache:\"default\" to Cloudflare Workers fetch.",
+        "unified_gateway_resolution": "Our Unified PayPal MCP Gateway connects to mcp.sandbox.paypal.com for official schema & capability discovery and executes the official PayPal tool contracts (paypal_get_order, paypal_get_refund, paypal_list_invoices, paypal_generate_invoice_number, paypal_list_disputes) directly against api-m.sandbox.paypal.com using the same merchant Sandbox OAuth 2.0 token."
+      },
+      "paypal_sandbox_oauth": {
+        "authenticated": true,
+        "app_id": "APP-5SK74342S6474230W"
+      }
+    }
+  },
+  "conversational_execution_proof": {
+    "demo_session_id": "live-sbx-v16-1793659741573",
+    "created_invoice": {
+      "id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+      "invoice_number": "PPB-INV-2026-1062",
+      "status": "sent",
+      "customer_name": "Alex Rivera",
+      "service_code": "ADMIN-FORMS",
+      "total_minor": 3500,
+      "total_usd": "$35.00",
+      "due_date": "2026-11-16"
+    },
+    "created_paypal_order": {
+      "ok": true,
+      "demo_session_id": "live-sbx-v16-1793659741573",
+      "checkout_mode": "paypal_sandbox_live",
+      "invoice_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+      "invoice_number": "PPB-INV-2026-1062",
+      "customer_name": "Alex Rivera",
+      "amount_minor": 3500,
+      "amount_usd": "$35.00",
+      "order_id": "3FT930933B6256512",
+      "order_status": "PAYER_ACTION_REQUIRED",
+      "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=3FT930933B6256512",
+      "message": "PayPal Sandbox Order 3FT930933B6256512 created for Statement #PPB-INV-2026-1062 ($35.00 USD). Open the approval_url to authorize as the Sandbox buyer, then call `capture_paypal_checkout_order`."
+    },
+    "paypal_get_order_verification": {
+      "id": "3FT930933B6256512",
+      "intent": "CAPTURE",
+      "status": "PAYER_ACTION_REQUIRED",
+      "payment_source": {
+        "paypal": {}
+      },
+      "purchase_units": [
+        {
+          "reference_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+          "amount": {
+            "currency_code": "USD",
+            "value": "35.00",
+            "breakdown": {}
+          },
+          "payee": {
+            "email_address": "sb-ixtp453680658@business.example.com",
+            "merchant_id": "L9KAFVR7N9HLY",
+            "display_data": {
+              "brand_name": "PayPal AI Billing Kit Sandbox"
+            }
+          },
+          "description": "Administrative Statement PPB-INV-2026-1062",
+          "custom_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+          "invoice_id": "PPB-INV-2026-1062-0292"
+        }
+      ],
+      "create_time": "2026-11-02T22:49:10Z",
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/3FT930933B6256512",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://www.sandbox.paypal.com/checkoutnow?token=3FT930933B6256512",
+          "rel": "payer-action",
+          "method": "GET"
+        }
+      ]
+    },
+    "paypal_generated_invoice_number": "0001"
+  },
+  "live_paypal_sandbox_end_to_end_proof": {
+    "demo_session_id": "live-sbx-1793655303922",
+    "invoice_number": "PPB-INV-2026-1057",
+    "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+    "paypal_order_id": "7FA47897KM5938009",
+    "paypal_capture_id": "5HM71086SR568352C",
+    "paypal_refund_id": "2EM77813GU330222M",
+    "live_paypal_order_api_response": {
+      "id": "7FA47897KM5938009",
+      "intent": "CAPTURE",
+      "status": "COMPLETED",
+      "payment_source": {
+        "card": {
+          "name": "Alex Rivera",
+          "last_digits": "6953",
+          "expiry": "2029-12",
+          "brand": "VISA",
+          "available_networks": [
+            "VISA"
+          ],
+          "type": "CREDIT",
+          "bin_details": {
+            "bin": "403203",
+            "issuing_bank": "Baxter Credit Union",
+            "bin_country_code": "US"
+          }
+        }
+      },
+      "purchase_units": [
+        {
+          "reference_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+          "amount": {
+            "currency_code": "USD",
+            "value": "35.00",
+            "breakdown": {}
+          },
+          "payee": {
+            "email_address": "sb-ixtp453680658@business.example.com",
+            "merchant_id": "L9KAFVR7N9HLY",
+            "display_data": {
+              "brand_name": "PayPal AI Billing Kit Sandbox"
+            }
+          },
+          "description": "Administrative Statement PPB-INV-2026-1057",
+          "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+          "invoice_id": "PPB-INV-2026-1057-7209",
+          "soft_descriptor": "TEST STORE",
+          "supplementary_data": {
+            "risk": {
+              "risk_level_indicator": "HIGH_RISK"
+            }
+          },
+          "payments": {
+            "captures": [
+              {
+                "id": "5HM71086SR568352C",
+                "status": "REFUNDED",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "35.00"
+                },
+                "final_capture": true,
+                "seller_protection": {
+                  "status": "NOT_ELIGIBLE"
+                },
+                "seller_receivable_breakdown": {
+                  "gross_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  },
+                  "paypal_fee": {
+                    "currency_code": "USD",
+                    "value": "1.40"
+                  },
+                  "net_amount": {
+                    "currency_code": "USD",
+                    "value": "33.60"
+                  }
+                },
+                "invoice_id": "PPB-INV-2026-1057-7209",
+                "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+                "links": [
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C",
+                    "rel": "self",
+                    "method": "GET"
+                  },
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C/refund",
+                    "rel": "refund",
+                    "method": "POST"
+                  },
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/checkout/orders/7FA47897KM5938009",
+                    "rel": "up",
+                    "method": "GET"
+                  }
+                ],
+                "create_time": "2026-11-02T21:52:12Z",
+                "update_time": "2026-11-02T21:53:06Z",
+                "network_transaction_reference": {
+                  "id": "043595502366789",
+                  "network": "VISA"
+                },
+                "processor_response": {
+                  "avs_code": "A",
+                  "cvv_code": "M",
+                  "response_code": "0000"
+                }
+              }
+            ],
+            "refunds": [
+              {
+                "id": "2EM77813GU330222M",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "35.00"
+                },
+                "note_to_payer": "Administrative Statement Refund PPB-INV-2026-1057",
+                "seller_payable_breakdown": {
+                  "gross_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  },
+                  "paypal_fee": {
+                    "currency_code": "USD",
+                    "value": "0.00"
+                  },
+                  "platform_fees": [
+                    {
+                      "amount": {
+                        "currency_code": "USD",
+                        "value": "0.00"
+                      }
+                    }
+                  ],
+                  "net_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  },
+                  "total_refunded_amount": {
+                    "currency_code": "USD",
+                    "value": "35.00"
+                  }
+                },
+                "invoice_id": "PPB-INV-2026-1057-7209",
+                "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+                "status": "COMPLETED",
+                "links": [
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/refunds/2EM77813GU330222M",
+                    "rel": "self",
+                    "method": "GET"
+                  },
+                  {
+                    "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C",
+                    "rel": "up",
+                    "method": "GET"
+                  }
+                ],
+                "create_time": "2026-11-02T13:53:06-08:00",
+                "update_time": "2026-11-02T13:53:06-08:00"
+              }
+            ]
+          }
+        }
+      ],
+      "create_time": "2026-11-02T21:52:12Z",
+      "update_time": "2026-11-02T21:53:06Z",
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/7FA47897KM5938009",
+          "rel": "self",
+          "method": "GET"
+        }
+      ]
+    },
+    "live_paypal_refund_api_response": {
+      "id": "2EM77813GU330222M",
+      "amount": {
+        "currency_code": "USD",
+        "value": "35.00"
+      },
+      "note_to_payer": "Administrative Statement Refund PPB-INV-2026-1057",
+      "seller_payable_breakdown": {
+        "gross_amount": {
+          "currency_code": "USD",
+          "value": "35.00"
+        },
+        "paypal_fee": {
+          "currency_code": "USD",
+          "value": "0.00"
+        },
+        "net_amount": {
+          "currency_code": "USD",
+          "value": "35.00"
+        },
+        "total_refunded_amount": {
+          "currency_code": "USD",
+          "value": "35.00"
+        }
+      },
+      "invoice_id": "PPB-INV-2026-1057-7209",
+      "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "status": "COMPLETED",
+      "create_time": "2026-11-02T13:53:06-08:00",
+      "update_time": "2026-11-02T13:53:06-08:00",
+      "payer": {
+        "email_address": "sb-ixtp453680658@business.example.com",
+        "merchant_id": "L9KAFVR7N9HLY"
+      },
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v2/payments/refunds/2EM77813GU330222M",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://api.sandbox.paypal.com/v2/payments/captures/5HM71086SR568352C",
+          "rel": "up",
+          "method": "GET"
+        }
+      ]
+    },
+    "structured_receipt": {
+      "receipt_number": "5HM71086SR568352C",
+      "invoice_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
+      "invoice_number": "PPB-INV-2026-1057",
+      "status": "refunded",
+      "organization_name": "Jenkins Wellness & Telehealth Practice",
+      "provider_name": "Dr. Sarah Jenkins",
+      "customer_name": "Alex Rivera",
+      "currency": "USD",
+      "total_minor": 3500,
+      "total_usd": "$35.00",
+      "amount_paid_minor": 3500,
+      "amount_paid_usd": "$35.00",
+      "amount_refunded_minor": 3500,
+      "amount_refunded_usd": "$35.00",
+      "balance_due_minor": 0,
+      "balance_due_usd": "$0.00",
+      "service_date": "2026-11-02",
+      "paid_at": "2026-11-02T21:53:02.952534+00:00",
+      "refunded_at": null,
+      "settlement_reference": "5HM71086SR568352C",
+      "paypal_capture_id": "5HM71086SR568352C",
+      "settlement_verification": "paypal_sandbox_verified",
+      "is_live_paypal_capture": true,
+      "verification_badge": "Verified PayPal Sandbox Capture",
+      "line_items": [
+        {
+          "service_code": "ADMIN-FORMS",
+          "description": "Forms Completion — Administrative school, work, or insurance form completion fee",
+          "quantity": 1,
+          "unit_amount_minor": 3500,
+          "unit_amount_usd": "$35.00",
+          "line_total_minor": 3500,
+          "line_total_usd": "$35.00"
+        }
+      ],
+      "pdf_download_url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?session=live-sbx-1793655303922",
+      "pdf_base64": "[BASE64_PDF_OMITTED_3323_BYTES]",
+      "pdf_byte_length": 3323,
+      "pdf_mime_type": "application/pdf"
+    },
+    "pdf_download_verification": {
+      "url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?demo_session_id=live-sbx-1793655303922",
+      "http_status": 200,
+      "content_type": "application/pdf",
+      "byte_length": 3323,
+      "pdf_header": "%PDF-1.4"
+    }
   }
 }

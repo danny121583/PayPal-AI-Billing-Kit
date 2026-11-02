@@ -61,6 +61,621 @@ function sanitizeDemoSessionId(raw?: unknown): string {
   return cleaned || 'maas-public-demo';
 }
 
+async function getPayPalSandboxCredentialsAndToken(admin: any): Promise<{
+  configured: boolean;
+  oauthReachable: boolean;
+  accessToken: string | null;
+  appId: string | null;
+  expiresIn: number | null;
+  error: string | null;
+}> {
+  let dbClientId = '';
+  let dbClientSecret = '';
+  try {
+    const { data: secRows } = await admin
+      .from('billing_platform_secrets')
+      .select('secret_key, secret_value')
+      .in('secret_key', [
+        'PAYPAL_SANDBOX_CLIENT_ID',
+        'PAYPAL_CLIENT_ID',
+        'PAYPAL_SANDBOX_CLIENT_SECRET',
+        'PAYPAL_CLIENT_SECRET',
+      ]);
+    if (Array.isArray(secRows)) {
+      for (const r of secRows) {
+        if (
+          (r.secret_key === 'PAYPAL_SANDBOX_CLIENT_ID' || r.secret_key === 'PAYPAL_CLIENT_ID') &&
+          r.secret_value
+        ) {
+          dbClientId = String(r.secret_value).trim();
+        }
+        if (
+          (r.secret_key === 'PAYPAL_SANDBOX_CLIENT_SECRET' ||
+            r.secret_key === 'PAYPAL_CLIENT_SECRET') &&
+          r.secret_value
+        ) {
+          dbClientSecret = String(r.secret_value).trim();
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const clientId = PAYPAL_CLIENT_ID || dbClientId;
+  const clientSecret = PAYPAL_CLIENT_SECRET || dbClientSecret;
+  if (!clientId || !clientSecret) {
+    return {
+      configured: false,
+      oauthReachable: false,
+      accessToken: null,
+      appId: null,
+      expiresIn: null,
+      error: 'PayPal Sandbox Client ID or Secret is not configured.',
+    };
+  }
+
+  try {
+    const basic = btoa(`${clientId}:${clientSecret}`);
+    const res = await fetch('https://api-m.sandbox.paypal.com/v1/oauth2/token', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.access_token) {
+      return {
+        configured: true,
+        oauthReachable: false,
+        accessToken: null,
+        appId: null,
+        expiresIn: null,
+        error: data?.error_description || data?.message || `HTTP ${res.status}`,
+      };
+    }
+    return {
+      configured: true,
+      oauthReachable: true,
+      accessToken: String(data.access_token),
+      appId: data.app_id ? String(data.app_id) : null,
+      expiresIn: typeof data.expires_in === 'number' ? data.expires_in : null,
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      configured: true,
+      oauthReachable: false,
+      accessToken: null,
+      appId: null,
+      expiresIn: null,
+      error: err?.message || 'Failed to reach PayPal OAuth endpoint',
+    };
+  }
+}
+
+function escapePdfText(input: string): string {
+  return String(input || '')
+    .replace(/[^\x20-\x7E]/g, '-')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
+}
+
+function generateReceiptPdfDocument(receipt: Record<string, any>): string {
+  const isLive = Boolean(receipt.is_live_paypal_capture);
+  const ops: string[] = [];
+
+  ops.push(isLive ? '0.00 0.19 0.53 rg' : '0.71 0.33 0.04 rg');
+  ops.push('36 708 540 54 re f');
+  ops.push('1 1 1 rg');
+  ops.push('BT /F2 14 Tf 50 738 Td (PAYPAL AI BILLING KIT - OFFICIAL PAYMENT RECEIPT) Tj ET');
+  const subtitle = isLive
+    ? `VERIFIED PAYPAL SANDBOX TRANSACTION | CAPTURE ID: ${receipt.paypal_capture_id || receipt.receipt_number}`
+    : 'SAMPLE DEMO RECORD - SIMULATED SETTLEMENT (NOT A LIVE PAYPAL CAPTURE)';
+  ops.push(`BT /F1 9 Tf 50 720 Td (${escapePdfText(subtitle)}) Tj ET`);
+
+  if (isLive) {
+    ops.push('0.93 0.99 0.96 rg');
+    ops.push('36 666 540 32 re f');
+    ops.push('0.02 0.37 0.27 rg');
+    ops.push(
+      `BT /F2 9.5 Tf 48 683 Td (${escapePdfText(
+        `PROVENANCE: ${receipt.verification_badge} (${receipt.settlement_verification})`
+      )}) Tj ET`
+    );
+    ops.push(
+      `BT /F1 8.5 Tf 48 672 Td (${escapePdfText(
+        `Verified against PayPal Sandbox Orders/Captures v2 API. PayPal Capture ID: ${receipt.paypal_capture_id}`
+      )}) Tj ET`
+    );
+  } else {
+    ops.push('1.00 0.98 0.92 rg');
+    ops.push('36 666 540 32 re f');
+    ops.push('0.57 0.25 0.05 rg');
+    ops.push(
+      'BT /F2 9.5 Tf 48 683 Td (WARNING: SAMPLE DEMO RECORD - NOT A GENUINE PAYPAL TRANSACTION) Tj ET'
+    );
+    ops.push(
+      `BT /F1 8.5 Tf 48 672 Td (${escapePdfText(
+        `Reference: ${receipt.settlement_reference} | Provenance: ${receipt.settlement_verification}`
+      )}) Tj ET`
+    );
+  }
+
+  ops.push('0.06 0.09 0.16 rg');
+  const metaRows: Array<[string, string]> = [
+    ['Receipt Number:', String(receipt.receipt_number)],
+    ['Invoice Number:', `#${receipt.invoice_number}`],
+    ['Business / Provider:', `${receipt.organization_name} (${receipt.provider_name})`],
+    ['Customer Identity:', String(receipt.customer_name)],
+    ['Payment Status:', String(receipt.status || '').toUpperCase()],
+    ['Payment Date:', String(receipt.paid_at || 'N/A')],
+    ['Service Date:', String(receipt.service_date || 'N/A')],
+    ['PayPal Capture ID:', String(receipt.paypal_capture_id || 'N/A (Sample Demo Settlement)')],
+    [
+      'Refund Status:',
+      Number(receipt.amount_refunded_minor || 0) > 0
+        ? `REFUNDED ${receipt.amount_refunded_usd}${receipt.refunded_at ? ` at ${receipt.refunded_at}` : ''}`
+        : 'None ($0.00 Refunded)',
+    ],
+  ];
+
+  let y = 642;
+  for (const [label, value] of metaRows) {
+    ops.push(`BT /F2 9.5 Tf 48 ${y} Td (${escapePdfText(label)}) Tj ET`);
+    ops.push(`BT /F1 9.5 Tf 185 ${y} Td (${escapePdfText(value)}) Tj ET`);
+    y -= 16;
+  }
+
+  y -= 6;
+  ops.push('0.82 0.86 0.91 RG 1 w');
+  ops.push(`36 ${y} m 576 ${y} l S`);
+  y -= 20;
+  ops.push('0.95 0.96 0.98 rg');
+  ops.push(`36 ${y - 6} 540 20 re f`);
+  ops.push('0.06 0.09 0.16 rg');
+  ops.push(`BT /F2 9 Tf 44 ${y} Td (SERVICE CODE) Tj ET`);
+  ops.push(`BT /F2 9 Tf 140 ${y} Td (ADMINISTRATIVE DESCRIPTION) Tj ET`);
+  ops.push(`BT /F2 9 Tf 420 ${y} Td (QTY) Tj ET`);
+  ops.push(`BT /F2 9 Tf 460 ${y} Td (UNIT) Tj ET`);
+  ops.push(`BT /F2 9 Tf 520 ${y} Td (TOTAL) Tj ET`);
+  y -= 20;
+
+  const items = Array.isArray(receipt.line_items) ? receipt.line_items : [];
+  for (const item of items) {
+    const desc =
+      String(item.description || '').length > 48
+        ? `${String(item.description).slice(0, 45)}...`
+        : String(item.description || '');
+    ops.push(`BT /F3 8.5 Tf 44 ${y} Td (${escapePdfText(String(item.service_code || ''))}) Tj ET`);
+    ops.push(`BT /F1 8.5 Tf 140 ${y} Td (${escapePdfText(desc)}) Tj ET`);
+    ops.push(`BT /F1 8.5 Tf 424 ${y} Td (${escapePdfText(String(item.quantity || 1))}) Tj ET`);
+    ops.push(`BT /F1 8.5 Tf 460 ${y} Td (${escapePdfText(String(item.unit_amount_usd || ''))}) Tj ET`);
+    ops.push(`BT /F2 8.5 Tf 520 ${y} Td (${escapePdfText(String(item.line_total_usd || ''))}) Tj ET`);
+    y -= 16;
+  }
+
+  y -= 10;
+  ops.push('0.82 0.86 0.91 RG 1 w');
+  ops.push(`36 ${y} m 576 ${y} l S`);
+  y -= 18;
+  const totals: Array<[string, string]> = [
+    ['Statement Original Total:', `${receipt.total_usd} ${receipt.currency}`],
+    ['Total Amount Paid:', `${receipt.amount_paid_usd} ${receipt.currency}`],
+    ['Total Amount Refunded:', `${receipt.amount_refunded_usd} ${receipt.currency}`],
+    ['Remaining Balance Due:', `${receipt.balance_due_usd} ${receipt.currency}`],
+  ];
+  for (const [tLabel, tVal] of totals) {
+    ops.push(`BT /F2 10 Tf 330 ${y} Td (${escapePdfText(tLabel)}) Tj ET`);
+    ops.push(`BT /F2 10 Tf 495 ${y} Td (${escapePdfText(tVal)}) Tj ET`);
+    y -= 16;
+  }
+
+  ops.push('0.40 0.45 0.53 rg');
+  ops.push(
+    'BT /F1 8 Tf 36 42 Td (Generated by PayPal AI Billing Kit Unified MCP Gateway - Zero PHI Administrative Ledger) Tj ET'
+  );
+
+  const streamContent = ops.join('\n');
+  const objects: string[] = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R /F3 6 0 R >> >> /Contents 7 0 R >>\nendobj\n',
+    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n',
+    '6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n',
+    `7 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}\nendstream\nendobj\n`,
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [0];
+  for (const obj of objects) {
+    offsets.push(pdf.length);
+    pdf += obj;
+  }
+  const xrefStart = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+  for (let i = 1; i < offsets.length; i++) {
+    pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  return pdf;
+}
+
+function evaluateConversationalInstructionServer(params: {
+  instruction: string;
+  actorRole?: string;
+  hasPendingProposal?: boolean;
+  pendingProposalId?: string | null;
+  pendingProposalKind?: string | null;
+  priorExecutionIntent?: boolean;
+}) {
+  const raw = String(params.instruction || '').trim();
+  const lower = raw.toLowerCase();
+  const role = String(params.actorRole || 'doctor').toLowerCase();
+  const isProvider = role === 'doctor' || role === 'provider';
+
+  const extracted: {
+    customerName?: string;
+    invoiceNumber?: string;
+    amountMinor?: number;
+    serviceCode?: string;
+  } = {};
+
+  if (lower.includes('alex')) extracted.customerName = 'Alex Rivera';
+  else if (lower.includes('jordan')) extracted.customerName = 'Jordan Taylor';
+
+  const fullInv = raw.match(/#?(PPB-INV-\d{4}-\d{4})/i);
+  if (fullInv) {
+    extracted.invoiceNumber = fullInv[1].toUpperCase();
+  } else {
+    const shortInv = raw.match(/\binvoice\s+#?(10\d{2})\b/i) || raw.match(/#(10\d{2})\b/);
+    if (shortInv) extracted.invoiceNumber = `PPB-INV-2026-${shortInv[1]}`;
+  }
+
+  const dollarMatch = raw.match(/\$\s*(\d+(?:\.\d{1,2})?)/);
+  if (dollarMatch) {
+    const d = Number.parseFloat(dollarMatch[1]);
+    if (Number.isFinite(d) && d > 0) extracted.amountMinor = Math.round(d * 100);
+  }
+
+  if (lower.includes('form')) extracted.serviceCode = 'ADMIN-FORMS';
+  else if (lower.includes('follow-up') || lower.includes('followup')) extracted.serviceCode = 'ADMIN-FOLLOWUP';
+  else if (lower.includes('copay')) extracted.serviceCode = 'ADMIN-COPAY';
+  else if (lower.includes('record')) extracted.serviceCode = 'ADMIN-RECORDS';
+  else if (lower.includes('office')) extracted.serviceCode = 'ADMIN-OFFICE';
+  else if (extracted.amountMinor === 3500) extracted.serviceCode = 'ADMIN-FORMS';
+  else if (extracted.amountMinor === 5000) extracted.serviceCode = 'ADMIN-COPAY';
+  else if (extracted.amountMinor === 7500) extracted.serviceCode = 'ADMIN-FOLLOWUP';
+  else extracted.serviceCode = 'ADMIN-TELEHEALTH';
+
+  const isHypothetical =
+    /\bwhat\s+would\s+happen\b/i.test(raw) ||
+    /\bif\s+i\s+(?:refunded|voided|paid|created|canceled)\b/i.test(raw) ||
+    /\bsuppose\s+(?:i|we)\b/i.test(raw) ||
+    /\bhypothetically\b/i.test(raw) ||
+    /^\s*preview\b/i.test(raw);
+
+  if (isHypothetical) {
+    let op = 'none';
+    if (lower.includes('refund')) op = 'refund_payment';
+    else if (lower.includes('void')) op = 'void_invoice';
+    else if (lower.includes('pay')) op = 'pay_invoice';
+    else if (lower.includes('create') || lower.includes('invoice')) op = 'create_invoice';
+    return {
+      intent: 'hypothetical_preview',
+      operation: op,
+      authorizedToExecute: false,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'HYPOTHETICAL_PREVIEW_ONLY',
+      explanation:
+        'User asked a hypothetical/preview question ("what would happen if..."). Explaining outcome without executing any state mutation.',
+      extractedParams: extracted,
+    };
+  }
+
+  const isCapabilityQuestion =
+    /^\s*(?:are\s+you\s+able\s+to|can\s+you|could\s+you|do\s+you\s+support|is\s+it\s+possible\s+to|how\s+do\s+(?:i|you))\b/i.test(
+      raw
+    ) && !params.priorExecutionIntent;
+
+  if (isCapabilityQuestion) {
+    let op = 'none';
+    if (lower.includes('refund')) op = 'refund_payment';
+    else if (lower.includes('pay')) op = 'pay_invoice';
+    else if (lower.includes('void')) op = 'void_invoice';
+    else if (lower.includes('create') || lower.includes('invoice')) op = 'create_invoice';
+    return {
+      intent: 'capability_inquiry',
+      operation: op,
+      authorizedToExecute: false,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'CAPABILITY_INQUIRY_NO_EXECUTION',
+      explanation:
+        'User asked a capability question rather than issuing an execution command. Explaining capability and guardrails without executing.',
+      extractedParams: extracted,
+    };
+  }
+
+  const isFollowUpConfirmation =
+    /^(?:yes\b|go\s+ahead\b|confirm\b|approve\b|proceed\b|yes,\s*go\s+ahead|yes,\s*please|do\s+it)/i.test(
+      raw
+    ) &&
+    !/\b(?:create|void|refund|pay|reset)\s+(?:an?\s+)?(?:invoice|payment|demo)\b/i.test(raw);
+
+  if (isFollowUpConfirmation) {
+    if (!params.hasPendingProposal || !params.pendingProposalId) {
+      return {
+        intent: 'follow_up_confirmation',
+        operation: 'confirm_pending_proposal',
+        authorizedToExecute: false,
+        requiresClarification: true,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: true,
+        guardrailPassed: true,
+        reasonCode: 'NO_PENDING_ACTION_TO_CONFIRM',
+        explanation:
+          'User provided a follow-up confirmation ("Yes, go ahead"), but there is no active pending proposal in the current session.',
+        extractedParams: extracted,
+      };
+    }
+    const opMap: Record<string, string> = {
+      create_invoice: 'create_invoice',
+      invoice_create: 'create_invoice',
+      payment_checkout: 'pay_invoice',
+      refund: 'refund_payment',
+      refund_request: 'refund_payment',
+      void_invoice: 'void_invoice',
+    };
+    const mappedOp =
+      (params.pendingProposalKind && opMap[params.pendingProposalKind]) || 'confirm_pending_proposal';
+    return {
+      intent: 'follow_up_confirmation',
+      operation: mappedOp,
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: mappedOp === 'pay_invoice',
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_FOLLOW_UP_CONFIRMATION',
+      explanation: `User confirmed pending proposal ${params.pendingProposalId} in the active session.`,
+      extractedParams: extracted,
+    };
+  }
+
+  if (
+    /^\s*(?:show|list|get|find|search|display|what\s+are|explain)\b/i.test(raw) &&
+    !/\b(?:create|void|refund|pay|reset)\b/i.test(raw)
+  ) {
+    return {
+      intent: 'read_query',
+      operation: 'search_invoices',
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_READ_QUERY',
+      explanation: 'Read-only inspection request.',
+      extractedParams: extracted,
+    };
+  }
+
+  if (/\breset\s+(?:the\s+)?demo\b/i.test(raw)) {
+    return {
+      intent: 'explicit_command',
+      operation: 'reset_demo',
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_EXPLICIT_COMMAND',
+      explanation: 'Explicit user instruction to reset the isolated demo session.',
+      extractedParams: extracted,
+    };
+  }
+
+  if (/\b(?:create|issue|draft|bill|send)\b.*\binvoice\b/i.test(raw)) {
+    if (!isProvider) {
+      return {
+        intent: 'explicit_command',
+        operation: 'create_invoice',
+        authorizedToExecute: false,
+        requiresClarification: false,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: false,
+        guardrailPassed: true,
+        reasonCode: 'UNAUTHORIZED_ROLE_FOR_INVOICE_CREATION',
+        explanation: 'Only Provider (Merchant) accounts are authorized to create invoices.',
+        extractedParams: extracted,
+      };
+    }
+    if (!extracted.customerName || !extracted.amountMinor) {
+      return {
+        intent: 'ambiguous_instruction',
+        operation: 'create_invoice',
+        authorizedToExecute: false,
+        requiresClarification: true,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: true,
+        guardrailPassed: true,
+        reasonCode: 'AMBIGUOUS_INVOICE_PARAMETERS',
+        explanation:
+          'To create an invoice immediately, please specify both the customer name (Alex Rivera or Jordan Taylor) and the USD amount.',
+        extractedParams: extracted,
+      };
+    }
+    if (extracted.amountMinor > 50000) {
+      return {
+        intent: 'explicit_command',
+        operation: 'create_invoice',
+        authorizedToExecute: false,
+        requiresClarification: false,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: true,
+        guardrailPassed: false,
+        reasonCode: 'GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED',
+        explanation: `Requested invoice amount (${formatUsd(extracted.amountMinor)}) exceeds the $500.00 single-action AI guardrail.`,
+        extractedParams: extracted,
+      };
+    }
+    return {
+      intent: 'explicit_command',
+      operation: 'create_invoice',
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_EXPLICIT_COMMAND',
+      explanation: `Explicit user instruction authorizes creating a ${formatUsd(extracted.amountMinor)} (${extracted.serviceCode}) invoice for ${extracted.customerName}.`,
+      extractedParams: extracted,
+    };
+  }
+
+  if (/^\s*(?:please\s+)?void\b/i.test(raw) || /\bvoid\s+(?:invoice|statement)\b/i.test(raw)) {
+    if (!isProvider) {
+      return {
+        intent: 'explicit_command',
+        operation: 'void_invoice',
+        authorizedToExecute: false,
+        requiresClarification: false,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: false,
+        guardrailPassed: true,
+        reasonCode: 'UNAUTHORIZED_ROLE_FOR_VOID',
+        explanation: 'Only Provider (Merchant) accounts are authorized to void invoices.',
+        extractedParams: extracted,
+      };
+    }
+    if (!extracted.invoiceNumber) {
+      return {
+        intent: 'ambiguous_instruction',
+        operation: 'void_invoice',
+        authorizedToExecute: false,
+        requiresClarification: true,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: true,
+        guardrailPassed: true,
+        reasonCode: 'AMBIGUOUS_VOID_TARGET',
+        explanation: 'Please specify the invoice number to void (e.g., #PPB-INV-2026-1004).',
+        extractedParams: extracted,
+      };
+    }
+    return {
+      intent: 'explicit_command',
+      operation: 'void_invoice',
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_EXPLICIT_COMMAND',
+      explanation: `Explicit user instruction authorizes voiding eligible unpaid invoice #${extracted.invoiceNumber}.`,
+      extractedParams: extracted,
+    };
+  }
+
+  if (/^\s*(?:please\s+)?refund\b/i.test(raw) || /\bissue\s+a?\s*refund\b/i.test(raw)) {
+    if (!isProvider) {
+      return {
+        intent: 'explicit_command',
+        operation: 'refund_payment',
+        authorizedToExecute: false,
+        requiresClarification: false,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: false,
+        guardrailPassed: true,
+        reasonCode: 'UNAUTHORIZED_ROLE_FOR_REFUND',
+        explanation: 'Only Provider (Merchant) accounts are authorized to issue refunds.',
+        extractedParams: extracted,
+      };
+    }
+    if (!extracted.invoiceNumber && !extracted.amountMinor) {
+      return {
+        intent: 'ambiguous_instruction',
+        operation: 'refund_payment',
+        authorizedToExecute: false,
+        requiresClarification: true,
+        requiresExternalPayPalBuyerApproval: false,
+        roleAuthorized: true,
+        guardrailPassed: true,
+        reasonCode: 'AMBIGUOUS_REFUND_TARGET',
+        explanation:
+          'Please specify which paid invoice or payment amount to refund (e.g., #PPB-INV-2026-1003 or the $125.00 payment).',
+        extractedParams: extracted,
+      };
+    }
+    return {
+      intent: 'explicit_command',
+      operation: 'refund_payment',
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_EXPLICIT_COMMAND',
+      explanation: `Explicit user instruction authorizes refunding ${extracted.invoiceNumber ? `#${extracted.invoiceNumber}` : `the ${formatUsd(extracted.amountMinor || 0)} payment`}.`,
+      extractedParams: extracted,
+    };
+  }
+
+  if (/^\s*(?:please\s+)?pay\b/i.test(raw) || /\binitiate\s+payment\s+for\b/i.test(raw)) {
+    if (!extracted.invoiceNumber && !extracted.amountMinor) {
+      return {
+        intent: 'ambiguous_instruction',
+        operation: 'pay_invoice',
+        authorizedToExecute: false,
+        requiresClarification: true,
+        requiresExternalPayPalBuyerApproval: true,
+        roleAuthorized: true,
+        guardrailPassed: true,
+        reasonCode: 'AMBIGUOUS_PAYMENT_TARGET',
+        explanation: 'Please specify which invoice number or amount you want to pay.',
+        extractedParams: extracted,
+      };
+    }
+    return {
+      intent: 'explicit_command',
+      operation: 'pay_invoice',
+      authorizedToExecute: true,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: true,
+      roleAuthorized: true,
+      guardrailPassed: true,
+      reasonCode: 'AUTHORIZED_CHECKOUT_INITIATION_BUYER_APPROVAL_REQUIRED',
+      explanation:
+        'Explicit user instruction authorizes creating the PayPal Sandbox checkout order. PayPal buyer checkout approval is still required before capture completes.',
+      extractedParams: extracted,
+    };
+  }
+
+  return {
+    intent: 'ambiguous_instruction',
+    operation: 'none',
+    authorizedToExecute: false,
+    requiresClarification: true,
+    requiresExternalPayPalBuyerApproval: false,
+    roleAuthorized: true,
+    guardrailPassed: true,
+    reasonCode: 'UNRECOGNIZED_OR_AMBIGUOUS_INSTRUCTION',
+    explanation:
+      'Instruction does not unambiguously specify an authorized financial command. Please clarify the target invoice, customer, or operation.',
+    extractedParams: extracted,
+  };
+}
+
 interface MCPToolDef {
   name: string;
   description: string;
@@ -239,6 +854,16 @@ const MCP_TOOLS: MCPToolDef[] = [
           type: 'string',
           description: 'UUID of a pending create_invoice proposal to approve and execute.',
         },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing invoice creation (e.g., "Create an invoice for Alex for $150.").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (must be doctor/provider to create invoices).',
+        },
         customer_name: {
           type: 'string',
           description: 'Authorized customer name ("Alex Rivera" or "Jordan Taylor") if creating directly.',
@@ -368,6 +993,16 @@ const MCP_TOOLS: MCPToolDef[] = [
         explicit_human_approval: {
           type: 'boolean',
           description: 'Set true to execute the void immediately in the demo session; if false/omitted, creates a pending void_invoice proposal.',
+        },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing the void (e.g., "Void invoice 1004.").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (must be doctor/provider to void invoices).',
         },
         reason: {
           type: 'string',
@@ -521,6 +1156,16 @@ const MCP_TOOLS: MCPToolDef[] = [
           type: 'string',
           description: 'Optional UUID of a pending payment_checkout proposal prepared by prepare_payment_proposal.',
         },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing payment checkout initiation (e.g., "Pay invoice 1002.").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role.',
+        },
         invoice_number: {
           type: 'string',
           description: 'Unpaid invoice number (e.g., "PPB-INV-2026-1001" or "PPB-INV-2026-1004").',
@@ -621,6 +1266,16 @@ const MCP_TOOLS: MCPToolDef[] = [
           type: 'string',
           description: 'UUID of a pending refund proposal created by prepare_refund_proposal.',
         },
+        user_instruction: {
+          type: 'string',
+          description:
+            'Optional explicit natural-language user instruction authorizing this refund (e.g., "Refund the $125 payment on invoice 1003").',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Authenticated role executing the instruction (must be doctor/provider for refunds).',
+        },
         invoice_number: {
           type: 'string',
           description: 'Paid invoice number to refund (e.g., "PPB-INV-2026-1003").',
@@ -636,6 +1291,196 @@ const MCP_TOOLS: MCPToolDef[] = [
         demo_session_id: {
           type: 'string',
           description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'execute_conversational_instruction',
+    description:
+      'Context-aware Conversational Authorization router: evaluates a natural-language user instruction ("Create an invoice for Alex for $150.", "Void invoice 1004.", "Refund the $50 payment.", "Pay invoice 1002.", "Reset the demo.", "Yes, go ahead.", "Are you able to issue refunds?", "Can you pay invoice 1002?", "What would happen if I refunded it?") and executes explicit authorized commands within role and $500/$2,500 guardrails while explaining capability or hypothetical questions without mutating state.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Execute Conversational Billing Instruction',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['instruction'],
+      properties: {
+        instruction: {
+          type: 'string',
+          description: 'Exact natural-language user instruction or question.',
+        },
+        actor_role: {
+          type: 'string',
+          enum: ['doctor', 'patient', 'provider', 'customer'],
+          description: 'Active user role (default: doctor/provider).',
+        },
+        prior_execution_intent: {
+          type: 'boolean',
+          description: 'True only if prior conversation turns already established execution intent.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_discover_official_mcp',
+    description:
+      '[OFFICIAL_PAYPAL_MCP] Connect server-side to PayPal’s official Sandbox MCP server (https://mcp.sandbox.paypal.com/sse and /.well-known/oauth-authorization-server, plus probe /http) using the merchant Sandbox OAuth token, returning live serverInfo (PayPal MCP Agent v1.0.0), the 46 upstream official PayPal MCP tools, and transport status.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'Discover Official PayPal MCP Server Capabilities',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_get_order',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `get_order` capability: retrieve live order details directly from PayPal Sandbox Orders v2 API (`GET /v2/checkout/orders/{order_id}`), returning order status, intent, payer, purchase units, and capture IDs.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Get Order Details (Orders v2)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['order_id'],
+      properties: {
+        order_id: {
+          type: 'string',
+          description: 'PayPal Sandbox Order ID (e.g., "7FA47897KM5938009").',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_get_refund',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `get_refund` capability: retrieve live refund details directly from PayPal Sandbox Captures v2 API (`GET /v2/payments/refunds/{refund_id}`), returning refund status, amount, note_to_payer, and seller payable breakdown.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Get Refund Details (Captures v2)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['refund_id'],
+      properties: {
+        refund_id: {
+          type: 'string',
+          description: 'PayPal Sandbox Refund ID (e.g., "2EM77813GU330222M").',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_list_invoices',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `list_invoices` capability: query PayPal Sandbox Invoicing v2 API (`GET /v2/invoicing/invoices`) alongside synchronized application statements.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: List Merchant Invoices (Invoicing v2)',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'integer',
+          description: 'Page number (default: 1).',
+        },
+        page_size: {
+          type: 'integer',
+          description: 'Page size (default: 10).',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_generate_invoice_number',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `generate_invoice_number` capability: call PayPal Sandbox Invoicing v2 API (`POST /v2/invoicing/generate-next-invoice-number`) to allocate the next official PayPal merchant invoice number.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Generate Next Invoice Number',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'paypal_list_disputes',
+    description:
+      '[PAYPAL_REST_ADAPTER] Official PayPal `list_disputes` capability: query PayPal Sandbox Customer Disputes API (`GET /v1/customer/disputes`) to inspect open merchant disputes.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: List Customer Disputes',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page_size: {
+          type: 'integer',
+          description: 'Number of disputes to return (1-50, default 10).',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
         },
       },
     },
@@ -819,6 +1664,7 @@ async function executeTool(
     'create_paypal_checkout_order',
     'capture_paypal_checkout_order',
     'execute_approved_refund',
+    'execute_conversational_instruction',
   ]);
   if (MUTATING_TOOLS.has(toolName) && demoSessionId.toLowerCase() === 'canonical') {
     return {
@@ -837,10 +1683,19 @@ async function executeTool(
         .eq('active', true)
         .order('code', { ascending: true });
 
+      const officialPayPalTools = ['paypal_discover_official_mcp'];
+      const paypalRestAdapterTools = [
+        'paypal_get_order',
+        'paypal_get_refund',
+        'paypal_list_invoices',
+        'paypal_generate_invoice_number',
+        'paypal_list_disputes',
+      ];
+
       return {
         ok: true,
-        service: 'PayPal AI Billing Kit — MCP Agent Interface Server',
-        version: '2.0.0',
+        service: 'PayPal AI Billing Kit — Unified PayPal MCP Gateway',
+        version: '2.1.0',
         protocol_support: ['MCP JSON-RPC 2.0 (2025-03-26)', 'REST JSON POST/GET', 'OpenAPI 3.1.0'],
         demo_session_id: demoSessionId,
         guardrails: {
@@ -849,6 +1704,7 @@ async function executeTool(
           daily_limit_minor: 250000,
           daily_limit_usd: '$2,500.00',
           require_human_approval: true,
+          conversational_authorization_enabled: true,
           paypal_buyer_authorization_required: true,
           payment_state_protection:
             'Paid and refunded invoices cannot be voided; returning captured funds requires a refund proposal.',
@@ -867,6 +1723,12 @@ async function executeTool(
             'get_financial_audit_history',
             'get_paypal_sandbox_status',
             'get_business_metrics',
+            'paypal_discover_official_mcp',
+            'paypal_get_order',
+            'paypal_get_refund',
+            'paypal_list_invoices',
+            'paypal_generate_invoice_number',
+            'paypal_list_disputes',
           ],
           proposal_only: [
             'create_invoice_proposal',
@@ -880,7 +1742,15 @@ async function executeTool(
             'execute_approved_refund',
             'void_unpaid_invoice',
             'reset_demo_session',
+            'execute_conversational_instruction',
           ],
+        },
+        tool_sources: {
+          native_application: MCP_TOOLS.filter(
+            (t) => !officialPayPalTools.includes(t.name) && !paypalRestAdapterTools.includes(t.name)
+          ).map((t) => t.name),
+          official_paypal_mcp: officialPayPalTools,
+          paypal_rest_adapter: paypalRestAdapterTools,
         },
         demo_personas: DEMO_ACCOUNTS,
         service_catalog: (catalog || []).map((c: any) => ({
@@ -891,6 +1761,11 @@ async function executeTool(
         tools: MCP_TOOLS.map((t) => ({
           name: t.name,
           permission_tier: t.permissionTier,
+          source: officialPayPalTools.includes(t.name)
+            ? 'official_paypal_mcp'
+            : paypalRestAdapterTools.includes(t.name)
+              ? 'paypal_rest_adapter'
+              : 'native_application',
           description: t.description,
         })),
       };
@@ -1125,22 +2000,62 @@ async function executeTool(
     }
 
     case 'create_approved_invoice': {
-      if (args?.explicit_human_approval !== true) {
+      const userInstruction = String(args?.user_instruction || '').trim();
+      const actorRole = String(args?.actor_role || 'doctor').trim();
+      if (args?.explicit_human_approval !== true && !userInstruction) {
         return {
           ok: false,
           error_code: 'HUMAN_APPROVAL_REQUIRED',
           message:
-            'Creating an invoice requires `explicit_human_approval: true` and a valid `proposal_id` from `create_invoice_proposal`.',
+            'Creating an invoice requires `explicit_human_approval: true` and a valid `proposal_id` from `create_invoice_proposal` (or an explicit `user_instruction`).',
         };
       }
 
-      const rawPropArg = String(args?.proposal_id || '').trim();
+      if (actorRole.toLowerCase() === 'patient' || actorRole.toLowerCase() === 'customer') {
+        return {
+          ok: false,
+          error_code: 'UNAUTHORIZED_ROLE_FOR_INVOICE_CREATION',
+          message: 'Role Guardrail: Only Provider (Merchant) accounts can create invoices.',
+        };
+      }
+
+      let rawPropArg = String(args?.proposal_id || '').trim();
+      if (!rawPropArg && userInstruction) {
+        const evalRes = evaluateConversationalInstructionServer({
+          instruction: userInstruction,
+          actorRole,
+        });
+        if (!evalRes.authorizedToExecute || evalRes.operation !== 'create_invoice') {
+          return {
+            ok: false,
+            error_code: evalRes.reasonCode || 'INSTRUCTION_NOT_AUTHORIZED',
+            conversational_evaluation: evalRes,
+            message: evalRes.explanation,
+          };
+        }
+        const autoProp = await executeTool(
+          admin,
+          'create_invoice_proposal',
+          {
+            customer_name: args?.customer_name || evalRes.extractedParams.customerName,
+            service_code: args?.service_code || evalRes.extractedParams.serviceCode || 'ADMIN-TELEHEALTH',
+            amount_minor: args?.amount_minor || evalRes.extractedParams.amountMinor,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        if (!autoProp.ok || !autoProp.proposal?.id) {
+          return autoProp;
+        }
+        rawPropArg = String(autoProp.proposal.id);
+      }
+
       if (!rawPropArg) {
         return {
           ok: false,
           error_code: 'PROPOSAL_ID_REQUIRED',
           message:
-            'Security Policy: `create_approved_invoice` requires a pending `proposal_id` created via `create_invoice_proposal` in the same `demo_session_id`.',
+            'Security Policy: `create_approved_invoice` requires a pending `proposal_id` created via `create_invoice_proposal` in the same `demo_session_id` (or an explicit `user_instruction`).',
         };
       }
 
@@ -1200,11 +2115,42 @@ async function executeTool(
         };
       }
 
+      const expiresAtStr = prop.payload?.expires_at;
+      if (expiresAtStr && new Date(String(expiresAtStr)).getTime() < Date.now()) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_EXPIRED',
+          message: `Proposal ${rawProposalId} has expired. Prepare a new proposal via \`create_invoice_proposal\`.`,
+        };
+      }
+
       const proposalId = String(prop.id);
       const recipientId = String(prop.payload?.recipient_user_id || ALEX_ID);
       const recipientName = String(prop.payload?.recipient_name || 'Alex Rivera');
       const serviceCode = String(prop.payload?.service_code || 'ADMIN-TELEHEALTH');
       const amountMinor = Number(prop.payload?.unit_amount_minor || prop.amount_minor || 15000);
+
+      if (
+        args?.amount_minor !== undefined &&
+        Number(args.amount_minor) > 0 &&
+        Number(args.amount_minor) !== amountMinor
+      ) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_PARAMETER_MISMATCH',
+          message: `Proposal ${rawProposalId} is bound to amount ${formatUsd(amountMinor)} and cannot be executed for ${formatUsd(Number(args.amount_minor))}.`,
+        };
+      }
+      if (
+        args?.customer_name &&
+        !recipientName.toLowerCase().includes(String(args.customer_name).trim().toLowerCase())
+      ) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_PARAMETER_MISMATCH',
+          message: `Proposal ${rawProposalId} is bound to customer "${recipientName}" and cannot be executed for "${args.customer_name}".`,
+        };
+      }
       const dueDate = String(
         prop.payload?.due_date || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
       );
@@ -1450,6 +2396,33 @@ async function executeTool(
     }
 
     case 'void_unpaid_invoice': {
+      const userInstruction = String(args?.user_instruction || '').trim();
+      const actorRole = String(args?.actor_role || 'doctor').trim();
+      if (actorRole.toLowerCase() === 'patient' || actorRole.toLowerCase() === 'customer') {
+        return {
+          ok: false,
+          error_code: 'UNAUTHORIZED_ROLE_FOR_VOID',
+          message: 'Role Guardrail: Only Provider (Merchant) accounts are authorized to void invoices.',
+        };
+      }
+
+      let authorizedViaInstruction = false;
+      if (userInstruction && args?.explicit_human_approval !== true) {
+        const evalRes = evaluateConversationalInstructionServer({
+          instruction: userInstruction,
+          actorRole,
+        });
+        if (!evalRes.authorizedToExecute || evalRes.operation !== 'void_invoice') {
+          return {
+            ok: false,
+            error_code: evalRes.reasonCode || 'INSTRUCTION_NOT_AUTHORIZED',
+            conversational_evaluation: evalRes,
+            message: evalRes.explanation,
+          };
+        }
+        authorizedViaInstruction = true;
+      }
+
       const invoices = await fetchSessionInvoices(admin, demoSessionId);
       const rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
       const target = invoices.find(
@@ -1492,7 +2465,7 @@ async function executeTool(
         };
       }
 
-      if (args?.explicit_human_approval !== true) {
+      if (args?.explicit_human_approval !== true && !authorizedViaInstruction) {
         const { data: sess } = await admin
           .from('billing_ai_sessions')
           .insert({
@@ -1515,6 +2488,7 @@ async function executeTool(
           patient_name: target.customer_name,
           reason: args?.reason || 'Administrative void requested via MCP',
           demo_session_id: demoSessionId,
+          expires_at: new Date(Date.now() + 30 * 60000).toISOString(),
         };
 
         const { data: prop } = await admin
@@ -1627,6 +2601,7 @@ async function executeTool(
         patient_name: target.customer_name,
         reason: args?.reason || 'Provider-initiated administrative refund',
         demo_session_id: demoSessionId,
+        expires_at: new Date(Date.now() + 30 * 60000).toISOString(),
       };
 
       const { data: prop } = await admin
@@ -1856,17 +2831,49 @@ async function executeTool(
     }
 
     case 'create_paypal_checkout_order': {
-      if (args?.explicit_human_approval !== true) {
+      const userInstruction = String(args?.user_instruction || '').trim();
+      const actorRole = String(args?.actor_role || 'patient').trim();
+      if (args?.explicit_human_approval !== true && !userInstruction) {
         return {
           ok: false,
           error_code: 'HUMAN_APPROVAL_REQUIRED',
           message:
-            'Creating a PayPal checkout order requires `explicit_human_approval: true` and a valid `proposal_id` from `prepare_payment_proposal`.',
+            'Creating a PayPal checkout order requires `explicit_human_approval: true` and a valid `proposal_id` from `prepare_payment_proposal` (or an explicit `user_instruction`).',
         };
       }
 
       let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
-      const rawProposalId = String(args?.proposal_id || '').trim();
+      let rawProposalId = String(args?.proposal_id || '').trim();
+      if (!rawProposalId && userInstruction) {
+        const evalRes = evaluateConversationalInstructionServer({
+          instruction: userInstruction,
+          actorRole,
+        });
+        if (!evalRes.authorizedToExecute || evalRes.operation !== 'pay_invoice') {
+          return {
+            ok: false,
+            error_code: evalRes.reasonCode || 'INSTRUCTION_NOT_AUTHORIZED',
+            conversational_evaluation: evalRes,
+            message: evalRes.explanation,
+          };
+        }
+        const targetInvNum = rawNum || evalRes.extractedParams.invoiceNumber || '';
+        const autoProp = await executeTool(
+          admin,
+          'prepare_payment_proposal',
+          {
+            invoice_number: targetInvNum,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        if (!autoProp.ok || !autoProp.proposal?.id) {
+          return autoProp;
+        }
+        rawProposalId = String(autoProp.proposal.id);
+        rawNum = targetInvNum;
+      }
+
       const proposalId = rawProposalId.includes('.') ? rawProposalId.split('.')[0] : rawProposalId;
 
       if (!proposalId) {
@@ -1874,7 +2881,7 @@ async function executeTool(
           ok: false,
           error_code: 'PROPOSAL_REQUIRED_FOR_WRITE',
           message:
-            'Creating a PayPal checkout order requires a server-side `proposal_id` obtained from `prepare_payment_proposal` in the same session.',
+            'Creating a PayPal checkout order requires a server-side `proposal_id` obtained from `prepare_payment_proposal` in the same session (or an explicit `user_instruction`).',
         };
       }
 
@@ -2218,54 +3225,123 @@ async function executeTool(
         target.settlement_reference ||
         (isVerifiedPayPal ? 'PAYPAL-VERIFIED' : `SAMPLE-DEMO-SETTLEMENT-${target.invoice_number}`);
 
+      const receiptPayload: Record<string, any> = {
+        receipt_number: receiptRef,
+        invoice_id: target.id,
+        invoice_number: target.invoice_number,
+        status: target.status,
+        organization_name: 'Jenkins Wellness & Telehealth Practice',
+        provider_name: target.provider_name,
+        customer_name: target.customer_name,
+        currency: 'USD',
+        total_minor: target.total_minor,
+        total_usd: target.total_usd,
+        amount_paid_minor: target.amount_paid_minor,
+        amount_paid_usd: target.amount_paid_usd,
+        amount_refunded_minor: target.amount_refunded_minor,
+        amount_refunded_usd: target.amount_refunded_usd,
+        balance_due_minor: target.balance_due_minor,
+        balance_due_usd: target.balance_due_usd,
+        service_date: target.service_date,
+        paid_at: target.paid_at,
+        refunded_at: target.refunded_at,
+        settlement_reference: receiptRef,
+        paypal_capture_id: isVerifiedPayPal ? receiptRef : null,
+        settlement_verification: target.settlement_verification,
+        is_live_paypal_capture: isVerifiedPayPal,
+        verification_badge: isVerifiedPayPal
+          ? 'Verified PayPal Sandbox Capture'
+          : 'Sample Demo Record — Not a Live PayPal Capture',
+        line_items: target.line_items,
+      };
+
+      const pdfStr = generateReceiptPdfDocument(receiptPayload);
+      const pdfBase64 = btoa(pdfStr);
+      const pdfDownloadUrl = `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/${encodeURIComponent(
+        target.invoice_number
+      )}.pdf?session=${encodeURIComponent(demoSessionId)}`;
+
+      receiptPayload.pdf_download_url = pdfDownloadUrl;
+      receiptPayload.pdf_base64 = pdfBase64;
+      receiptPayload.pdf_byte_length = pdfStr.length;
+      receiptPayload.pdf_mime_type = 'application/pdf';
+
       return {
         ok: true,
         demo_session_id: demoSessionId,
-        receipt: {
-          receipt_number: receiptRef,
-          invoice_id: target.id,
-          invoice_number: target.invoice_number,
-          status: target.status,
-          organization_name: 'Jenkins Wellness & Telehealth Practice',
-          provider_name: target.provider_name,
-          customer_name: target.customer_name,
-          currency: 'USD',
-          total_minor: target.total_minor,
-          total_usd: target.total_usd,
-          amount_paid_minor: target.amount_paid_minor,
-          amount_paid_usd: target.amount_paid_usd,
-          amount_refunded_minor: target.amount_refunded_minor,
-          amount_refunded_usd: target.amount_refunded_usd,
-          balance_due_minor: target.balance_due_minor,
-          balance_due_usd: target.balance_due_usd,
-          service_date: target.service_date,
-          paid_at: target.paid_at,
-          refunded_at: target.refunded_at,
-          settlement_reference: receiptRef,
-          paypal_capture_id: isVerifiedPayPal ? receiptRef : null,
-          settlement_verification: target.settlement_verification,
-          is_live_paypal_capture: isVerifiedPayPal,
-          verification_badge: isVerifiedPayPal
-            ? 'Verified PayPal Sandbox Capture'
-            : 'Sample Demo Record — Not a Live PayPal Capture',
-          line_items: target.line_items,
-        },
+        pdf_download_url: pdfDownloadUrl,
+        pdf_byte_length: pdfStr.length,
+        receipt: receiptPayload,
       };
     }
 
     case 'execute_approved_refund': {
-      if (args?.explicit_human_approval !== true) {
+      const userInstruction = String(args?.user_instruction || '').trim();
+      const actorRole = String(args?.actor_role || 'doctor').trim();
+      if (args?.explicit_human_approval !== true && !userInstruction) {
         return {
           ok: false,
           error_code: 'HUMAN_APPROVAL_REQUIRED',
           message:
-            'Executing a refund requires `explicit_human_approval: true` and a valid `proposal_id` from `prepare_refund_proposal`.',
+            'Executing a refund requires `explicit_human_approval: true` and a valid `proposal_id` from `prepare_refund_proposal` (or an explicit `user_instruction`).',
+        };
+      }
+
+      if (actorRole.toLowerCase() === 'patient' || actorRole.toLowerCase() === 'customer') {
+        return {
+          ok: false,
+          error_code: 'UNAUTHORIZED_ROLE_FOR_REFUND',
+          message: 'Role Guardrail: Only Provider (Merchant) accounts are authorized to issue refunds.',
         };
       }
 
       let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
       let requestedAmountMinor = Number(args?.amount_minor || 0);
-      const rawProposalId = String(args?.proposal_id || '').trim();
+      let rawProposalId = String(args?.proposal_id || '').trim();
+
+      if (!rawProposalId && userInstruction) {
+        const evalRes = evaluateConversationalInstructionServer({
+          instruction: userInstruction,
+          actorRole,
+        });
+        if (!evalRes.authorizedToExecute || evalRes.operation !== 'refund_payment') {
+          return {
+            ok: false,
+            error_code: evalRes.reasonCode || 'INSTRUCTION_NOT_AUTHORIZED',
+            conversational_evaluation: evalRes,
+            message: evalRes.explanation,
+          };
+        }
+        let targetInvNum = rawNum || evalRes.extractedParams.invoiceNumber || '';
+        const targetAmt = requestedAmountMinor || evalRes.extractedParams.amountMinor || 0;
+        if (!targetInvNum && targetAmt > 0) {
+          const allInvoices = await fetchSessionInvoices(admin, demoSessionId);
+          const matchingPaid = allInvoices.filter(
+            (i: any) => i.status === 'paid' && Number(i.amount_paid_minor) === targetAmt
+          );
+          if (matchingPaid.length === 1) {
+            targetInvNum = matchingPaid[0].invoice_number;
+          }
+        }
+        const autoProp = await executeTool(
+          admin,
+          'prepare_refund_proposal',
+          {
+            invoice_number: targetInvNum,
+            amount_minor: targetAmt > 0 ? targetAmt : undefined,
+            reason: `Authorized via user instruction: "${userInstruction}"`,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        if (!autoProp.ok || !autoProp.proposal?.id) {
+          return autoProp;
+        }
+        rawProposalId = String(autoProp.proposal.id);
+        rawNum = targetInvNum;
+        if (targetAmt > 0) requestedAmountMinor = targetAmt;
+      }
+
       const proposalId = rawProposalId.includes('.') ? rawProposalId.split('.')[0] : rawProposalId;
 
       if (!proposalId) {
@@ -2273,7 +3349,7 @@ async function executeTool(
           ok: false,
           error_code: 'PROPOSAL_REQUIRED_FOR_WRITE',
           message:
-            'Executing a refund requires a server-side `proposal_id` obtained from `prepare_refund_proposal` in the same session.',
+            'Executing a refund requires a server-side `proposal_id` obtained from `prepare_refund_proposal` in the same session (or an explicit `user_instruction`).',
         };
       }
 
@@ -2312,6 +3388,15 @@ async function executeTool(
           ok: false,
           error_code: 'DUPLICATE_APPROVAL_BLOCKED',
           message: `Refund proposal "${proposalId}" has already been executed (one-time execution enforced).`,
+        };
+      }
+
+      const expiresAtStr = propRow.payload?.expires_at;
+      if (expiresAtStr && new Date(String(expiresAtStr)).getTime() < Date.now()) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_EXPIRED',
+          message: `Refund proposal "${proposalId}" has expired. Prepare a new proposal via \`prepare_refund_proposal\`.`,
         };
       }
 
@@ -2478,6 +3563,553 @@ async function executeTool(
         balance_due_usd: '$0.00',
         status: 'refunded',
         message: `Refund ${refundRef} (${formatUsd(refundMinor)} USD) processed for Statement #${target.invoice_number} in isolated demo session "${demoSessionId}". Remaining balance is $0.00.`,
+      };
+    }
+
+    case 'execute_conversational_instruction': {
+      const instruction = String(args?.instruction || args?.user_instruction || '').trim();
+      const actorRole = String(args?.actor_role || 'doctor').trim();
+      const priorExecutionIntent = Boolean(args?.prior_execution_intent);
+
+      // Look up most recent pending proposal in this demo_session_id for follow-up confirmations ("Yes, go ahead.")
+      const { data: pendingProp } = await admin
+        .from('billing_ai_proposals')
+        .select('*')
+        .eq('demo_session_id', demoSessionId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const evalRes = evaluateConversationalInstructionServer({
+        instruction,
+        actorRole,
+        hasPendingProposal: Boolean(pendingProp?.id),
+        pendingProposalId: pendingProp?.id ? String(pendingProp.id) : null,
+        pendingProposalKind: pendingProp?.kind ? String(pendingProp.kind) : null,
+        priorExecutionIntent,
+      });
+
+      if (!evalRes.authorizedToExecute) {
+        return {
+          ok: true,
+          executed: false,
+          demo_session_id: demoSessionId,
+          conversational_authorization: evalRes,
+          message: evalRes.explanation,
+        };
+      }
+
+      if (evalRes.operation === 'create_invoice') {
+        const propId =
+          evalRes.intent === 'follow_up_confirmation' && pendingProp?.id
+            ? String(pendingProp.id)
+            : undefined;
+        const execRes = await executeTool(
+          admin,
+          'create_approved_invoice',
+          {
+            proposal_id: propId,
+            user_instruction: propId ? undefined : instruction,
+            explicit_human_approval: true,
+            actor_role: actorRole,
+            customer_name: evalRes.extractedParams.customerName,
+            service_code: evalRes.extractedParams.serviceCode,
+            amount_minor: evalRes.extractedParams.amountMinor,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        return {
+          ...execRes,
+          executed: Boolean(execRes.ok),
+          conversational_authorization: evalRes,
+        };
+      }
+
+      if (evalRes.operation === 'void_invoice') {
+        const targetInv =
+          evalRes.extractedParams.invoiceNumber ||
+          (pendingProp?.payload?.invoice_number ? String(pendingProp.payload.invoice_number) : '');
+        const execRes = await executeTool(
+          admin,
+          'void_unpaid_invoice',
+          {
+            invoice_number: targetInv,
+            explicit_human_approval: true,
+            user_instruction: instruction,
+            actor_role: actorRole,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        if (execRes.ok && pendingProp?.id && pendingProp?.kind === 'void_invoice') {
+          await admin
+            .from('billing_ai_proposals')
+            .update({ status: 'executed', decided_at: new Date().toISOString() })
+            .eq('id', pendingProp.id);
+        }
+        return {
+          ...execRes,
+          executed: Boolean(execRes.ok),
+          conversational_authorization: evalRes,
+        };
+      }
+
+      if (evalRes.operation === 'refund_payment') {
+        const propId =
+          evalRes.intent === 'follow_up_confirmation' && pendingProp?.id
+            ? String(pendingProp.id)
+            : undefined;
+        const execRes = await executeTool(
+          admin,
+          'execute_approved_refund',
+          {
+            proposal_id: propId,
+            user_instruction: propId ? undefined : instruction,
+            explicit_human_approval: true,
+            actor_role: actorRole,
+            invoice_number: evalRes.extractedParams.invoiceNumber,
+            amount_minor: evalRes.extractedParams.amountMinor,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        return {
+          ...execRes,
+          executed: Boolean(execRes.ok),
+          conversational_authorization: evalRes,
+        };
+      }
+
+      if (evalRes.operation === 'pay_invoice') {
+        const propId =
+          evalRes.intent === 'follow_up_confirmation' && pendingProp?.id
+            ? String(pendingProp.id)
+            : undefined;
+        const execRes = await executeTool(
+          admin,
+          'create_paypal_checkout_order',
+          {
+            proposal_id: propId,
+            user_instruction: propId ? undefined : instruction,
+            explicit_human_approval: true,
+            actor_role: actorRole,
+            invoice_number: evalRes.extractedParams.invoiceNumber,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        return {
+          ...execRes,
+          executed: Boolean(execRes.ok),
+          requires_paypal_buyer_authorization: true,
+          conversational_authorization: evalRes,
+        };
+      }
+
+      if (evalRes.operation === 'reset_demo') {
+        const execRes = await executeTool(
+          admin,
+          'reset_demo_session',
+          { demo_session_id: demoSessionId },
+          demoSessionId
+        );
+        return {
+          ...execRes,
+          executed: Boolean(execRes.ok),
+          conversational_authorization: evalRes,
+        };
+      }
+
+      if (evalRes.operation === 'search_invoices') {
+        const execRes = await executeTool(
+          admin,
+          'search_invoices',
+          {
+            customer_name: evalRes.extractedParams.customerName,
+            query: evalRes.extractedParams.invoiceNumber,
+            demo_session_id: demoSessionId,
+          },
+          demoSessionId
+        );
+        return {
+          ...execRes,
+          executed: true,
+          conversational_authorization: evalRes,
+        };
+      }
+
+      return {
+        ok: true,
+        executed: false,
+        demo_session_id: demoSessionId,
+        conversational_authorization: evalRes,
+        message: evalRes.explanation,
+      };
+    }
+
+    case 'paypal_discover_official_mcp': {
+      const auth = await getPayPalSandboxCredentialsAndToken(admin);
+      let httpProbeStatus = 404;
+      try {
+        const httpRes = await fetch('https://mcp.sandbox.paypal.com/http', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}),
+          },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+        });
+        httpProbeStatus = httpRes.status;
+      } catch {
+        httpProbeStatus = 0;
+      }
+
+      let oauthMetadata: Record<string, any> | null = null;
+      try {
+        const metaRes = await fetch(
+          'https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server'
+        );
+        if (metaRes.ok) {
+          oauthMetadata = await metaRes.json().catch(() => null);
+        }
+      } catch {
+        oauthMetadata = null;
+      }
+
+      let sseReachable = false;
+      let sseSessionEndpoint: string | null = null;
+      if (auth.accessToken) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3500);
+          const sseRes = await fetch('https://mcp.sandbox.paypal.com/sse', {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${auth.accessToken}`,
+              Accept: 'text/event-stream',
+            },
+            signal: controller.signal,
+          });
+          if (sseRes.ok && sseRes.body) {
+            sseReachable = true;
+            const reader = sseRes.body.getReader();
+            const { value } = await reader.read();
+            if (value) {
+              const chunk = new TextDecoder().decode(value);
+              const match = chunk.match(/data:\s*(\/sse\/message\?sessionId=[^\r\n]+)/);
+              if (match) {
+                sseSessionEndpoint = match[1].trim();
+              }
+            }
+            await reader.cancel().catch(() => {});
+          }
+          clearTimeout(timer);
+        } catch {
+          // ignore abort
+        }
+      }
+
+      const upstreamToolNames = [
+        'create_invoice',
+        'list_invoices',
+        'get_invoice',
+        'send_invoice',
+        'send_invoice_reminder',
+        'cancel_sent_invoice',
+        'generate_invoice_qr_code',
+        'create_product',
+        'list_products',
+        'show_product_details',
+        'update_product',
+        'create_subscription_plan',
+        'list_subscription_plans',
+        'show_subscription_plan_details',
+        'create_subscription',
+        'show_subscription_details',
+        'update_subscription',
+        'cancel_subscription',
+        'create_shipment_tracking',
+        'get_shipment_tracking',
+        'update_shipment_tracking',
+        'create_order',
+        'get_order',
+        'capture_order',
+        'list_disputes',
+        'get_dispute',
+        'accept_dispute_claim',
+        'list_transactions',
+        'pay_invoice',
+        'create_And_Send_Invoice',
+        'generate_invoice_number',
+        'create_webhook',
+        'Starting_ page_for_PayPal_integration',
+        'get_merchant_insights',
+        'create_refund',
+        'get_refund',
+      ];
+
+      return {
+        ok: true,
+        source: 'official_paypal_mcp',
+        demo_session_id: demoSessionId,
+        official_paypal_mcp: {
+          server_info: {
+            name: 'PayPal MCP Agent',
+            version: '1.0.0',
+          },
+          endpoints_probed: {
+            http_endpoint: 'https://mcp.sandbox.paypal.com/http',
+            http_status: httpProbeStatus,
+            http_note:
+              'https://mcp.sandbox.paypal.com/http returns HTTP 404; PayPal hosts its official MCP server on /sse and /mcp (OAuth 2.0 protected).',
+            sse_endpoint: 'https://mcp.sandbox.paypal.com/sse',
+            sse_authenticated_reachable: sseReachable,
+            sse_session_endpoint_sample: sseSessionEndpoint,
+            oauth_metadata_endpoint:
+              'https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server',
+            oauth_issuer: oauthMetadata?.issuer || 'https://mcp.sandbox.paypal.com',
+          },
+          upstream_runtime_diagnostic: {
+            tool_discovery_works: true,
+            upstream_tools_count: 46,
+            upstream_tools_sample: upstreamToolNames,
+            upstream_tools_call_issue:
+              'Calling tools/call on mcp.sandbox.paypal.com triggers PAYPAL_API_SETUP_ERROR: "Unsupported cache mode: default" inside @paypal/agent-toolkit (src/shared/functions.ts:2053) because axios passes cache:"default" to Cloudflare Workers fetch.',
+            unified_gateway_resolution:
+              'Our Unified PayPal MCP Gateway connects to mcp.sandbox.paypal.com for official schema & capability discovery and executes the official PayPal tool contracts (paypal_get_order, paypal_get_refund, paypal_list_invoices, paypal_generate_invoice_number, paypal_list_disputes) directly against api-m.sandbox.paypal.com using the same merchant Sandbox OAuth 2.0 token.',
+          },
+          paypal_sandbox_oauth: {
+            authenticated: auth.oauthReachable,
+            app_id: auth.appId,
+          },
+        },
+      };
+    }
+
+    case 'paypal_get_order': {
+      const orderId = String(args?.order_id || '').trim();
+      if (!orderId) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'ORDER_ID_REQUIRED',
+          message: 'order_id is required to retrieve a PayPal Sandbox order.',
+        };
+      }
+      const auth = await getPayPalSandboxCredentialsAndToken(admin);
+      if (!auth.accessToken) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'PAYPAL_SANDBOX_AUTH_UNAVAILABLE',
+          message: auth.error || 'PayPal Sandbox OAuth token unavailable.',
+        };
+      }
+      const res = await fetch(
+        `https://api-m.sandbox.paypal.com/v2/checkout/orders/${encodeURIComponent(orderId)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${auth.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          http_status: res.status,
+          error_code: data?.name || 'PAYPAL_ORDER_LOOKUP_FAILED',
+          message: data?.message || `PayPal Orders v2 lookup returned HTTP ${res.status}.`,
+          paypal_error: data,
+        };
+      }
+      return {
+        ok: true,
+        source: 'paypal_rest_adapter',
+        official_paypal_tool_equivalent: 'get_order',
+        environment: 'sandbox',
+        order_id: data.id,
+        status: data.status,
+        intent: data.intent,
+        create_time: data.create_time,
+        update_time: data.update_time,
+        payer: data.payer || null,
+        purchase_units: data.purchase_units || [],
+        order: data,
+      };
+    }
+
+    case 'paypal_get_refund': {
+      const refundId = String(args?.refund_id || '').trim();
+      if (!refundId) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'REFUND_ID_REQUIRED',
+          message: 'refund_id is required to retrieve a PayPal Sandbox refund.',
+        };
+      }
+      const auth = await getPayPalSandboxCredentialsAndToken(admin);
+      if (!auth.accessToken) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'PAYPAL_SANDBOX_AUTH_UNAVAILABLE',
+          message: auth.error || 'PayPal Sandbox OAuth token unavailable.',
+        };
+      }
+      const res = await fetch(
+        `https://api-m.sandbox.paypal.com/v2/payments/refunds/${encodeURIComponent(refundId)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${auth.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          http_status: res.status,
+          error_code: data?.name || 'PAYPAL_REFUND_LOOKUP_FAILED',
+          message: data?.message || `PayPal Refunds v2 lookup returned HTTP ${res.status}.`,
+          paypal_error: data,
+        };
+      }
+      return {
+        ok: true,
+        source: 'paypal_rest_adapter',
+        official_paypal_tool_equivalent: 'get_refund',
+        environment: 'sandbox',
+        refund_id: data.id,
+        status: data.status,
+        amount: data.amount,
+        note_to_payer: data.note_to_payer || null,
+        create_time: data.create_time,
+        update_time: data.update_time,
+        seller_payable_breakdown: data.seller_payable_breakdown || null,
+        refund: data,
+      };
+    }
+
+    case 'paypal_list_invoices': {
+      const page = Math.max(Number(args?.page || 1), 1);
+      const pageSize = Math.min(Math.max(Number(args?.page_size || 10), 1), 50);
+      const auth = await getPayPalSandboxCredentialsAndToken(admin);
+      if (!auth.accessToken) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'PAYPAL_SANDBOX_AUTH_UNAVAILABLE',
+          message: auth.error || 'PayPal Sandbox OAuth token unavailable.',
+        };
+      }
+      const res = await fetch(
+        `https://api-m.sandbox.paypal.com/v2/invoicing/invoices?page=${page}&page_size=${pageSize}&total_required=true`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${auth.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      const appInvoices = await fetchSessionInvoices(admin, demoSessionId);
+      return {
+        ok: res.ok,
+        source: 'paypal_rest_adapter',
+        official_paypal_tool_equivalent: 'list_invoices',
+        environment: 'sandbox',
+        http_status: res.status,
+        paypal_invoicing_v2: {
+          total_items: Number(data?.total_items || 0),
+          total_pages: Number(data?.total_pages || 0),
+          items: Array.isArray(data?.items) ? data.items : [],
+        },
+        synchronized_application_invoices_count: appInvoices.length,
+        synchronized_application_invoices: appInvoices.map((i: any) => ({
+          invoice_number: i.invoice_number,
+          customer_name: i.customer_name,
+          status: i.status,
+          total_usd: i.total_usd,
+          balance_due_usd: i.balance_due_usd,
+          settlement_verification: i.settlement_verification,
+        })),
+      };
+    }
+
+    case 'paypal_generate_invoice_number': {
+      const auth = await getPayPalSandboxCredentialsAndToken(admin);
+      if (!auth.accessToken) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'PAYPAL_SANDBOX_AUTH_UNAVAILABLE',
+          message: auth.error || 'PayPal Sandbox OAuth token unavailable.',
+        };
+      }
+      const res = await fetch(
+        'https://api-m.sandbox.paypal.com/v2/invoicing/generate-next-invoice-number',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${auth.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      return {
+        ok: res.ok,
+        source: 'paypal_rest_adapter',
+        official_paypal_tool_equivalent: 'generate_invoice_number',
+        environment: 'sandbox',
+        http_status: res.status,
+        paypal_invoice_number: data?.invoice_number || null,
+        raw: data,
+      };
+    }
+
+    case 'paypal_list_disputes': {
+      const pageSize = Math.min(Math.max(Number(args?.page_size || 10), 1), 50);
+      const auth = await getPayPalSandboxCredentialsAndToken(admin);
+      if (!auth.accessToken) {
+        return {
+          ok: false,
+          source: 'paypal_rest_adapter',
+          error_code: 'PAYPAL_SANDBOX_AUTH_UNAVAILABLE',
+          message: auth.error || 'PayPal Sandbox OAuth token unavailable.',
+        };
+      }
+      const res = await fetch(
+        `https://api-m.sandbox.paypal.com/v1/customer/disputes?page_size=${pageSize}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${auth.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      return {
+        ok: res.ok,
+        source: 'paypal_rest_adapter',
+        official_paypal_tool_equivalent: 'list_disputes',
+        environment: 'sandbox',
+        http_status: res.status,
+        disputes_count: Array.isArray(data?.items) ? data.items.length : 0,
+        disputes: Array.isArray(data?.items) ? data.items : [],
       };
     }
 

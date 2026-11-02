@@ -1,0 +1,76 @@
+# Unified PayPal MCP Gateway, Conversational Authorization & PDF Receipt Architecture
+
+**Project:** PayPal AI Billing Kit (`v1.6.0`)  
+**Unified MCP Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`  
+**Vercel MCP Mirror:** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
+**OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json`  
+**PDF Receipt Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/:invoice_number.pdf`
+
+---
+
+## 1. Unified MCP Gateway Architecture (26 Tools)
+
+External AI clients (ChatGPT MCP, Claude Desktop, MCP Inspector, or custom agents) connect to **one single MCP endpoint** (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`) and gain access to **26 unified tools** across three source categories and three permission tiers.
+
+### 1.1 Tool Breakdown by Source
+
+| Source Category | Count | Tools |
+| --- | --- | --- |
+| **Native Application (`native_app`)** | 20 | `discover_billing_capabilities`, `list_demo_customers`, `search_invoices`, `get_invoice_details`, `explain_outstanding_balances`, `get_transaction_history`, `get_payment_receipt`, `get_financial_audit_history`, `get_paypal_sandbox_status`, `get_business_metrics`, `create_invoice_proposal`, `prepare_payment_proposal`, `prepare_refund_proposal`, `create_approved_invoice`, `create_paypal_checkout_order`, `capture_paypal_checkout_order`, `execute_approved_refund`, `void_unpaid_invoice`, `reset_demo_session`, `execute_conversational_instruction` |
+| **Official PayPal MCP (`official_paypal_mcp`)** | 1 | `paypal_discover_official_mcp` |
+| **PayPal REST Adapter (`paypal_rest_adapter`)** | 5 | `paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes` |
+
+### 1.2 Official PayPal Sandbox MCP Server Diagnostic (`https://mcp.sandbox.paypal.com`)
+
+During integration with PayPal's official remote MCP server (`https://mcp.sandbox.paypal.com`), we verified the live transport and execution behavior:
+
+1. **Endpoint Discovery:**
+   - `https://mcp.sandbox.paypal.com/http` returns `HTTP 404 Not Found` (`Requested path /http not found`).
+   - `https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server` returns `HTTP 200 OK` (OAuth 2.0 metadata with issuer `https://mcp.sandbox.paypal.com`).
+   - `GET https://mcp.sandbox.paypal.com/sse` with `Authorization: Bearer <PayPal_Sandbox_Access_Token>` returns `HTTP 200 OK` (`text/event-stream`), initializes `PayPal MCP Agent v1.0.0`, and lists **46 official PayPal tools** (`create_order`, `get_order`, `capture_order`, `create_refund`, `get_refund`, `list_invoices`, `generate_invoice_number`, `list_disputes`, etc.).
+2. **Upstream Cloudflare Workers Runtime Issue in `@paypal/agent-toolkit`:**
+   - When invoking `tools/call` on PayPal's hosted remote MCP server (`mcp.sandbox.paypal.com`), PayPal's internal Cloudflare Worker executes `@paypal/agent-toolkit` (`src/shared/functions.ts:2053`), which uses `axios` with `cache: "default"` in its `fetch` adapter. Cloudflare Workers' runtime `fetch` rejects `cache: "default"`, causing PayPal's hosted MCP server to return `PAYPAL_API_SETUP_ERROR: "Unsupported cache mode: default"`.
+3. **Unified Gateway Solution:**
+   - Our Unified MCP Gateway exposes `paypal_discover_official_mcp` (`source: "official_paypal_mcp"`) to inspect live connectivity and OAuth status against `mcp.sandbox.paypal.com/sse`, while executing the 5 official PayPal tool contracts (`paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `source: "paypal_rest_adapter"`) directly against `https://api-m.sandbox.paypal.com` using native `fetch` with zero `cache` runtime errors.
+
+---
+
+## 2. Conversational Authorization & Proposal Security (`Section 6`)
+
+The PayPal AI Billing Kit supports **two complementary authorization paths** for mutating actions:
+
+### Path A: Cryptographic Proposal Token (`proposal_id`)
+1. Calling a proposal tool (`create_invoice_proposal`, `prepare_payment_proposal`, `prepare_refund_proposal`) persists a server-side proposal record in `public.billing_ai_action_proposals` (30-minute TTL) and issues an HMAC-SHA256 signed token (`PPB-PROP-1.<payload>.<signature>`).
+2. Executing a confirmed write tool (`create_approved_invoice`, `create_paypal_checkout_order`, `execute_approved_refund`) verifies:
+   - HMAC signature integrity (tampered or forged tokens are rejected with `INVALID_PROPOSAL_TOKEN`).
+   - Server-side database status (`pending`) and non-expiration (`expires_at > now()`, or rejected with `EXPIRED_PROPOSAL_TOKEN`).
+   - Exact parameter binding (e.g., `invoice_number` and `amount_cents` must match the proposal, or rejected with `PROPOSAL_PARAMETER_MISMATCH`).
+   - Single-use consumption (replaying a consumed `proposal_id` is rejected with `PROPOSAL_ALREADY_CONSUMED`).
+
+### Path B: Explicit Conversational Instruction (`user_instruction` / `execute_conversational_instruction`)
+When a user gives a direct, unambiguous action command in ChatGPT or the in-app Billing AI Assistant, `evaluateConversationalAuthorization` (`packages/paypal-billing-kit/src/conversationalAuth.ts`) evaluates whether the utterance authorizes execution without requiring a separate button click:
+
+| Utterance Type | Example | Allowed to Execute? | Reason Code |
+| --- | --- | --- | --- |
+| **Capability Question** | `"Can you refund invoices?"` | ❌ **NO** | `CAPABILITY_QUESTION_NOT_COMMAND` |
+| **Hypothetical Question** | `"What would happen if I paid Alex Rivera's invoice?"` | ❌ **NO** | `HYPOTHETICAL_NOT_COMMAND` |
+| **Read / Explanation Request** | `"Show me Alex Rivera's invoices."` | ❌ **NO** (Read-Only) | `READ_ONLY_REQUEST` |
+| **Explicit Create Invoice** | `"Create a $35 invoice for Alex Rivera for immunization."` | ✅ **YES** (`create_invoice`) | `EXPLICIT_CONVERSATIONAL_COMMAND` |
+| **Explicit Prepare Payment** | `"Pay Alex Rivera's $35 invoice PPB-INV-2026-1003."` | ✅ **YES** (`prepare_payment` → real PayPal Sandbox approval URL) | `EXPLICIT_CONVERSATIONAL_COMMAND` |
+| **Explicit Refund** | `"Refund $20 on invoice PPB-INV-2026-1003."` | ✅ **YES** (`execute_refund` within `$500` single / `$2,500` daily guardrails) | `EXPLICIT_CONVERSATIONAL_COMMAND` |
+| **Over-Limit Refund** | `"Refund $600 on invoice PPB-INV-2026-1003."` | ❌ **NO** | `EXCEEDS_SINGLE_ACTION_LIMIT` (`$500.00` max) |
+| **Explicit Void Unpaid Invoice** | `"Void unpaid invoice PPB-INV-2026-1001."` | ✅ **YES** (`void_invoice`) | `EXPLICIT_CONVERSATIONAL_COMMAND` |
+| **Prior Proposal Confirmation** | `"Yes, confirm that."` (with active pending proposal) | ✅ **YES** | `CONFIRMED_PRIOR_PROPOSAL` |
+
+> **PayPal Buyer Checkout Invariant:** Even when `"Pay Alex Rivera's $35 invoice"` is authorized conversationally, the system **never** fabricates a payment capture. It creates a real PayPal Sandbox Order (`v2/checkout/orders`) and returns the `checkout_approval_url` for genuine buyer approval on `sandbox.paypal.com`.
+
+---
+
+## 3. Downloadable PDF Receipt Engine
+
+Every paid, partially refunded, or refunded invoice has a structured JSON receipt (`get_payment_receipt`) and a valid **PDF 1.4 binary receipt** (`packages/paypal-billing-kit/src/pdfReceipt.ts`) containing:
+- Receipt Number & Invoice Number (`PPB-INV-2026-1003`)
+- Customer & Provider Organization details
+- Line item breakdown, subtotal, discount, tax, total, amount paid, and refunded amount
+- Authentic PayPal Sandbox Order ID, Capture ID, and Refund IDs
+- Direct download endpoint: `GET https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/:invoice_number.pdf` (`Content-Type: application/pdf`).

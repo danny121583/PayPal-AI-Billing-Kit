@@ -3,8 +3,7 @@
 # Workspace: /Users/danny/Desktop/PayPal-AI-Billing-Kit/worker/wrangler.toml
 #
 # Isolation Boundary:
-# - Completely separate from Health eRecords workers (`health-erecords-*`)
-# - Completely separate from TraceForge worker (`traceforge-*`)
+# - Completely separate from any other Cloudflare workers
 # - Connects EXCLUSIVELY to dedicated Supabase project `dvzfesfvefggnunkjhom`
 # - Runs on Cloudflare Workers Free Tier ($0 cost, 100k req/day)
 # =============================================================================

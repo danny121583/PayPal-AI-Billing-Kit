@@ -19,12 +19,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-
-const requireFromHealth = createRequire(
-  '/Users/danny/Desktop/health-erecords-app/package.json'
-);
-const { chromium } = requireFromHealth('playwright');
+import { chromium } from 'playwright';
 
 const TARGET_URL =
   process.argv.find((a) => a.startsWith('--url='))?.slice(6) ||
@@ -37,7 +32,7 @@ const ARTIFACT_DIR =
 
 const SCREENSHOTS_DIR = path.join(
   '/Users/danny/Desktop/PayPal-AI-Billing-Kit',
-  'docs/assets/screenshots'
+  'docs/screenshots'
 );
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
@@ -105,12 +100,18 @@ async function run() {
     await page.waitForTimeout(1500);
 
     const bodyText1 = await page.locator('body').innerText();
+    const hasFaviconLink =
+      (await page.locator('link[rel*="icon"]').count()) > 0;
+    const hasBrandIcon =
+      (await page.locator('[data-testid="billing-brand-icon"]').count()) > 0;
     check(
-      'Step 1: Public URL opens directly to Billing dashboard with zero login prompt',
+      'Step 1: Public URL opens directly to Billing dashboard with reusable Brand Icon, Favicon link, and zero login prompt',
       bodyText1.includes('Provider Billing') &&
         bodyText1.includes('Dr. Sarah Jenkins') &&
-        bodyText1.includes('PPB-INV-2026-1001'),
-      'Dr. Sarah Jenkins Provider dashboard loaded automatically'
+        bodyText1.includes('PPB-INV-2026-1001') &&
+        hasFaviconLink &&
+        hasBrandIcon,
+      'Dr. Sarah Jenkins Provider dashboard + Brand Icon + Favicon verified'
     );
 
     await page.screenshot({
@@ -217,7 +218,9 @@ async function run() {
 
     // Step 2c (Section 9 Regression): Open Jordan Taylor #PPB-INV-2026-1004 failed payment statement and click Retry with PayPal Sandbox
     await page
-      .locator('[data-testid^="billing-invoice-card-"]')
+      .locator('[data-testid^="billing-invoice-card-"]', {
+        hasText: 'PPB-INV-2026-1004',
+      })
       .first()
       .click();
     await page.waitForSelector('[data-testid="billing-invoice-detail-modal"]', {
@@ -428,10 +431,13 @@ async function run() {
     const detailAfterSettle = await page
       .locator('[data-testid="billing-invoice-detail-modal"]')
       .innerText();
+    const hasPdfReceiptBtn =
+      (await page.locator('[data-testid="billing-download-pdf-receipt-btn"]').count()) > 0;
     check(
-      'Step 8: Customer Demo Settlement Simulation settles #PPB-INV-2026-1002 and shows Sample Demo Record badge',
-      detailAfterSettle.includes('Sample Demo') ||
-        detailAfterSettle.includes('PAID')
+      'Step 8: Customer Demo Settlement Simulation settles #PPB-INV-2026-1002, shows Sample Demo Record badge, and exposes Download PDF Receipt button',
+      (detailAfterSettle.includes('Sample Demo') ||
+        detailAfterSettle.includes('PAID')) &&
+        hasPdfReceiptBtn
     );
     await page.locator('[data-testid="billing-detail-close-btn"], [aria-label="Close statement details"]').first().click();
     await page.waitForTimeout(500);
@@ -488,11 +494,14 @@ async function run() {
     });
     const modalText = await page.locator('[data-testid="billing-maas-mcp-modal"]').innerText();
     check(
-      'Step 10a: Header navigation pill and modal title use "MCP Agent Interface" with zero MaaS branding',
+      'Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 26 tools, source badges, PDF receipt endpoint, and zero MaaS branding',
       mcpBtnText.includes('MCP Agent Interface') &&
         !mcpBtnText.includes('MaaS') &&
         modalText.includes('MCP Agent Interface') &&
-        modalText.includes('Connect AI agents to billing tools through Model Context Protocol (MCP).') &&
+        modalText.includes('26 Exposed Tools by Permission Tier') &&
+        modalText.includes('20 Native Application') &&
+        modalText.includes('1 Official PayPal MCP') &&
+        modalText.includes('5 PayPal REST Adapter') &&
         !modalText.includes('MaaS') &&
         !modalText.includes('Model-as-a-Service')
     );

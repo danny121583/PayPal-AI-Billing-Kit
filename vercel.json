@@ -19,6 +19,10 @@
       "destination": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp"
     },
     {
+      "source": "/api/receipts/:path*",
+      "destination": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/:path*"
+    },
+    {
       "source": "/docs/mcp",
       "destination": "https://paypal-ai-billing-mcp.apd1034.workers.dev/docs/mcp"
     },
@@ -35,7 +39,7 @@
       "destination": "https://paypal-ai-billing-mcp.apd1034.workers.dev/.well-known/jwks.json"
     },
     {
-      "source": "/((?!api/|docs/|_expo/|assets/|favicon\\.ico).*)",
+      "source": "/((?!api/|docs/|_expo/|assets/|favicon\\.(?:ico|svg|png)|apple-touch-icon\\.png).*)",
       "destination": "/index.html"
     }
   ],

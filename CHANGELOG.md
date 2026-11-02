@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.6.0] - 2026-11-02
+
+### Added
+- **Unified 26-Tool PayPal MCP Gateway (`worker/src/index.ts`, `supabase/functions/billing-maas-mcp/index.ts`, `packages/paypal-billing-kit/src/mcpRegistry.ts`):**
+  - Expanded the single MCP endpoint (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp` and `https://paypal-ai-billing-kit.vercel.app/api/mcp`) from 19 tools to **26 unified tools** (`16 Read-Only`, `3 Proposal-Only`, `7 Confirmed Write`).
+  - Added `paypal_discover_official_mcp` (`source: "official_paypal_mcp"`) to inspect live connectivity, OAuth 2.0 discovery, and the 46-tool catalog on PayPal's official remote MCP server (`https://mcp.sandbox.paypal.com/sse`).
+  - Added 5 PayPal Sandbox REST Adapter tools (`paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `source: "paypal_rest_adapter"`) executing official PayPal MCP tool contracts directly against `https://api-m.sandbox.paypal.com` with native `fetch` (bypassing the upstream `@paypal/agent-toolkit` `axios` `cache: "default"` Cloudflare Workers error).
+  - Added `execute_conversational_instruction` (`[CONFIRMED_WRITE]`) for natural-language action execution with full guardrail enforcement.
+- **Explicit Conversational Authorization Engine (`packages/paypal-billing-kit/src/conversationalAuth.ts`, `supabase/functions/billing-ai-assistant/index.ts`):**
+  - Implemented `evaluateConversationalAuthorization` supporting explicit natural-language commands (`create_invoice`, `prepare_payment`, `execute_refund`, `void_invoice`) alongside cryptographic `proposal_id` tokens, while blocking capability questions (`"Can you refund invoices?"`), hypothetical questions (`"What would happen if I paid?"`), read-only queries, and over-limit requests (`>$500.00`).
+- **Downloadable PDF 1.4 Receipt Engine (`packages/paypal-billing-kit/src/pdfReceipt.ts`, `worker/src/index.ts`, `components/billing/BillingInvoiceDetailModal.tsx`):**
+  - Added zero-dependency PDF 1.4 binary receipt generation served at `GET /api/receipts/:invoice_number.pdf` (`Content-Type: application/pdf`) and embedded in `get_payment_receipt` (`pdf_download_url`, `pdf_base64`, `pdf_byte_length`).
+  - Added a **"Download PDF Receipt"** button (`testID="billing-download-pdf-receipt-btn"`) to `BillingInvoiceDetailModal` for `paid`, `partially_refunded`, and `refunded` invoices.
+- **Reusable Brand Icon & Browser Tab Favicon (`components/billing/BillingBrandIcon.tsx`, `app/+html.tsx`, `public/favicon.*`):**
+  - Created reusable `<BillingBrandIcon />` component and multi-resolution web favicons (`public/favicon.svg`, `public/favicon.png`, `public/favicon.ico`, `public/apple-touch-icon.png`) rendered in the browser tab, top navigation header, and Unified MCP Agent Interface modal.
+- **Complete Standalone Repository Isolation:**
+  - Replaced symlinked `node_modules` with a standalone local installation (`package-lock.json`, 956 packages), consolidated screenshots under `docs/screenshots/`, removed obsolete planning files (`docs/01_*.md`–`docs/06_*.md`), and added `docs/UNIFIED_MCP_AND_SECURITY_ARCHITECTURE.md`.
+
+---
+
 ## [1.5.0] - 2026-11-02
 
 ### Added

@@ -1,11 +1,11 @@
 {
   "name": "paypal-ai-billing-kit",
-  "version": "1.0.0",
+  "version": "1.6.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "web": "expo start --web --port 4040",
+    "web": "expo start --web --port 8081",
     "ios": "expo start --ios",
     "android": "expo start --android",
     "typecheck": "tsc --noEmit",
@@ -16,8 +16,9 @@
     "verify:maas": "node scripts/verify-maas-mcp.mjs",
     "verify:ai-security": "node scripts/verify-security-and-ai.mjs",
     "verify:paypal-sandbox": "node scripts/verify-live-paypal-sandbox.mjs",
+    "verify:e2e": "node scripts/verify-public-vercel-e2e.mjs",
     "sync:secrets": "node scripts/sync-local-env-secrets.mjs",
-    "build:web": "EXPO_NO_TELEMETRY=1 npx expo export --platform web",
+    "build:web": "EXPO_NO_TELEMETRY=1 npx expo export --platform web && node scripts/inject-web-favicon.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs"
   },
   "dependencies": {
@@ -49,6 +50,7 @@
     "@types/react": "~19.1.0",
     "jest": "^29.7.0",
     "jest-expo": "~54.0.17",
+    "playwright": "^1.50.0",
     "typescript": "~5.9.2"
   }
 }
