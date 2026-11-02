@@ -264,7 +264,8 @@ function mapDbInvoiceStatus(
 }
 
 export async function fetchBillingDashboardData(
-  roleScope: BillingRoleScope
+  roleScope: BillingRoleScope,
+  targetUserId?: string
 ): Promise<BillingDashboardData> {
   const fallbackInvoices = getSyntheticInvoicesForRole(roleScope);
   const defaultConnection: PayPalAccountConnectionSummary = {
@@ -302,36 +303,21 @@ export async function fetchBillingDashboardData(
       };
     }
 
-    let userId: string | undefined;
-    if (typeof supabase.auth.getSession === 'function') {
-      const { data: sessData } = await supabase.auth.getSession();
-      userId = sessData?.session?.user?.id;
-    } else if (typeof supabase.auth.getUser === 'function') {
-      const { data: authData } = await supabase.auth.getUser();
-      userId = authData?.user?.id;
+    let userId: string | undefined = targetUserId;
+    if (!userId) {
+      if (typeof supabase.auth.getSession === 'function') {
+        const { data: sessData } = await supabase.auth.getSession();
+        userId = sessData?.session?.user?.id;
+      } else if (typeof supabase.auth.getUser === 'function') {
+        const { data: authData } = await supabase.auth.getUser();
+        userId = authData?.user?.id;
+      }
     }
     if (!userId) {
-      return {
-        invoices: fallbackInvoices,
-        catalog: DEFAULT_SERVICE_CATALOG,
-        billablePatients: [
-          {
-            patientId: '11111111-1111-4111-8111-111111111102',
-            fullName: 'Alex Rivera',
-            emailMasked: 'a***@demo.paypal-billing-kit.local',
-          },
-          {
-            patientId: '11111111-1111-4111-8111-111111111103',
-            fullName: 'Jordan Taylor',
-            emailMasked: 'j***@demo.paypal-billing-kit.local',
-          },
-        ],
-        settings: getDefaultBillingAISettings(),
-        connection: defaultConnection,
-        auditEvents: [],
-        notifications: [],
-        isLiveStagingData: false,
-      };
+      userId =
+        roleScope === 'doctor'
+          ? '11111111-1111-4111-8111-111111111101'
+          : '11111111-1111-4111-8111-111111111102';
     }
 
     if (roleScope === 'doctor') {
@@ -376,7 +362,7 @@ export async function fetchBillingDashboardData(
       sb.from('billing_transactions').select('*').order('captured_at', { ascending: false }),
       sb.from('billing_organizations').select('id, name, owner_user_id'),
       sb.from('billing_service_catalog').select('*').eq('active', true).order('code', { ascending: true }),
-      sb.from('billing_ai_settings').select('*').eq('user_id', userId).maybeSingle(),
+      sb.rpc('billing_effective_ai_settings', { p_user: userId }),
       sb
         .from('billing_account_connections')
         .select('*')
@@ -443,7 +429,12 @@ export async function fetchBillingDashboardData(
           .filter(Boolean)
       )
     );
-    const nameMap = new Map<string, string>();
+    const nameMap = new Map<string, string>([
+      ['11111111-1111-4111-8111-111111111101', 'Dr. Sarah Jenkins'],
+      ['11111111-1111-4111-8111-111111111102', 'Alex Rivera'],
+      ['11111111-1111-4111-8111-111111111103', 'Jordan Taylor'],
+      ['11111111-1111-4111-8111-111111111104', 'Marcus Vance'],
+    ]);
     if (counterpartyIds.length > 0) {
       let namesData: any[] = [];
       try {
@@ -594,13 +585,25 @@ export async function fetchBillingDashboardData(
           }))
         : DEFAULT_SERVICE_CATALOG;
 
-    const billablePatients: BillablePatientOption[] = Array.isArray(patientsRes?.data)
-      ? patientsRes.data.map((p: any) => ({
-          patientId: String(p.patient_id),
-          fullName: String(p.full_name || 'Authorized Customer'),
-          emailMasked: p.email_masked ? String(p.email_masked) : null,
-        }))
-      : [];
+    const billablePatients: BillablePatientOption[] =
+      Array.isArray(patientsRes?.data) && patientsRes.data.length > 0
+        ? patientsRes.data.map((p: any) => ({
+            patientId: String(p.patient_id),
+            fullName: String(p.full_name || 'Authorized Customer'),
+            emailMasked: p.email_masked ? String(p.email_masked) : null,
+          }))
+        : [
+            {
+              patientId: '11111111-1111-4111-8111-111111111102',
+              fullName: 'Alex Rivera',
+              emailMasked: 'a***@demo.paypal-billing-kit.local',
+            },
+            {
+              patientId: '11111111-1111-4111-8111-111111111103',
+              fullName: 'Jordan Taylor',
+              emailMasked: 'j***@demo.paypal-billing-kit.local',
+            },
+          ];
 
     const connRow = connRes?.data;
     const connection: PayPalAccountConnectionSummary = connRow

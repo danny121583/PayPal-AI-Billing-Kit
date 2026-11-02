@@ -1041,7 +1041,13 @@ export async function sendBillingAIMessage(params: {
   };
 
   try {
-    if (sb?.functions?.invoke && process.env.NODE_ENV !== 'test') {
+    const { data: sessData } =
+      typeof sb?.auth?.getSession === 'function'
+        ? await sb.auth.getSession()
+        : { data: { session: null } };
+    const hasAuthSession = Boolean(sessData?.session?.access_token);
+
+    if (sb?.functions?.invoke && process.env.NODE_ENV !== 'test' && hasAuthSession) {
       const demoSessionId = await getOrCreateDemoSessionId();
       const { data, error } = await sb.functions.invoke('billing-ai-assistant', {
         body: {

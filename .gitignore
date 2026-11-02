@@ -12,3 +12,5 @@ web-build/
 coverage/
 .vercel
 .vercel/
+.wrangler/
+.wrangler

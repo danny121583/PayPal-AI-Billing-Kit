@@ -1,0 +1,11 @@
+{
+  "name": "paypal-ai-billing-mcp-worker",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Dedicated Cloudflare Worker MaaS/MCP Gateway for PayPal AI Billing Kit",
+  "main": "src/index.ts",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  }
+}

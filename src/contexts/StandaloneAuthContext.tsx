@@ -110,7 +110,7 @@ export function StandaloneAuthProvider({ children }: { children: React.ReactNode
     account_role: 'provider',
     organization_name: DEMO_ACCOUNT_PRESETS.sarah_jenkins.organizationName,
   });
-  const [isSwitchingAccount, setIsSwitchingAccount] = useState(true);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const applyPresetState = useCallback((preset: DemoAccountPreset, realUserId?: string) => {
@@ -131,25 +131,9 @@ export function StandaloneAuthProvider({ children }: { children: React.ReactNode
     async (key: DemoAccountKey) => {
       const preset = DEMO_ACCOUNT_PRESETS[key];
       if (!preset) return;
-      setIsSwitchingAccount(true);
+      setIsSwitchingAccount(false);
       setAuthError(null);
-      // Apply preset immediately for responsive UI, then establish real Supabase JWT session
       applyPresetState(preset);
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: preset.email,
-          password: preset.password,
-        });
-        if (error) {
-          setAuthError(error.message);
-        } else if (data?.user?.id) {
-          applyPresetState(preset, data.user.id);
-        }
-      } catch (err) {
-        setAuthError(err instanceof Error ? err.message : 'Could not sign in to demo account.');
-      } finally {
-        setIsSwitchingAccount(false);
-      }
     },
     [applyPresetState]
   );
@@ -211,6 +195,14 @@ export function StandaloneAuthProvider({ children }: { children: React.ReactNode
       }
     }
     void switchDemoAccount(initialKey);
+    // Ensure any stale JWT from previous sessions is cleared so PostgREST uses clean anon demo RLS
+    if (typeof supabase.auth.getSession === 'function') {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session) {
+          supabase.auth.signOut().catch(() => {});
+        }
+      }).catch(() => {});
+    }
   }, [switchDemoAccount]);
 
   return (

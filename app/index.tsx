@@ -148,7 +148,7 @@ export default function BillingScreen() {
     try {
       const sid = await getOrCreateDemoSessionId();
       setDemoSessionId(sid);
-      const dash = await fetchBillingDashboardData(roleScope);
+      const dash = await fetchBillingDashboardData(roleScope, activePreset.id);
       setLiveInvoices(dash.invoices);
       setCatalog(dash.catalog);
       setBillablePatients(dash.billablePatients);
@@ -161,7 +161,7 @@ export default function BillingScreen() {
     } finally {
       setHasLoadedLiveOnce(true);
     }
-  }, [roleScope]);
+  }, [activePreset.id, roleScope]);
 
   const handleResetDemoSession = useCallback(async () => {
     if (isResettingDemo) return;
@@ -195,14 +195,12 @@ export default function BillingScreen() {
   }, [refreshBillingData]);
 
   useEffect(() => {
-    setLiveInvoices(null);
     setSelectedInvoice(null);
     setFocusedAiInvoice(null);
     setResetBannerText(null);
     setSearchQuery('');
-    if (isSwitchingAccount) return;
     void refreshBillingData();
-  }, [activePreset.id, isSwitchingAccount, refreshBillingData]);
+  }, [activePreset.id, refreshBillingData]);
 
   useEffect(() => {
     if (!selectedInvoice || !liveInvoices) return;

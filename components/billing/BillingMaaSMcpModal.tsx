@@ -22,6 +22,9 @@ export interface BillingMaaSMcpModalProps {
   onClose: () => void;
 }
 
+const MAAS_CLOUDFLARE_ENDPOINT =
+  'https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp';
+
 const MAAS_SUPABASE_ENDPOINT =
   'https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp';
 
@@ -68,7 +71,7 @@ export default function BillingMaaSMcpModal({
     setTestingTool(true);
     setLiveOutput(null);
     try {
-      const response = await fetch(MAAS_SUPABASE_ENDPOINT, {
+      const response = await fetch(MAAS_CLOUDFLARE_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,19 +159,24 @@ export default function BillingMaaSMcpModal({
           {demoSessionId}
         </Text>
 
-        <Text style={styles.label}>Vercel Proxy MCP / MaaS Endpoint (POST & GET)</Text>
+        <Text style={styles.label}>Dedicated Cloudflare Worker MCP Gateway (Global Edge)</Text>
+        <Text style={styles.codeBox} selectable testID="maas-cloudflare-endpoint">
+          {MAAS_CLOUDFLARE_ENDPOINT}
+        </Text>
+
+        <Text style={styles.label}>Vercel Web App MCP Gateway (POST & GET)</Text>
         <Text style={styles.codeBox} selectable testID="maas-vercel-endpoint">
           {`${publicOrigin}/api/mcp`}
         </Text>
 
         <Text style={styles.label}>OpenAPI 3.1.0 Schema (ChatGPT Actions / Evaluators)</Text>
         <Text style={styles.codeBox} selectable testID="maas-openapi-endpoint">
-          {`${publicOrigin}/api/openapi.json`}
+          {`https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json`}
         </Text>
 
-        <Text style={styles.label}>Direct Supabase Edge Function MCP Endpoint</Text>
-        <Text style={styles.codeBox} selectable testID="maas-supabase-endpoint">
-          {MAAS_SUPABASE_ENDPOINT}
+        <Text style={styles.label}>Interactive MCP Documentation & Explorer</Text>
+        <Text style={styles.codeBox} selectable testID="maas-docs-endpoint">
+          {`https://paypal-ai-billing-mcp.apd1034.workers.dev/docs/mcp`}
         </Text>
       </View>
 

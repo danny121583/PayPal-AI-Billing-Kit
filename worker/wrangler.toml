@@ -1,0 +1,29 @@
+# =============================================================================
+# Standalone PayPal AI Billing Kit — Dedicated Cloudflare Worker MaaS/MCP Gateway
+# Workspace: /Users/danny/Desktop/PayPal-AI-Billing-Kit/worker/wrangler.toml
+#
+# Isolation Boundary:
+# - Completely separate from Health eRecords workers (`health-erecords-*`)
+# - Completely separate from TraceForge worker (`traceforge-*`)
+# - Connects EXCLUSIVELY to dedicated Supabase project `dvzfesfvefggnunkjhom`
+# - Runs on Cloudflare Workers Free Tier ($0 cost, 100k req/day)
+# =============================================================================
+
+name = "paypal-ai-billing-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+ENVIRONMENT = "production"
+MCP_ENVIRONMENT = "sandbox"
+CANONICAL_ISSUER = "https://paypal-ai-billing-mcp.apd1034.workers.dev"
+MCP_CANONICAL_ISSUER = "https://paypal-ai-billing-mcp.apd1034.workers.dev"
+MCP_RESOURCE_URI = "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp"
+APP_ORIGIN = "https://paypal-ai-billing-kit.vercel.app"
+SUPABASE_URL = "https://dvzfesfvefggnunkjhom.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2emZlc2Z2ZWZnZ251bmtqaG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NTQyMzMsImV4cCI6MjEwOTAzMDIzM30.2tR5MsIMnCBrLvvhE1mgC-nbOPIhDbdkU0cGFs1x4PA"
+MCP_PROTOCOL_MODERN = "2026-07-28"
+MCP_PROTOCOL_LEGACY = "2025-06-18"
+RATE_LIMIT_MAX_PER_MINUTE = "120"

@@ -83,6 +83,12 @@ async function run() {
     page.on('pageerror', (err) => {
       pageErrors.push(err.message || String(err));
     });
+    page.on('response', async (res) => {
+      if (res.status() >= 400) {
+        const body = await res.text().catch(() => '');
+        console.log(`   [DEBUG HTTP ${res.status()}] ${res.request().method()} ${res.url()} -> ${body}`);
+      }
+    });
 
     // Step 1: Open public URL -> Direct entry to Billing dashboard without login prompt
     await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 45000 });
@@ -154,25 +160,36 @@ async function run() {
     await page.locator('[data-testid="create-invoice-service-ADMIN-FORMS"]').click();
     await page.waitForTimeout(300);
     await page.locator('[data-testid="create-invoice-send-btn"]').click();
-    await page.waitForTimeout(2400);
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid="doctor-metric-outstanding"]');
+        return el && el.textContent && el.textContent.includes('$310.00');
+      },
+      { timeout: 15000 }
+    ).catch(() => {});
+    await page.waitForTimeout(1000);
 
     const afterCreateText = await page.locator('body').innerText();
+    const hasForms = afterCreateText.includes('Forms Completion');
+    const outstandingVal = await page.locator('[data-testid="doctor-metric-outstanding"]').innerText();
+    console.log(`   [DEBUG Step 3] hasForms=${hasForms}, outstandingVal=${outstandingVal}`);
     check(
       'Step 3: Provider creates & sends $35.00 Forms Completion invoice for Alex Rivera',
-      afterCreateText.includes('Forms Completion') &&
-        afterCreateText.includes('$310.00'),
-      'Outstanding updated from $275.00 -> $310.00'
+      hasForms && (outstandingVal === '$310.00' || afterCreateText.includes('$310.00')),
+      `Outstanding updated to ${outstandingVal}`
     );
 
     // Step 4: Switch to Alex Rivera and view the newly created invoice
     await page.locator('[data-testid="demo-account-chip-alex_rivera"]').click();
     await page.waitForTimeout(2000);
     const alexAfterCreate = await page.locator('body').innerText();
+    const hasAlexForms = alexAfterCreate.includes('Forms Completion');
+    const balanceDueVal = await page.locator('[data-testid="patient-metric-balance-due"]').innerText();
+    console.log(`   [DEBUG Step 4] hasAlexForms=${hasAlexForms}, balanceDueVal=${balanceDueVal}`);
     check(
       'Step 4: Customer (Alex Rivera) immediately sees the newly sent $35.00 Forms Completion invoice',
-      alexAfterCreate.includes('Forms Completion') &&
-        alexAfterCreate.includes('$260.00'),
-      'Alex open balance updated from $225.00 -> $260.00'
+      hasAlexForms && (balanceDueVal === '$260.00' || alexAfterCreate.includes('$260.00')),
+      `Alex open balance updated to ${balanceDueVal}`
     );
 
     // Switch back to Provider for Steps 5 & 6
@@ -208,7 +225,13 @@ async function run() {
       .locator('[data-testid="billing-ai-chat-input"]')
       .fill('what is this invoice for? when were services provided?');
     await page.locator('[data-testid="billing-ai-chat-send"]').click();
-    await page.waitForTimeout(3000);
+    try {
+      await page.waitForSelector('[data-testid="billing-ai-msg-assistant"]', {
+        timeout: 10000,
+      });
+    } catch {
+      await page.waitForTimeout(3000);
+    }
 
     const aiModalText = await page
       .locator('[data-testid="billing-ai-assistant-modal"]')
@@ -249,16 +272,26 @@ async function run() {
       .locator('[data-testid="billing-ai-chat-input"]')
       .fill('Prepare a payment proposal for invoice #PPB-INV-2026-1002');
     await page.locator('[data-testid="billing-ai-chat-send"]').click();
-    await page.waitForTimeout(3000);
+    try {
+      await page.waitForSelector('[data-testid^="billing-ai-proposal-"]', {
+        timeout: 12000,
+      });
+    } catch {
+      await page.waitForTimeout(4000);
+    }
 
     const payPropText = await page
       .locator('[data-testid="billing-ai-assistant-modal"]')
       .innerText();
+    const has1002 = payPropText.includes('PPB-INV-2026-1002');
+    const has75 = payPropText.includes('$75.00');
+    const hasApprove = payPropText.includes('Approve');
+    if (!has1002 || !has75 || !hasApprove) {
+      console.log(`   [DEBUG Step 7] has1002=${has1002}, has75=${has75}, hasApprove=${hasApprove}, snippet:`, payPropText.slice(0, 300));
+    }
     check(
       'Step 7: Customer Billing AI prepares a payment checkout proposal requiring human approval',
-      payPropText.includes('PPB-INV-2026-1002') &&
-        payPropText.includes('$75.00') &&
-        payPropText.includes('Approve')
+      has1002 && has75 && hasApprove
     );
     await page.locator('[data-testid="billing-ai-close-btn"]').click();
     await page.waitForTimeout(500);
@@ -354,6 +387,12 @@ async function run() {
 
     await page.locator('[data-testid="billing-maas-mcp-close-btn"]').click();
     await page.waitForTimeout(400);
+
+    // Switch back to Provider before resetting so we verify practice receivables ($275.00) & all 6 seed invoices
+    await page
+      .locator('[data-testid="demo-account-chip-sarah_jenkins"]')
+      .click();
+    await page.waitForTimeout(1500);
 
     // Step 11: Click Reset Demo and confirm session resets back to $275.00 / 6 canonical invoices
     await page.locator('[data-testid="demo-reset-session-btn"]').click();

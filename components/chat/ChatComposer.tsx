@@ -68,7 +68,7 @@ export function ChatComposer({
       : Boolean(value.trim()) && !sending && !disabled;
 
   useEffect(() => {
-    if (!value) {
+    if (!value || !value.trim()) {
       setComposerHeight(COMPOSER_MIN_HEIGHT);
     }
   }, [value]);
@@ -76,9 +76,10 @@ export function ChatComposer({
   const handleContentSizeChange = useCallback(
     (e: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
       const contentH = e?.nativeEvent?.contentSize?.height ?? 0;
+      if (!contentH) return;
       const next = Math.min(
         COMPOSER_MAX_HEIGHT,
-        Math.max(COMPOSER_MIN_HEIGHT, Math.ceil(contentH) + 18)
+        Math.max(COMPOSER_MIN_HEIGHT, Math.ceil(contentH))
       );
       setComposerHeight((prev) => (prev === next ? prev : next));
     },
@@ -159,7 +160,7 @@ export function ChatComposer({
 const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingTop: 10,
     backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -179,6 +180,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 12 : 9,
     fontSize: 15,
     color: '#1F2937',
+    ...(Platform.OS === 'web' ? ({ overflowY: 'auto' } as const) : {}),
   },
   inputDisabled: {
     opacity: 0.6,
@@ -190,6 +192,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 2,
     ...shadow({ color: '#EA580C', opacity: 0.25, radius: 6, y: 2, elevation: 2 }),
   },
   sendButtonDisabled: {

@@ -116,15 +116,19 @@ export default function BillingInvoiceCard({
   );
 
   return (
-    <Pressable
+    <View
       style={[styles.card, highlighted && styles.cardHighlighted]}
-      onPress={() => onSelect(invoice)}
-      accessibilityLabel={`Invoice ${invoice.invoiceNumber}, ${invoice.administrativeSummary}, original amount ${formatUsdCents(
-        invoice.totalCents
-      )}, remaining balance ${formatUsdCents(effectiveBalanceCents)}, status ${badge.label}`}
       testID={`billing-invoice-card-${invoice.id}`}
     >
-      {/* Top Row: Date + Invoice Number + Status Badge */}
+      <Pressable
+        style={styles.cardMainArea}
+        onPress={() => onSelect(invoice)}
+        accessibilityRole="button"
+        accessibilityLabel={`Invoice ${invoice.invoiceNumber}, ${invoice.administrativeSummary}, original amount ${formatUsdCents(
+          invoice.totalCents
+        )}, remaining balance ${formatUsdCents(effectiveBalanceCents)}, status ${badge.label}`}
+      >
+        {/* Top Row: Date + Invoice Number + Status Badge */}
       <View style={styles.cardHeader}>
         <View style={styles.invoiceMetaRow}>
           <FileText size={16} color="#2563EB" />
@@ -261,6 +265,7 @@ export default function BillingInvoiceCard({
           </Text>
         </View>
       ) : null}
+      </Pressable>
 
       {/* Footer Metadata & Action Strip */}
       <View style={styles.footerRow}>
@@ -285,13 +290,18 @@ export default function BillingInvoiceCard({
             <Text style={styles.aiExplainChipText}>Ask Billing AI</Text>
           </Pressable>
 
-          <View style={styles.detailsChevron}>
+          <Pressable
+            style={styles.detailsChevron}
+            onPress={() => onSelect(invoice)}
+            accessibilityRole="button"
+            accessibilityLabel={`View details for invoice ${invoice.invoiceNumber}`}
+          >
             <Text style={styles.detailsText}>Details</Text>
             <ChevronRight size={15} color="#2563EB" />
-          </View>
+          </Pressable>
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -308,6 +318,9 @@ const styles = StyleSheet.create({
     borderColor: '#2563EB',
     borderWidth: 2,
     backgroundColor: '#F8FAFC',
+  },
+  cardMainArea: {
+    width: '100%',
   },
   cardHeader: {
     flexDirection: 'row',

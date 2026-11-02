@@ -252,7 +252,7 @@ export default function BillingAIAssistantModal({
       subtitle={
         isDoctor
           ? 'Invoices, balances & payments for your practice'
-          : 'Your statements, payments & receipts'
+          : 'Your statements, balances, payments & receipts'
       }
       scroll={false}
       testID="billing-ai-assistant-modal"
