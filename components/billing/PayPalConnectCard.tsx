@@ -64,13 +64,17 @@ export default function PayPalConnectCard({
     const pre =
       propConnection ?? getPreloadedPayPalConnection(roleScope, effectiveUserId);
     if (!pre || !pre.connected) return null;
+    const isVerified =
+      pre.oauthVerified !== undefined
+        ? Boolean(pre.oauthVerified)
+        : Boolean(pre.sandboxCredentialsConfigured);
     return {
       status: 'connected',
       connection_type: pre.connectionType,
       environment: pre.environment,
       paypal_payer_id: pre.paypalPayerIdMasked,
       paypal_email_masked: pre.paypalEmailMasked,
-      paypal_verified: true,
+      paypal_verified: isVerified,
       connected_at: pre.connectedAt,
     };
   });
@@ -94,13 +98,17 @@ export default function PayPalConnectCard({
   const loadStatus = useCallback(async () => {
     const pre = getPreloadedPayPalConnection(roleScope, effectiveUserId);
     if (pre && pre.connected) {
+      const isVerified =
+        pre.oauthVerified !== undefined
+          ? Boolean(pre.oauthVerified)
+          : Boolean(pre.sandboxCredentialsConfigured);
       setConn({
         status: 'connected',
         connection_type: pre.connectionType,
         environment: pre.environment,
         paypal_payer_id: pre.paypalPayerIdMasked,
         paypal_email_masked: pre.paypalEmailMasked,
-        paypal_verified: true,
+        paypal_verified: isVerified,
         connected_at: pre.connectedAt,
       });
       return;
@@ -110,7 +118,7 @@ export default function PayPalConnectCard({
       const { data, error } = await supabase
         .from('billing_account_connections')
         .select(
-          'connection_status, connection_type, paypal_environment, paypal_merchant_id, paypal_payer_id, paypal_email_masked, connected_at'
+          'status, connection_status, connection_type, environment, paypal_environment, paypal_merchant_id, paypal_payer_id, paypal_email_masked, paypal_verified, connected_at'
         )
         .eq('user_id', effectiveUserId)
         .maybeSingle();
@@ -118,26 +126,28 @@ export default function PayPalConnectCard({
       if (!error && data) {
         const raw = data as any;
         const isConn =
-          String(raw.connection_status || raw.status || '').toLowerCase() === 'connected';
+          String(raw.status || raw.connection_status || '').toLowerCase() === 'connected';
+        const isOAuth = Boolean(raw.paypal_verified);
         const payerOrMerchantId = raw.paypal_merchant_id || raw.paypal_payer_id || null;
         const record: ConnectionRecord = {
           status: isConn ? 'connected' : 'revoked',
           connection_type: roleScope === 'doctor' ? 'merchant' : 'payer',
-          environment: raw.paypal_environment === 'live' ? 'live' : 'sandbox',
+          environment: (raw.environment || raw.paypal_environment) === 'live' ? 'live' : 'sandbox',
           paypal_payer_id: isConn ? payerOrMerchantId : null,
           paypal_email_masked: isConn ? raw.paypal_email_masked : null,
-          paypal_verified: isConn,
+          paypal_verified: isConn && isOAuth,
           connected_at: isConn ? raw.connected_at : null,
         };
         setConn(record);
         setPreloadedPayPalConnection(effectiveUserId, {
           connected: isConn,
-          environment: raw.paypal_environment === 'live' ? 'live' : 'sandbox',
+          environment: (raw.environment || raw.paypal_environment) === 'live' ? 'live' : 'sandbox',
           connectionType: roleScope === 'doctor' ? 'merchant' : 'payer',
           paypalEmailMasked: isConn ? raw.paypal_email_masked : null,
           paypalPayerIdMasked: isConn ? payerOrMerchantId : null,
           connectedAt: isConn ? raw.connected_at : null,
-          sandboxCredentialsConfigured: false,
+          sandboxCredentialsConfigured: isOAuth,
+          oauthVerified: isOAuth,
         });
       }
     } catch {
@@ -149,13 +159,17 @@ export default function PayPalConnectCard({
     const pre =
       propConnection ?? getPreloadedPayPalConnection(roleScope, effectiveUserId);
     if (pre?.connected) {
+      const isVerified =
+        pre.oauthVerified !== undefined
+          ? Boolean(pre.oauthVerified)
+          : Boolean(pre.sandboxCredentialsConfigured);
       setConn({
         status: 'connected',
         connection_type: pre.connectionType,
         environment: pre.environment,
         paypal_payer_id: pre.paypalPayerIdMasked,
         paypal_email_masked: pre.paypalEmailMasked,
-        paypal_verified: true,
+        paypal_verified: isVerified,
         connected_at: pre.connectedAt,
       });
       setShowConnectForm(false);
@@ -213,6 +227,8 @@ export default function PayPalConnectCard({
             paypal_verified: Boolean(data?.oauthVerified),
             connected_at: new Date().toISOString(),
           };
+      const isVerified = Boolean(data?.oauthVerified ?? nextConn.paypal_verified);
+      nextConn.paypal_verified = isVerified;
       setConn(nextConn);
       const summary: PayPalAccountConnectionSummary = {
         connected: true,
@@ -221,7 +237,8 @@ export default function PayPalConnectCard({
         paypalEmailMasked: nextConn.paypal_email_masked,
         paypalPayerIdMasked: nextConn.paypal_payer_id,
         connectedAt: nextConn.connected_at || new Date().toISOString(),
-        sandboxCredentialsConfigured: false,
+        sandboxCredentialsConfigured: isVerified,
+        oauthVerified: isVerified,
       };
       setPreloadedPayPalConnection(effectiveUserId, summary);
       onConnectionChanged?.(summary);
@@ -279,13 +296,20 @@ export default function PayPalConnectCard({
 
   const isConnected =
     String(conn?.status || '').toUpperCase() === 'CONNECTED';
+  const isOAuthAuthenticated = isConnected && Boolean(conn?.paypal_verified);
+  const isDemoProfileOnly = isConnected && !conn?.paypal_verified;
+  const badgeLabel = !isConnected
+    ? 'DISCONNECTED'
+    : isOAuthAuthenticated
+      ? 'SANDBOX AUTHENTICATED'
+      : 'DEMO PROFILE AVAILABLE';
 
   return (
     <View style={styles.card} testID="paypal-connect-card">
       <View style={styles.topRow}>
         <View style={styles.brandRow}>
-          <View style={[styles.iconBadge, isConnected && styles.iconBadgeConnected]}>
-            <CreditCard size={20} color={isConnected ? '#047857' : '#003087'} />
+          <View style={[styles.iconBadge, isOAuthAuthenticated && styles.iconBadgeConnected]}>
+            <CreditCard size={20} color={isOAuthAuthenticated ? '#047857' : '#003087'} />
           </View>
           <View style={styles.titleCol}>
             <Text style={styles.title}>
@@ -300,23 +324,25 @@ export default function PayPalConnectCard({
         </View>
 
         <View
-          style={[styles.statusBadge, isConnected && styles.statusBadgeConnected]}
+          style={[styles.statusBadge, isOAuthAuthenticated && styles.statusBadgeConnected]}
           testID="paypal-connect-status-badge"
         >
           <Text
-            style={[styles.statusBadgeText, isConnected && styles.statusBadgeTextConnected]}
+            style={[styles.statusBadgeText, isOAuthAuthenticated && styles.statusBadgeTextConnected]}
           >
-            {isConnected ? 'SANDBOX CONNECTED' : 'DISCONNECTED'}
+            {badgeLabel}
           </Text>
         </View>
       </View>
 
       <Text style={styles.description}>
-        {isConnected
-          ? `Connected to PayPal Sandbox (${conn?.paypal_email_masked || 'Verified Sandbox Account'} • ID: ${conn?.paypal_payer_id || 'SANDBOX'}). All invoice orders, captures, and refunds are logged to the immutable ledger.`
-          : isDoctor
-            ? 'Connect your PayPal Developer Sandbox merchant profile to issue invoices, capture customer payments, and process full or partial refunds.'
-            : 'Connect your PayPal Developer Sandbox buyer account or launch PayPal Sandbox checkout directly from any open statement.'}
+        {isOAuthAuthenticated
+          ? `Authenticated with PayPal Sandbox OAuth 2.0 (${conn?.paypal_email_masked || 'Verified Sandbox Account'} • ID: ${conn?.paypal_payer_id || 'SANDBOX'}). Account Linked — all invoice orders, captures, and refunds are logged to the immutable ledger.`
+          : isDemoProfileOnly
+            ? `Demo Profile Available (${conn?.paypal_email_masked || 'Demo Account'} • ID: ${conn?.paypal_payer_id || 'DEMO'}). Sandbox Configuration Missing — fictional profile available for demonstration, not OAuth authenticated.`
+            : isDoctor
+              ? 'Connect your PayPal Developer Sandbox merchant profile to issue invoices, capture customer payments, and process full or partial refunds.'
+              : 'Connect your PayPal Developer Sandbox buyer account or launch PayPal Sandbox checkout directly from any open statement.'}
       </Text>
 
       {isConnected ? (
@@ -324,14 +350,15 @@ export default function PayPalConnectCard({
           style={styles.connectedAccountBox}
           testID="paypal-connected-account-summary"
         >
-          <CheckCircle2 size={15} color="#047857" />
+          <CheckCircle2 size={15} color={isOAuthAuthenticated ? '#047857' : '#B45309'} />
           <Text style={styles.connectedAccountText}>
-            Linked Account: {conn?.paypal_email_masked || 'sb-***@sandbox.paypal.com'} •{' '}
+            {isOAuthAuthenticated ? 'Account Linked' : 'Demo Profile Available'}:{' '}
+            {conn?.paypal_email_masked || 'sb-***@sandbox.paypal.com'} •{' '}
             {isDoctor ? 'Merchant ID' : 'Payer ID'}:{' '}
             {conn?.paypal_payer_id || 'PAYPAL-SANDBOX'} •{' '}
-            {conn?.paypal_verified
-              ? 'PayPal OAuth 2.0 Verified'
-              : 'Sandbox Profile Linked'}
+            {isOAuthAuthenticated
+              ? 'PayPal OAuth 2.0 Authenticated'
+              : 'Sandbox Configuration Missing'}
           </Text>
         </View>
       ) : null}

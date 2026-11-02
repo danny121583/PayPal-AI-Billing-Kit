@@ -79,8 +79,8 @@ All screenshots below are captured directly from the live production deployment 
 | :---: | :---: |
 | ![Create Invoice Modal](docs/assets/screenshots/04-create-invoice-modal.png) | ![Failed Payment Retry](docs/assets/screenshots/07-failed-payment-retry-1004.png) |
 
-### 3.4 PayPal Sandbox Connection State Transitions (`Connected` ↔ `Disconnected`)
-| PayPal Sandbox Connected (`SANDBOX CONNECTED`) | PayPal Sandbox Disconnected (`DISCONNECTED` + Reconnect CTA) |
+### 3.4 PayPal Sandbox Connection State Transitions (`SANDBOX AUTHENTICATED` ↔ `DISCONNECTED`)
+| PayPal Sandbox Authenticated (`SANDBOX AUTHENTICATED` + `Account Linked`) | PayPal Sandbox Disconnected (`DISCONNECTED` + Reconnect CTA) |
 | :---: | :---: |
 | ![PayPal Sandbox Connected](docs/assets/screenshots/05-paypal-sandbox-connected.png) | ![PayPal Sandbox Disconnected](docs/assets/screenshots/06-paypal-sandbox-disconnected.png) |
 
@@ -246,11 +246,22 @@ Once connected in ChatGPT (or inside the in-app **Billing AI Assistant**), test 
 ## 9. PayPal Sandbox Integration & Settlement Verification
 
 The `paypal-billing` and `paypal-webhook` Supabase Edge Functions implement genuine PayPal Sandbox REST API v2 integration against `https://api-m.sandbox.paypal.com`:
-- **OAuth 2.0 Client Credentials (`POST /v1/oauth2/token`):** Exchanges `PAYPAL_SANDBOX_CLIENT_ID` and `PAYPAL_SANDBOX_CLIENT_SECRET` for a live Sandbox bearer token and verifies merchant/payer connectivity.
+- **OAuth 2.0 Client Credentials (`POST /v1/oauth2/token`):** Exchanges `PAYPAL_SANDBOX_CLIENT_ID` and `PAYPAL_SANDBOX_CLIENT_SECRET` (`Default Application`, `App ID: APP-5SK74342S6474230W`) for a live Sandbox bearer token and distinguishes **`SANDBOX AUTHENTICATED`** (`Account Linked`, `paypal_verified: true`) from unverified demo profiles (**`DEMO PROFILE AVAILABLE`** / `Sandbox Configuration Missing`) and **`DISCONNECTED`**.
 - **PayPal Orders v2 (`POST /v2/checkout/orders`):** Creates an order with `intent: "CAPTURE"`, `custom_id: <invoice_id>`, `invoice_id: <invoice_number>-<timestamp>`, and sanitized `ADMIN-*` item metadata, returning the `orderId` and buyer `approve` link.
 - **PayPal Order Capture (`POST /v2/checkout/orders/{id}/capture`):** Captures buyer-approved orders and invokes `billing_apply_verified_capture` (`service_role` only) to record the `paypal_capture_id`, seller fee breakdown, and receipt.
 - **PayPal Captures v2 Refund (`POST /v2/payments/captures/{id}/refund`):** Issues full or partial refunds against verified PayPal capture IDs and updates `billing_refunds` and `billing_invoices`.
 - **PayPal Webhook Signature Verification (`POST /v1/notifications/verify-webhook-signature`):** Rejects unsigned or spoofed webhook payloads (`400 MISSING_SIGNATURE_HEADERS`) before any state change.
+
+### Verified End-to-End Real PayPal Sandbox Transaction (`evidence/04_live_paypal_sandbox_transaction.json`)
+| Artifact / Field | Verified Value |
+| :--- | :--- |
+| **PayPal REST Application** | `Default Application` (`APP-5SK74342S6474230W`) |
+| **Isolated Session ID** | `live-sbx-1793655303922` |
+| **Created Statement** | `#PPB-INV-2026-1057` (`562b3029-9a2c-452b-8ee8-d04939e336bf`, `$35.00 USD`, `ADMIN-FORMS`) |
+| **Payment Proposal ID** | `6696130a-4d92-4753-bc71-34bc04340b5b.b554bcdcbb79dc7f` |
+| **Real PayPal Sandbox Order ID** | `7FA47897KM5938009` (`PAYER_ACTION_REQUIRED` → `COMPLETED`) |
+| **Real PayPal Sandbox Capture ID** | `5HM71086SR568352C` (`COMPLETED`, `$35.00 USD`, `2026-11-02T21:53:02.952534+00:00`) |
+| **Real PayPal Sandbox Refund ID** | `2EM77813GU330222M` (`COMPLETED`, `$35.00 USD`, `2026-11-02T21:53:07.54377+00:00`) |
 
 ---
 

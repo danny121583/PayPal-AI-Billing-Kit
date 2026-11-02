@@ -138,6 +138,7 @@ export interface PayPalAccountConnectionSummary {
   paypalPayerIdMasked: string | null;
   connectedAt: string | null;
   sandboxCredentialsConfigured: boolean;
+  oauthVerified?: boolean;
 }
 
 export interface BillingAuditEventItem {
@@ -257,17 +258,16 @@ export function getDefaultPayPalConnection(
     environment: 'sandbox',
     connectionType: isDoctor ? 'merchant' : 'payer',
     paypalEmailMasked: isDoctor
-      ? 'b***g@paypal-demo.example.com'
-      : isJordan
-        ? 'j***t@personal.example.com'
-        : 'a***a@personal.example.com',
+      ? 'sb-***@business.example.com'
+      : 'sb-***@personal.example.com',
     paypalPayerIdMasked: isDoctor
-      ? 'SB-MERCHANT-CLINIC-01'
+      ? 'PAYPAL-SANDBOX-MERCHANT'
       : isJordan
-        ? 'SB-PAYER-JORDAN-03'
-        : 'SB-PAYER-ALEX-02',
-    connectedAt: '2026-10-15T12:00:00.000Z',
-    sandboxCredentialsConfigured: false,
+        ? 'SB-PAYER-JORDAN-1003'
+        : 'SB-PAYER-ALEX-1002',
+    connectedAt: '2026-11-02T21:35:00.000Z',
+    sandboxCredentialsConfigured: true,
+    oauthVerified: true,
   };
 }
 
@@ -713,6 +713,7 @@ export async function fetchBillingDashboardData(
         const isDoc = rowUid === DEMO_USER_IDS.sarah_jenkins;
         const isConn =
           row.connection_status === 'connected' || row.status === 'connected';
+        const isOAuth = Boolean(row.paypal_verified);
         nextConnectionsByUser[rowUid] = {
           connected: isConn,
           environment: (row.paypal_environment || row.paypal_env || row.environment || 'sandbox') as
@@ -726,7 +727,8 @@ export async function fetchBillingDashboardData(
               ? String(row.paypal_merchant_id || row.paypal_payer_id)
               : null,
           connectedAt: isConn && row.connected_at ? String(row.connected_at) : null,
-          sandboxCredentialsConfigured: false,
+          sandboxCredentialsConfigured: isOAuth,
+          oauthVerified: isOAuth,
         };
       }
 

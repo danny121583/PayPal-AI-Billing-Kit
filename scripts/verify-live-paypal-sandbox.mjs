@@ -164,6 +164,11 @@ async function main() {
     });
     console.log('  • Capture Response:', JSON.stringify(capRes.data, null, 2));
 
+    const mcpReceiptAfterCapture = await callMcpTool(
+      'get_payment_receipt',
+      { invoice_number: capRes.data?.invoiceNumber || undefined, invoice_id: targetInvoiceId },
+      sessionArg
+    );
     const mcpAfterCapture = await callMcpTool('get_transaction_history', {}, sessionArg);
     const mcpAuditAfterCapture = await callMcpTool('get_financial_audit_history', { limit: 10 }, sessionArg);
 
@@ -185,6 +190,7 @@ async function main() {
 
     writeSanitizedEvidence({
       capture_verification: capRes.data,
+      mcp_payment_receipt_after_capture: mcpReceiptAfterCapture,
       refund_verification: refundResult,
       mcp_transaction_history_after_capture: mcpAfterCapture,
       mcp_financial_audit_after_capture: mcpAuditAfterCapture,

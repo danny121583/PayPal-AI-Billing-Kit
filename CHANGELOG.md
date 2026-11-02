@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.5.0] - 2026-11-02
+
+### Added
+- **End-to-End Real PayPal Sandbox Verification (`scripts/verify-live-paypal-sandbox.mjs`, `evidence/04_live_paypal_sandbox_transaction.json`):**
+  - Configured and verified PayPal Sandbox `Default Application` (`APP-5SK74342S6474230W`) OAuth 2.0 handshake (`POST /v1/oauth2/token` → `200 OK`) via server-only `billing_platform_secrets`.
+  - Executed and reconciled a complete live PayPal Sandbox transaction lifecycle on session-scoped invoice `#PPB-INV-2026-1057` (`562b3029-9a2c-452b-8ee8-d04939e336bf`, `$35.00 USD`, `ADMIN-FORMS`):
+    - **Order Creation (`POST /v2/checkout/orders`):** `7FA47897KM5938009` (`PAYER_ACTION_REQUIRED`)
+    - **Order Capture (`POST /v2/checkout/orders/7FA47897KM5938009/capture`):** `5HM71086SR568352C` (`COMPLETED`, `$35.00 USD`, `captured_at: 2026-11-02T21:53:02.952534+00:00`)
+    - **Receipt Verification (`get_payment_receipt`):** `receipt_number: 5HM71086SR568352C`, `settlement_verification: paypal_sandbox_verified`, `is_live_paypal_capture: true`
+    - **Refund Execution (`POST /v2/payments/captures/5HM71086SR568352C/refund`):** `2EM77813GU330222M` (`COMPLETED`, `$35.00 USD`, `completed_at: 2026-11-02T21:53:07.54377+00:00`)
+
+### Security
+- **Mandatory Server-Side Proposal Verification Across Financial Execution Tools (`supabase/functions/billing-maas-mcp/index.ts`, `worker/src/index.ts`):**
+  - Required valid `proposal_id` + `explicit_human_approval: true` on `create_approved_invoice`, `create_paypal_checkout_order`, and `execute_approved_refund`.
+  - Enforced 5 server-side invariants on every proposal execution: (1) Session ownership (`CROSS_SESSION_PROPOSAL_ACCESS_DENIED` + Cloudflare Worker HMAC-SHA256 `<uuid>.<sig16>` binding), (2) Proposal kind match (`INVALID_PROPOSAL_KIND`), (3) One-time execution / replay protection (`DUPLICATE_APPROVAL_BLOCKED`), (4) Expiration enforcement (`PROPOSAL_EXPIRED`), and (5) Parameter binding (`PROPOSAL_PARAMETER_MISMATCH`).
+- **Truthful PayPal Connection Status Labels (`components/billing/PayPalConnectCard.tsx`, `src/billing/api/billingService.ts`):**
+  - Replaced generic `SANDBOX CONNECTED` on unverified demo rows with distinct verified vs. unverified states: `SANDBOX AUTHENTICATED` + `Account Linked` (when `oauthVerified === true` and `paypal_verified === true`), `DEMO PROFILE AVAILABLE` + `Sandbox Configuration Missing` (when `oauthVerified === false`), and `DISCONNECTED` (when `connected === false`).
+
+---
+
 ## [1.4.0] - 2026-11-02
 
 ### Added

@@ -1685,7 +1685,9 @@ async function executeTool(
     case 'get_paypal_sandbox_status': {
       const { data: conns } = await admin
         .from('billing_account_connections')
-        .select('user_id, connection_type, environment, paypal_payer_id, paypal_email_masked, status, connected_at');
+        .select(
+          'user_id, connection_type, paypal_environment, paypal_merchant_id, paypal_payer_id, paypal_email_masked, connection_status, connected_at'
+        );
 
       let dbClientId = '';
       let dbClientSecret = '';
@@ -1720,18 +1722,50 @@ async function executeTool(
         // Ignore if table not present
       }
 
-      const liveCredentialsConfigured = Boolean(
-        (PAYPAL_CLIENT_ID || dbClientId) && (PAYPAL_CLIENT_SECRET || dbClientSecret)
-      );
+      const effectiveClientId = PAYPAL_CLIENT_ID || dbClientId;
+      const effectiveClientSecret = PAYPAL_CLIENT_SECRET || dbClientSecret;
+      const liveCredentialsConfigured = Boolean(effectiveClientId && effectiveClientSecret);
+
+      let oauthReachable = false;
+      let paypalAppId: string | null = null;
+      if (liveCredentialsConfigured) {
+        try {
+          const sbStatusResp = await fetch(`${SUPABASE_URL}/functions/v1/paypal-billing`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SUPABASE_SERVICE_ROLE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({
+              action: 'sandbox-status',
+              roleScope: 'doctor',
+              userId: PROVIDER_ID,
+            }),
+          });
+          const sbStatusData = await sbStatusResp.json().catch(() => ({}));
+          oauthReachable = Boolean(sbStatusData?.oauthReachable);
+          paypalAppId = sbStatusData?.appId ? String(sbStatusData.appId) : null;
+        } catch {
+          oauthReachable = false;
+        }
+      }
 
       return {
         ok: true,
         environment: 'sandbox',
         production_live_payments_disabled: true,
         paypal_sandbox_api_credentials_configured: liveCredentialsConfigured,
-        verification_mode_explanation: liveCredentialsConfigured
-          ? 'Live PayPal Developer Sandbox REST credentials are configured. Create-order, buyer approval redirect, and capture-order run against api-m.sandbox.paypal.com.'
-          : 'PayPal Sandbox account connection records are seeded and active. Because PAYPAL_SANDBOX_CLIENT_ID / PAYPAL_SANDBOX_CLIENT_SECRET are not set in Edge Function secrets, live PayPal API checkout returns an explicit configuration notice while Demo Settlement Simulation remains available and clearly labeled as a Sample Demo Record.',
+        oauth_reachable: oauthReachable,
+        paypal_app_id: paypalAppId,
+        connection_state: oauthReachable
+          ? 'SANDBOX_AUTHENTICATED'
+          : liveCredentialsConfigured
+            ? 'SANDBOX_CONFIGURED_PENDING_OAUTH'
+            : 'DEMO_PROFILE_AVAILABLE',
+        verification_mode_explanation: oauthReachable
+          ? `PayPal Sandbox REST API credentials verified via live OAuth 2.0 handshake (App ID: ${paypalAppId || 'Verified'}). Create-order, buyer approval redirect, capture-order, and refund-capture execute against api-m.sandbox.paypal.com.`
+          : 'Demo PayPal profiles are available for demonstration, but live PayPal Sandbox REST API credentials are not authenticated.',
         connected_accounts: conns || [],
       };
     }
@@ -1827,39 +1861,86 @@ async function executeTool(
           ok: false,
           error_code: 'HUMAN_APPROVAL_REQUIRED',
           message:
-            'Creating a PayPal checkout order requires `explicit_human_approval: true`. Call `prepare_payment_proposal` first if you need to present a proposal to the customer.',
+            'Creating a PayPal checkout order requires `explicit_human_approval: true` and a valid `proposal_id` from `prepare_payment_proposal`.',
         };
       }
 
       let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
-      const proposalId = String(args?.proposal_id || '').trim();
+      const rawProposalId = String(args?.proposal_id || '').trim();
+      const proposalId = rawProposalId.includes('.') ? rawProposalId.split('.')[0] : rawProposalId;
 
-      if (proposalId) {
-        const { data: propRow } = await admin
-          .from('billing_ai_proposals')
-          .select('*')
-          .eq('id', proposalId)
-          .maybeSingle();
+      if (!proposalId) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_REQUIRED_FOR_WRITE',
+          message:
+            'Creating a PayPal checkout order requires a server-side `proposal_id` obtained from `prepare_payment_proposal` in the same session.',
+        };
+      }
 
-        if (!propRow) {
-          return {
-            ok: false,
-            error_code: 'PROPOSAL_NOT_FOUND',
-            message: `Payment proposal "${proposalId}" was not found.`,
-          };
-        }
+      const { data: propRow } = await admin
+        .from('billing_ai_proposals')
+        .select('*')
+        .eq('id', proposalId)
+        .maybeSingle();
 
-        if (String(propRow.demo_session_id || '') !== demoSessionId) {
-          return {
-            ok: false,
-            error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
-            message: 'Proposal belongs to a different demo_session_id.',
-          };
-        }
+      if (!propRow) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_NOT_FOUND',
+          message: `Payment proposal "${proposalId}" was not found.`,
+        };
+      }
 
-        if (!rawNum && propRow.payload?.invoice_number) {
-          rawNum = String(propRow.payload.invoice_number).replace(/^#/, '');
-        }
+      if (String(propRow.demo_session_id || '') !== demoSessionId) {
+        return {
+          ok: false,
+          error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+          message: 'Proposal belongs to a different demo_session_id.',
+        };
+      }
+
+      if (propRow.kind !== 'payment_checkout') {
+        return {
+          ok: false,
+          error_code: 'INVALID_PROPOSAL_KIND',
+          message: `Proposal "${proposalId}" has kind "${propRow.kind}" and cannot be used for payment checkout.`,
+        };
+      }
+
+      if (propRow.status === 'approved' || propRow.status === 'executed') {
+        return {
+          ok: false,
+          error_code: 'DUPLICATE_APPROVAL_BLOCKED',
+          message: `Payment proposal "${proposalId}" has already been executed (one-time execution enforced).`,
+        };
+      }
+
+      const expiresAtStr = propRow.payload?.expires_at;
+      if (expiresAtStr && new Date(String(expiresAtStr)).getTime() < Date.now()) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_EXPIRED',
+          message: `Payment proposal "${proposalId}" has expired. Prepare a new proposal via \`prepare_payment_proposal\`.`,
+        };
+      }
+
+      const proposedInvoiceNum = String(propRow.payload?.invoice_number || '').replace(/^#/, '');
+      if (
+        rawNum &&
+        proposedInvoiceNum &&
+        rawNum.toLowerCase() !== proposedInvoiceNum.toLowerCase() &&
+        !proposedInvoiceNum.toLowerCase().endsWith(rawNum.toLowerCase())
+      ) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_PARAMETER_MISMATCH',
+          message: `Proposal "${proposalId}" is bound to invoice #${proposedInvoiceNum} and cannot be used for "${rawNum}".`,
+        };
+      }
+
+      if (!rawNum && proposedInvoiceNum) {
+        rawNum = proposedInvoiceNum;
       }
 
       const invoices = await fetchSessionInvoices(admin, demoSessionId);
@@ -2178,51 +2259,95 @@ async function executeTool(
           ok: false,
           error_code: 'HUMAN_APPROVAL_REQUIRED',
           message:
-            'Executing a refund requires `explicit_human_approval: true`. Call `prepare_refund_proposal` first to prepare a refund proposal.',
+            'Executing a refund requires `explicit_human_approval: true` and a valid `proposal_id` from `prepare_refund_proposal`.',
         };
       }
 
       let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
       let requestedAmountMinor = Number(args?.amount_minor || 0);
-      const proposalId = String(args?.proposal_id || '').trim();
+      const rawProposalId = String(args?.proposal_id || '').trim();
+      const proposalId = rawProposalId.includes('.') ? rawProposalId.split('.')[0] : rawProposalId;
 
-      if (proposalId) {
-        const { data: propRow } = await admin
-          .from('billing_ai_proposals')
-          .select('*')
-          .eq('id', proposalId)
-          .maybeSingle();
+      if (!proposalId) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_REQUIRED_FOR_WRITE',
+          message:
+            'Executing a refund requires a server-side `proposal_id` obtained from `prepare_refund_proposal` in the same session.',
+        };
+      }
 
-        if (!propRow) {
-          return {
-            ok: false,
-            error_code: 'PROPOSAL_NOT_FOUND',
-            message: `Refund proposal "${proposalId}" was not found.`,
-          };
-        }
+      const { data: propRow } = await admin
+        .from('billing_ai_proposals')
+        .select('*')
+        .eq('id', proposalId)
+        .maybeSingle();
 
-        if (String(propRow.demo_session_id || '') !== demoSessionId) {
-          return {
-            ok: false,
-            error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
-            message: 'Proposal belongs to a different demo_session_id.',
-          };
-        }
+      if (!propRow) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_NOT_FOUND',
+          message: `Refund proposal "${proposalId}" was not found.`,
+        };
+      }
 
-        if (propRow.status === 'executed' || propRow.status === 'approved') {
-          return {
-            ok: false,
-            error_code: 'DUPLICATE_APPROVAL_BLOCKED',
-            message: `Refund proposal "${proposalId}" has already been executed.`,
-          };
-        }
+      if (String(propRow.demo_session_id || '') !== demoSessionId) {
+        return {
+          ok: false,
+          error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+          message: 'Proposal belongs to a different demo_session_id.',
+        };
+      }
 
-        if (!rawNum && propRow.payload?.invoice_number) {
-          rawNum = String(propRow.payload.invoice_number).replace(/^#/, '');
-        }
-        if (!requestedAmountMinor && propRow.amount_minor) {
-          requestedAmountMinor = Number(propRow.amount_minor);
-        }
+      if (propRow.kind !== 'refund') {
+        return {
+          ok: false,
+          error_code: 'INVALID_PROPOSAL_KIND',
+          message: `Proposal "${proposalId}" has kind "${propRow.kind}" and cannot be used for refund execution.`,
+        };
+      }
+
+      if (propRow.status === 'executed' || propRow.status === 'approved') {
+        return {
+          ok: false,
+          error_code: 'DUPLICATE_APPROVAL_BLOCKED',
+          message: `Refund proposal "${proposalId}" has already been executed (one-time execution enforced).`,
+        };
+      }
+
+      const proposedInvoiceNum = String(propRow.payload?.invoice_number || '').replace(/^#/, '');
+      if (
+        rawNum &&
+        proposedInvoiceNum &&
+        rawNum.toLowerCase() !== proposedInvoiceNum.toLowerCase() &&
+        !proposedInvoiceNum.toLowerCase().endsWith(rawNum.toLowerCase())
+      ) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_PARAMETER_MISMATCH',
+          message: `Refund proposal "${proposalId}" is bound to invoice #${proposedInvoiceNum} and cannot be used for "${rawNum}".`,
+        };
+      }
+
+      if (
+        requestedAmountMinor > 0 &&
+        propRow.amount_minor &&
+        requestedAmountMinor !== Number(propRow.amount_minor)
+      ) {
+        return {
+          ok: false,
+          error_code: 'PROPOSAL_PARAMETER_MISMATCH',
+          message: `Refund proposal "${proposalId}" was approved for ${formatUsd(
+            Number(propRow.amount_minor)
+          )} and cannot be executed for ${formatUsd(requestedAmountMinor)}.`,
+        };
+      }
+
+      if (!rawNum && proposedInvoiceNum) {
+        rawNum = proposedInvoiceNum;
+      }
+      if (!requestedAmountMinor && propRow.amount_minor) {
+        requestedAmountMinor = Number(propRow.amount_minor);
       }
 
       const invoices = await fetchSessionInvoices(admin, demoSessionId);

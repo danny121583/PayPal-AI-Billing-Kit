@@ -394,7 +394,7 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     expect(res.reply.content).toContain('Remaining Balance Due $0.00 USD');
   });
 
-  it('Section 8 Regression: PayPalConnectCard renders distinct Connected vs Disconnected UI states and transitions cleanly', async () => {
+  it('Section 8 Regression: PayPalConnectCard renders distinct Disconnected, Demo Profile Available (Sandbox Configuration Missing), and Sandbox Authenticated (Account Linked) states', async () => {
     const onConnectionChanged = jest.fn();
 
     // 1. Disconnected state: shows DISCONNECTED badge, Connect PayPal Sandbox button, and hides setup form initially
@@ -404,7 +404,12 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
         connection={{
           connected: false,
           environment: 'sandbox',
-          roleScope: 'patient',
+          connectionType: 'payer',
+          paypalEmailMasked: null,
+          paypalPayerIdMasked: null,
+          connectedAt: null,
+          sandboxCredentialsConfigured: false,
+          oauthVerified: false,
         }}
         onConnectionChanged={onConnectionChanged}
       />
@@ -421,7 +426,7 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     expect(getByTestId('paypal-connect-form')).toBeTruthy();
     expect(getByTestId('paypal-connect-email-input')).toBeTruthy();
 
-    // 2. Connected state: shows SANDBOX CONNECTED badge, linked summary, Disconnect button, and hides setup form
+    // 2. Demo Profile Available (unauthenticated seed where Sandbox Configuration is Missing)
     rerender(
       <PayPalConnectCard
         roleScope="patient"
@@ -432,12 +437,35 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
           paypalPayerIdMasked: 'PAYER-SANDBOX-ALEX',
           paypalEmailMasked: 'a***@personal.example.com',
           connectedAt: '2026-10-15T10:00:00Z',
+          sandboxCredentialsConfigured: false,
+          oauthVerified: false,
         }}
         onConnectionChanged={onConnectionChanged}
       />
     );
 
-    expect(getByText('SANDBOX CONNECTED')).toBeTruthy();
+    expect(getByText('DEMO PROFILE AVAILABLE')).toBeTruthy();
+    expect(getByTestId('paypal-connected-account-summary')).toBeTruthy();
+
+    // 3. Sandbox Authenticated + Account Linked state (backed by real PayPal OAuth 2.0)
+    rerender(
+      <PayPalConnectCard
+        roleScope="patient"
+        connection={{
+          connected: true,
+          environment: 'sandbox',
+          connectionType: 'payer',
+          paypalPayerIdMasked: 'SB-PAYER-ALEX-1002',
+          paypalEmailMasked: 'sb-***@personal.example.com',
+          connectedAt: '2026-11-02T21:35:00Z',
+          sandboxCredentialsConfigured: true,
+          oauthVerified: true,
+        }}
+        onConnectionChanged={onConnectionChanged}
+      />
+    );
+
+    expect(getByText('SANDBOX AUTHENTICATED')).toBeTruthy();
     expect(getByTestId('paypal-connected-account-summary')).toBeTruthy();
     expect(getByTestId('paypal-disconnect-cta-btn')).toBeTruthy();
     expect(queryByTestId('paypal-connect-form')).toBeNull();

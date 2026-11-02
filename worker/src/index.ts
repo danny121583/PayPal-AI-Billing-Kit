@@ -1465,14 +1465,18 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
           );
         }
 
-        // Invariant 4: `create_approved_invoice` requires BOTH a valid session-bound `proposal_id` AND `explicit_human_approval: true`
-        if (toolName === 'create_approved_invoice') {
+        // Invariant 4: `create_approved_invoice`, `create_paypal_checkout_order`, and `execute_approved_refund`
+        // require BOTH a valid session-bound `proposal_id` AND `explicit_human_approval: true`
+        if (
+          toolName === 'create_approved_invoice' ||
+          toolName === 'create_paypal_checkout_order' ||
+          toolName === 'execute_approved_refund'
+        ) {
           if (args.explicit_human_approval !== true) {
             const errPayload = {
               ok: false,
               error_code: 'HUMAN_APPROVAL_REQUIRED',
-              message:
-                'Executing `create_approved_invoice` requires `explicit_human_approval: true`.',
+              message: `Executing \`${toolName}\` requires \`explicit_human_approval: true\`.`,
             };
             return new Response(
               JSON.stringify(
@@ -1489,8 +1493,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
             const errPayload = {
               ok: false,
               error_code: 'PROPOSAL_REQUIRED_FOR_WRITE',
-              message:
-                'Direct invoice creation without a prior proposal is blocked. First call `create_invoice_proposal` to run guardrail checks and obtain a session-bound `proposal_id`.',
+              message: `Direct execution of \`${toolName}\` without a prior proposal is blocked. First call the corresponding proposal tool to obtain a session-bound \`proposal_id\`.`,
             };
             return new Response(
               JSON.stringify(
@@ -1543,7 +1546,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
               const errPayload = {
                 ok: false,
                 error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
-                message: `Proposal "${suppliedProposalId}" is not bound to demo_session_id "${activeSessionId}". Obtain a session-bound proposal_id from \`create_invoice_proposal\` in the same session.`,
+                message: `Proposal "${suppliedProposalId}" is not bound to demo_session_id "${activeSessionId}". Obtain a session-bound proposal_id in the same session.`,
               };
               return new Response(
                 JSON.stringify(
@@ -1563,40 +1566,6 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
           if (sigValid) {
             args.proposal_id = rawUuid;
           }
-        }
-
-        // Strip HMAC session signature from proposal_id if supplied to `create_paypal_checkout_order` or `execute_approved_refund`
-        if (
-          (toolName === 'create_paypal_checkout_order' || toolName === 'execute_approved_refund') &&
-          args.proposal_id &&
-          String(args.proposal_id).includes('.')
-        ) {
-          const [uuidPart, sigPart] = String(args.proposal_id).split('.');
-          const expectedSig = await computeProposalSessionSig(
-            activeSessionId,
-            uuidPart,
-            supabaseAnonKey
-          );
-          if (sigPart !== expectedSig) {
-            const errPayload = {
-              ok: false,
-              error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
-              message: `Cross-session proposal execution denied: proposal "${args.proposal_id}" does not belong to demo_session_id "${activeSessionId}".`,
-            };
-            return new Response(
-              JSON.stringify(
-                isToolsCall
-                  ? {
-                      jsonrpc: '2.0',
-                      id: jsonRpcId,
-                      result: buildMcpToolResult(errPayload, true),
-                    }
-                  : errPayload
-              ),
-              { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
-            );
-          }
-          args.proposal_id = uuidPart;
         }
 
         // Ensure sanitized activeSessionId is forwarded
