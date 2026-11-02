@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /**
  * Independent MaaS & MCP Verification Suite
- * Exercises MCP JSON-RPC 2.0 (`initialize`, `tools/list`, `tools/call`),
- * OpenAPI 3.1.0 schema discovery, and all 15 billing tools against either the
- * Supabase Edge Function endpoint or the deployed Vercel `/api/mcp` proxy.
+ * Exercises:
+ * - MCP JSON-RPC 2.0 (`initialize`, `notifications/initialized`, `ping`, `prompts/list`, `resources/list`, `tools/list`, `tools/call`)
+ * - OpenAPI 3.1.0 schema discovery, HEAD probes, `/robots.txt`, and OAuth 2.1 DCR
+ * - All 15 billing tools end-to-end
+ * - Strict cross-session isolation and caller-supplied approval/guardrail bypass prevention
  */
 
 const endpointArg = process.argv.find((a) => a.startsWith('--url='))?.split('=')[1];
 const MCP_URL =
   endpointArg ||
   process.env.MAAS_MCP_URL ||
-  'https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp';
+  'https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp';
 
+const BASE_ORIGIN = new URL(MCP_URL).origin;
 const TEST_SESSION = `mcp-verify-${Date.now().toString(36)}`;
+const OTHER_SESSION = `mcp-other-${Date.now().toString(36)}`;
 
 let passed = 0;
 let failed = 0;
@@ -27,29 +31,47 @@ function assert(cond, label, detail = '') {
   }
 }
 
-async function mcpRpc(method, params = {}, id = 1) {
+async function mcpRpc(method, params = {}, id = 1, sessionHeader = TEST_SESSION) {
+  const payload = {
+    jsonrpc: '2.0',
+    method,
+    params,
+  };
+  if (id !== undefined && id !== null) {
+    payload.id = id;
+  }
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  if (sessionHeader) {
+    headers['X-Demo-Session-Id'] = sessionHeader;
+  }
   const res = await fetch(MCP_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Demo-Session-Id': TEST_SESSION,
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id,
-      method,
-      params,
-    }),
+    headers,
+    body: JSON.stringify(payload),
   });
-  const json = await res.json();
-  return { status: res.status, json };
+  const text = await res.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  return { status: res.status, json, headers: res.headers };
 }
 
-async function callTool(name, args = {}) {
-  const { status, json } = await mcpRpc('tools/call', {
-    name,
-    arguments: { ...args, demo_session_id: TEST_SESSION },
-  });
+async function callTool(name, args = {}, sessionOverride = TEST_SESSION, headerOverride = TEST_SESSION) {
+  const finalArgs = sessionOverride !== null ? { ...args, demo_session_id: sessionOverride } : { ...args };
+  const { status, json } = await mcpRpc(
+    'tools/call',
+    {
+      name,
+      arguments: finalArgs,
+    },
+    1,
+    headerOverride
+  );
   return {
     status,
     rpc: json,
@@ -69,23 +91,54 @@ async function main() {
     'OpenAPI 3.1.0 specification endpoint returns valid schema'
   );
 
-  // 2. MCP initialize
-  const initRes = await mcpRpc('initialize', { protocolVersion: '2025-03-26' }, 1);
+  // 2. HEAD /mcp & /robots.txt
+  const headRes = await fetch(MCP_URL, { method: 'HEAD' });
+  const robotsRes = await fetch(`${BASE_ORIGIN}/robots.txt`);
+  assert(
+    headRes.status === 200 && robotsRes.status === 200,
+    'HTTP HEAD probe and /robots.txt return 200 OK for crawler/connector compatibility'
+  );
+
+  // 3. MCP initialize
+  const initRes = await mcpRpc('initialize', { protocolVersion: '2025-06-18' }, 1);
   assert(
     initRes.status === 200 &&
-      initRes.json?.result?.serverInfo?.name === 'paypal-ai-billing-kit-maas',
-    'MCP JSON-RPC 2.0 `initialize` handshake succeeds'
+      initRes.json?.result?.serverInfo?.name === 'paypal-ai-billing-kit-maas' &&
+      initRes.json?.result?.protocolVersion === '2025-06-18',
+    'MCP JSON-RPC 2.0 `initialize` handshake succeeds (protocol 2025-06-18)'
   );
 
-  // 3. MCP tools/list
-  const listRes = await mcpRpc('tools/list', {}, 2);
-  const tools = listRes.json?.result?.tools || [];
+  // 4. MCP notifications/initialized (without id -> HTTP 202 Accepted)
+  const notifRes = await mcpRpc('notifications/initialized', {}, null);
   assert(
-    tools.length === 15,
-    `MCP \`tools/list\` exposes all 15 tools (received ${tools.length})`
+    notifRes.status === 202 && notifRes.json === null,
+    'MCP JSON-RPC 2.0 `notifications/initialized` (notification without id) returns HTTP 202 Accepted'
   );
 
-  // 4. discover_billing_capabilities
+  // 5. MCP ping, prompts/list, resources/list
+  const pingRes = await mcpRpc('ping', {}, 2);
+  const promptsRes = await mcpRpc('prompts/list', {}, 3);
+  const resourcesRes = await mcpRpc('resources/list', {}, 4);
+  assert(
+    pingRes.status === 200 &&
+      Array.isArray(promptsRes.json?.result?.prompts) &&
+      Array.isArray(resourcesRes.json?.result?.resources),
+    'MCP standard methods (`ping`, `prompts/list`, `resources/list`) return valid JSON-RPC responses'
+  );
+
+  // 6. MCP tools/list strict schema verification
+  const listRes = await mcpRpc('tools/list', {}, 5);
+  const tools = listRes.json?.result?.tools || [];
+  const allowedTopKeys = new Set(['name', 'description', 'inputSchema', 'annotations', '_meta']);
+  const strictSchemaValid =
+    tools.length === 15 &&
+    tools.every((t) => Object.keys(t).every((k) => allowedTopKeys.has(k)) && t._meta?.permissionTier);
+  assert(
+    strictSchemaValid,
+    `MCP \`tools/list\` exposes all 15 tools with strict MCP schema compliance (count=${tools.length})`
+  );
+
+  // 7. Tool 1: discover_billing_capabilities
   const cap = await callTool('discover_billing_capabilities');
   assert(
     cap.data?.ok === true &&
@@ -94,21 +147,21 @@ async function main() {
     'Tool 1 (`discover_billing_capabilities`): returns guardrails ($500/$2,500) & permission tiers'
   );
 
-  // 5. list_demo_customers
+  // 8. Tool 2: list_demo_customers
   const cust = await callTool('list_demo_customers');
   assert(
     cust.data?.ok === true && cust.data?.authorized_customers?.length === 2,
     'Tool 2 (`list_demo_customers`): lists Alex Rivera & Jordan Taylor under Dr. Sarah Jenkins'
   );
 
-  // 6. search_invoices
+  // 9. Tool 3: search_invoices
   const search = await callTool('search_invoices', { status: 'all' });
   assert(
     search.data?.ok === true && search.data?.count >= 6,
     `Tool 3 (\`search_invoices\`): returns canonical statements (count=${search.data?.count})`
   );
 
-  // 7. get_invoice_details (#PPB-INV-2026-1003)
+  // 10. Tool 4: get_invoice_details (#PPB-INV-2026-1003)
   const details = await callTool('get_invoice_details', {
     invoice_number: 'PPB-INV-2026-1003',
   });
@@ -120,7 +173,7 @@ async function main() {
     'Tool 4 (`get_invoice_details`): explains #PPB-INV-2026-1003 line items, service date, and settlement status'
   );
 
-  // 8. create_invoice_proposal (Guardrail block > $500 + valid $35 proposal)
+  // 11. Tool 5: create_invoice_proposal (Guardrail block > $500 + valid $35 proposal)
   const blockedProp = await callTool('create_invoice_proposal', {
     customer_name: 'Alex Rivera',
     service_code: 'ADMIN-TELEHEALTH',
@@ -144,7 +197,66 @@ async function main() {
     'Tool 5b (`create_invoice_proposal`): creates pending $35.00 ADMIN-FORMS proposal requiring human approval'
   );
 
-  // 9. create_approved_invoice
+  // 12. Security Check A: Block caller-supplied approval/guardrail bypass attempts
+  const bypassFlagAttempt = await callTool('create_invoice_proposal', {
+    customer_name: 'Alex Rivera',
+    service_code: 'ADMIN-TELEHEALTH',
+    amount_minor: 75000,
+    bypass_guardrail: true,
+  });
+  const noProposalWriteAttempt = await callTool('create_approved_invoice', {
+    customer_name: 'Alex Rivera',
+    service_code: 'ADMIN-FORMS',
+    amount_minor: 3500,
+    explicit_human_approval: true,
+  });
+  const noApprovalWriteAttempt = await callTool('create_approved_invoice', {
+    proposal_id: validProp.data?.proposal?.id,
+    explicit_human_approval: false,
+  });
+  assert(
+    bypassFlagAttempt.data?.ok === false &&
+      bypassFlagAttempt.data?.error_code === 'APPROVAL_BYPASS_PROHIBITED' &&
+      noProposalWriteAttempt.data?.ok === false &&
+      noProposalWriteAttempt.data?.error_code === 'PROPOSAL_REQUIRED_FOR_WRITE' &&
+      noApprovalWriteAttempt.data?.ok === false &&
+      noApprovalWriteAttempt.data?.error_code === 'HUMAN_APPROVAL_REQUIRED',
+    'Security Guardrail: blocks caller-supplied bypass flags (`bypass_guardrail`), unproposed writes, and unapproved writes'
+  );
+
+  // 13. Security Check B: Block cross-session manipulation & canonical session mutation
+  const crossSessionHeaderMismatch = await callTool(
+    'search_invoices',
+    { status: 'all' },
+    OTHER_SESSION,
+    TEST_SESSION
+  );
+  const crossSessionProposalAttempt = await callTool(
+    'create_approved_invoice',
+    {
+      proposal_id: validProp.data?.proposal?.id,
+      explicit_human_approval: true,
+    },
+    OTHER_SESSION,
+    OTHER_SESSION
+  );
+  const canonicalMutationAttempt = await callTool(
+    'reset_demo_session',
+    {},
+    'canonical',
+    'canonical'
+  );
+  assert(
+    crossSessionHeaderMismatch.data?.ok === false &&
+      crossSessionHeaderMismatch.data?.error_code === 'CROSS_SESSION_ISOLATION_VIOLATION' &&
+      crossSessionProposalAttempt.data?.ok === false &&
+      crossSessionProposalAttempt.data?.error_code === 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED' &&
+      canonicalMutationAttempt.data?.ok === false &&
+      canonicalMutationAttempt.data?.error_code === 'CANONICAL_SESSION_IMMUTABLE',
+    'Security Isolation: blocks cross-session header/arg mismatch, cross-session proposal execution, and canonical session mutation'
+  );
+
+  // 14. Tool 6: create_approved_invoice (in legitimate owning session)
   const createdInv = await callTool('create_approved_invoice', {
     proposal_id: validProp.data?.proposal?.id,
     explicit_human_approval: true,
@@ -155,7 +267,24 @@ async function main() {
     `Tool 6 (\`create_approved_invoice\`): executes approved proposal -> created #${createdInvoiceNumber}`
   );
 
-  // 10. explain_outstanding_balances
+  // Verify OTHER_SESSION cannot see TEST_SESSION's newly created invoice
+  const otherSessionInvoices = await callTool(
+    'search_invoices',
+    { status: 'all' },
+    OTHER_SESSION,
+    OTHER_SESSION
+  );
+  const leakedToOtherSession = (otherSessionInvoices.data?.invoices || []).some(
+    (inv) => inv.invoice_number === createdInvoiceNumber
+  );
+  assert(
+    otherSessionInvoices.data?.ok === true &&
+      otherSessionInvoices.data?.count === 6 &&
+      leakedToOtherSession === false,
+    `Cross-Visitor Isolation: session "${OTHER_SESSION}" sees only 6 canonical statements (zero leak of #${createdInvoiceNumber})`
+  );
+
+  // 15. Tool 7: explain_outstanding_balances
   const balances = await callTool('explain_outstanding_balances', {
     customer_name: 'Alex Rivera',
   });
@@ -164,7 +293,7 @@ async function main() {
     `Tool 7 (\`explain_outstanding_balances\`): computes Alex Rivera outstanding balance (${balances.data?.total_outstanding_usd})`
   );
 
-  // 11. get_transaction_history
+  // 16. Tool 8: get_transaction_history
   const txHist = await callTool('get_transaction_history');
   assert(
     txHist.data?.ok === true &&
@@ -174,7 +303,7 @@ async function main() {
     'Tool 8 (`get_transaction_history`): returns settlements & labels SAMPLE-DEMO-SETTLEMENT-1003 as non-live sample'
   );
 
-  // 12. prepare_payment_proposal
+  // 17. Tool 9: prepare_payment_proposal
   const payProp = await callTool('prepare_payment_proposal', {
     invoice_number: 'PPB-INV-2026-1001',
   });
@@ -185,9 +314,10 @@ async function main() {
     'Tool 9 (`prepare_payment_proposal`): prepares PayPal Sandbox checkout proposal without charging autonomously'
   );
 
-  // 13. void_unpaid_invoice (Payment-State Protection on paid 1003 + void newly created invoice)
+  // 18. Tool 10: void_unpaid_invoice (Payment-State Protection on paid 1003 + void newly created invoice)
   const voidPaid = await callTool('void_unpaid_invoice', {
     invoice_number: 'PPB-INV-2026-1003',
+    reason: 'Attempted void on paid invoice',
     explicit_human_approval: true,
   });
   assert(
@@ -198,6 +328,7 @@ async function main() {
 
   const voidUnpaid = await callTool('void_unpaid_invoice', {
     invoice_number: createdInvoiceNumber,
+    reason: 'Administrative test void',
     explicit_human_approval: true,
   });
   assert(
@@ -205,7 +336,7 @@ async function main() {
     `Tool 10b (\`void_unpaid_invoice\`): voids unpaid session invoice #${createdInvoiceNumber} ($0.00 balance due)`
   );
 
-  // 14. prepare_refund_proposal
+  // 19. Tool 11: prepare_refund_proposal
   const refundProp = await callTool('prepare_refund_proposal', {
     invoice_number: 'PPB-INV-2026-1003',
     reason: 'Duplicate administrative charge adjustment',
@@ -217,7 +348,7 @@ async function main() {
     'Tool 11 (`prepare_refund_proposal`): prepares $125.00 refund proposal for paid #PPB-INV-2026-1003'
   );
 
-  // 15. get_financial_audit_history
+  // 20. Tool 12: get_financial_audit_history
   const audit = await callTool('get_financial_audit_history', { limit: 15 });
   assert(
     audit.data?.ok === true &&
@@ -226,7 +357,7 @@ async function main() {
     `Tool 12 (\`get_financial_audit_history\`): returns ${audit.data?.count} append-only financial audit events`
   );
 
-  // 16. get_paypal_sandbox_status
+  // 21. Tool 13: get_paypal_sandbox_status
   const ppStatus = await callTool('get_paypal_sandbox_status');
   assert(
     ppStatus.data?.ok === true &&
@@ -235,7 +366,7 @@ async function main() {
     'Tool 13 (`get_paypal_sandbox_status`): reports PayPal Sandbox status & credential state accurately'
   );
 
-  // 17. get_business_metrics
+  // 22. Tool 14: get_business_metrics
   const metrics = await callTool('get_business_metrics');
   assert(
     metrics.data?.ok === true &&
@@ -243,7 +374,7 @@ async function main() {
     `Tool 14 (\`get_business_metrics\`): returns practice KPIs (Outstanding=${metrics.data?.provider_metrics?.outstanding_balance_usd})`
   );
 
-  // 18. reset_demo_session
+  // 23. Tool 15: reset_demo_session
   const reset = await callTool('reset_demo_session');
   const afterReset = await callTool('search_invoices', { status: 'all' });
   assert(
