@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "PayPal AI Billing Kit",
+    "slug": "paypal-ai-billing-kit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "paypalbillingkit",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.paypalhackathon2026.billingkit"
+    },
+    "android": {
+      "package": "com.paypalhackathon2026.billingkit"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

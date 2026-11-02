@@ -1,0 +1,34 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./*"],
+      "@paypal-ai-billing-kit/sdk": ["./packages/paypal-billing-kit/src/index.ts"]
+    }
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "packages/paypal-billing-kit/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "babel.config.js",
+    "jest.config.js",
+    "supabase/functions",
+    "scripts",
+    "**/__tests__/**"
+  ]
+}

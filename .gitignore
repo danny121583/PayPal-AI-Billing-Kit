@@ -1,0 +1,12 @@
+node_modules
+node_modules/
+.expo/
+.build/
+dist/
+web-build/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+coverage/
