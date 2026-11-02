@@ -106,9 +106,21 @@ export default function BillingInvoiceDetailModal({
     try {
       const res = await invokePayPalBillingFunction({
         action: 'create-order',
+        invoiceId: invoice.id,
         invoice_id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        invoice_number: invoice.invoiceNumber,
       });
       if (!res.ok) {
+        if (res.code === 'PAYPAL_SANDBOX_CREDENTIALS_MISSING') {
+          setBannerMessage({
+            type: 'info',
+            text:
+              res.message ||
+              `Statement #${invoice.invoiceNumber} (${formatUsdCents(invoice.balanceDueCents)}) verified for checkout. Live PayPal Sandbox REST API credentials are not configured on the server; use "Simulate Demo Settlement" below or configure Sandbox credentials to open live PayPal buyer approval.`,
+          });
+          return;
+        }
         setBannerMessage({
           type: 'error',
           text:
@@ -118,7 +130,7 @@ export default function BillingInvoiceDetailModal({
         return;
       }
       const orderId = res.data?.order_id || res.data?.orderId;
-      const approvalUrl = res.data?.approval_url || res.data?.approveUrl;
+      const approvalUrl = res.data?.approval_url || res.data?.approveUrl || res.data?.approvalUrl;
       if (orderId) {
         setActiveOrderId(String(orderId));
       }
@@ -156,7 +168,11 @@ export default function BillingInvoiceDetailModal({
     try {
       const res = await invokePayPalBillingFunction({
         action: 'capture-order',
+        invoiceId: invoice.id,
         invoice_id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        invoice_number: invoice.invoiceNumber,
+        orderId: activeOrderId,
         order_id: activeOrderId,
       });
       if (!res.ok) {

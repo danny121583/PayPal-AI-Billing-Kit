@@ -19,6 +19,7 @@ import BillingAISettingsModal, {
 import BillingCreateInvoiceModal from '../components/billing/BillingCreateInvoiceModal';
 import BillingInvoiceCard from '../components/billing/BillingInvoiceCard';
 import BillingInvoiceDetailModal from '../components/billing/BillingInvoiceDetailModal';
+import PayPalConnectCard from '../components/billing/PayPalConnectCard';
 import DoctorBillingView from '../components/billing/DoctorBillingView';
 import PatientBillingView from '../components/billing/PatientBillingView';
 import {
@@ -391,5 +392,86 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     );
     expect(res.reply.content).toContain('Original Total $125.00 USD');
     expect(res.reply.content).toContain('Remaining Balance Due $0.00 USD');
+  });
+
+  it('Section 8 Regression: PayPalConnectCard renders distinct Connected vs Disconnected UI states and transitions cleanly', async () => {
+    const onConnectionChanged = jest.fn();
+
+    // 1. Disconnected state: shows DISCONNECTED badge, Connect PayPal Sandbox button, and hides setup form initially
+    const { getByTestId, queryByTestId, getByText, rerender } = render(
+      <PayPalConnectCard
+        roleScope="patient"
+        connection={{
+          connected: false,
+          environment: 'sandbox',
+          roleScope: 'patient',
+        }}
+        onConnectionChanged={onConnectionChanged}
+      />
+    );
+
+    expect(getByTestId('paypal-connect-status-badge')).toBeTruthy();
+    expect(getByText('DISCONNECTED')).toBeTruthy();
+    expect(getByTestId('paypal-connect-cta-btn')).toBeTruthy();
+    expect(queryByTestId('paypal-connect-form')).toBeNull();
+    expect(queryByTestId('paypal-disconnect-cta-btn')).toBeNull();
+
+    // Clicking Connect PayPal Sandbox reveals setup form
+    fireEvent.press(getByTestId('paypal-connect-cta-btn'));
+    expect(getByTestId('paypal-connect-form')).toBeTruthy();
+    expect(getByTestId('paypal-connect-email-input')).toBeTruthy();
+
+    // 2. Connected state: shows SANDBOX CONNECTED badge, linked summary, Disconnect button, and hides setup form
+    rerender(
+      <PayPalConnectCard
+        roleScope="patient"
+        connection={{
+          connected: true,
+          environment: 'sandbox',
+          connectionType: 'payer',
+          paypalPayerIdMasked: 'PAYER-SANDBOX-ALEX',
+          paypalEmailMasked: 'a***@personal.example.com',
+          connectedAt: '2026-10-15T10:00:00Z',
+        }}
+        onConnectionChanged={onConnectionChanged}
+      />
+    );
+
+    expect(getByText('SANDBOX CONNECTED')).toBeTruthy();
+    expect(getByTestId('paypal-connected-account-summary')).toBeTruthy();
+    expect(getByTestId('paypal-disconnect-cta-btn')).toBeTruthy();
+    expect(queryByTestId('paypal-connect-form')).toBeNull();
+    expect(queryByTestId('paypal-connect-cta-btn')).toBeNull();
+  });
+
+  it('Section 9 Regression: Jordan Taylor #PPB-INV-2026-1004 failed payment statement opens cleanly and retries without "Invoice not found."', async () => {
+    const invoices = getSyntheticInvoicesForRole('patient');
+    const jordanFailedInv = invoices.find(
+      (i) => i.invoiceNumber === 'PPB-INV-2026-1004'
+    )!;
+    expect(jordanFailedInv).toBeTruthy();
+
+    const { getByTestId, getByText, queryByText } = render(
+      <BillingInvoiceDetailModal
+        visible={true}
+        invoice={jordanFailedInv}
+        roleScope="patient"
+        onClose={jest.fn()}
+        onAskBillingAI={jest.fn()}
+      />
+    );
+
+    // Failed attempt history is rendered
+    expect(getByText('Last Payment Attempt Declined')).toBeTruthy();
+
+    // Press Retry with PayPal Sandbox button
+    const retryBtn = getByTestId('billing-detail-paypal-checkout-btn');
+    fireEvent.press(retryBtn);
+
+    await waitFor(() => {
+      expect(getByTestId('billing-detail-feedback-banner')).toBeTruthy();
+    });
+
+    expect(queryByText(/Invoice not found/i)).toBeNull();
   });
 });

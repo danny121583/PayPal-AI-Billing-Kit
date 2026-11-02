@@ -18,10 +18,19 @@ import {
 import { shadows } from '../../src/lib/shadow';
 import { supabase } from '../../src/lib/supabase';
 import type { BillingRoleScope } from '../../src/billing/types';
-import { getPreloadedPayPalConnection } from '../../src/billing/api/billingService';
+import {
+  DEMO_USER_IDS,
+  getPreloadedPayPalConnection,
+  setPreloadedPayPalConnection,
+  type PayPalAccountConnectionSummary,
+} from '../../src/billing/api/billingService';
+import { useAuth } from '../../src/contexts/StandaloneAuthContext';
 
 export interface PayPalConnectCardProps {
   roleScope: BillingRoleScope;
+  userId?: string;
+  connection?: PayPalAccountConnectionSummary | null;
+  onConnectionChanged?: (next: PayPalAccountConnectionSummary) => void;
   onOpenSettings?: () => void;
 }
 
@@ -37,13 +46,23 @@ interface ConnectionRecord {
 
 export default function PayPalConnectCard({
   roleScope,
+  userId: propUserId,
+  connection: propConnection,
+  onConnectionChanged,
   onOpenSettings,
 }: PayPalConnectCardProps) {
+  const { user } = useAuth();
   const isDoctor = roleScope === 'doctor';
+  const effectiveUserId =
+    propUserId ||
+    user?.id ||
+    (isDoctor ? DEMO_USER_IDS.sarah_jenkins : DEMO_USER_IDS.alex_rivera);
+
   const [loading] = useState(false);
   const [acting, setActing] = useState(false);
   const [conn, setConn] = useState<ConnectionRecord | null>(() => {
-    const pre = getPreloadedPayPalConnection(roleScope);
+    const pre =
+      propConnection ?? getPreloadedPayPalConnection(roleScope, effectiveUserId);
     if (!pre || !pre.connected) return null;
     return {
       status: 'connected',
@@ -58,14 +77,22 @@ export default function PayPalConnectCard({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
   const [sandboxEmailInput, setSandboxEmailInput] = useState(
-    isDoctor ? 'sb-merchant-jenkins@business.example.com' : 'sb-customer-rivera@personal.example.com'
+    isDoctor
+      ? 'sb-merchant-jenkins@business.example.com'
+      : effectiveUserId === DEMO_USER_IDS.jordan_taylor
+        ? 'sb-customer-taylor@personal.example.com'
+        : 'sb-customer-rivera@personal.example.com'
   );
   const [sandboxMerchantIdInput, setSandboxMerchantIdInput] = useState(
-    isDoctor ? 'PAYPAL-SB-MERCHANT-JENKINS' : 'PAYPAL-SB-PAYER-RIVERA'
+    isDoctor
+      ? 'PAYPAL-SB-MERCHANT-JENKINS'
+      : effectiveUserId === DEMO_USER_IDS.jordan_taylor
+        ? 'SB-PAYER-JORDAN-1003'
+        : 'SB-PAYER-ALEX-1002'
   );
 
   const loadStatus = useCallback(async () => {
-    const pre = getPreloadedPayPalConnection(roleScope);
+    const pre = getPreloadedPayPalConnection(roleScope, effectiveUserId);
     if (pre && pre.connected) {
       setConn({
         status: 'connected',
@@ -80,32 +107,47 @@ export default function PayPalConnectCard({
     }
     if (process.env.NODE_ENV === 'test') return;
     try {
-      let userId: string | undefined;
-      if (typeof supabase.auth.getSession === 'function') {
-        const { data: sessRes } = await supabase.auth.getSession();
-        userId = sessRes?.session?.user?.id;
-      }
-      if (!userId) return;
-
       const { data, error } = await supabase
         .from('billing_account_connections')
         .select(
-          'status, connection_type, environment, paypal_payer_id, paypal_email_masked, paypal_verified, connected_at'
+          'connection_status, connection_type, paypal_environment, paypal_merchant_id, paypal_payer_id, paypal_email_masked, connected_at'
         )
-        .eq('user_id', userId)
-        .eq('connection_type', roleScope === 'doctor' ? 'merchant' : 'payer')
+        .eq('user_id', effectiveUserId)
         .maybeSingle();
 
       if (!error && data) {
-        setConn(data as ConnectionRecord);
+        const raw = data as any;
+        const isConn =
+          String(raw.connection_status || raw.status || '').toLowerCase() === 'connected';
+        const payerOrMerchantId = raw.paypal_merchant_id || raw.paypal_payer_id || null;
+        const record: ConnectionRecord = {
+          status: isConn ? 'connected' : 'revoked',
+          connection_type: roleScope === 'doctor' ? 'merchant' : 'payer',
+          environment: raw.paypal_environment === 'live' ? 'live' : 'sandbox',
+          paypal_payer_id: isConn ? payerOrMerchantId : null,
+          paypal_email_masked: isConn ? raw.paypal_email_masked : null,
+          paypal_verified: isConn,
+          connected_at: isConn ? raw.connected_at : null,
+        };
+        setConn(record);
+        setPreloadedPayPalConnection(effectiveUserId, {
+          connected: isConn,
+          environment: raw.paypal_environment === 'live' ? 'live' : 'sandbox',
+          connectionType: roleScope === 'doctor' ? 'merchant' : 'payer',
+          paypalEmailMasked: isConn ? raw.paypal_email_masked : null,
+          paypalPayerIdMasked: isConn ? payerOrMerchantId : null,
+          connectedAt: isConn ? raw.connected_at : null,
+          sandboxCredentialsConfigured: false,
+        });
       }
     } catch {
       // Non-fatal in unit tests / offline mode
     }
-  }, [roleScope]);
+  }, [roleScope, effectiveUserId]);
 
   useEffect(() => {
-    const pre = getPreloadedPayPalConnection(roleScope);
+    const pre =
+      propConnection ?? getPreloadedPayPalConnection(roleScope, effectiveUserId);
     if (pre?.connected) {
       setConn({
         status: 'connected',
@@ -116,10 +158,25 @@ export default function PayPalConnectCard({
         paypal_verified: true,
         connected_at: pre.connectedAt,
       });
+      setShowConnectForm(false);
     } else {
       setConn(null);
     }
-  }, [roleScope]);
+    setSandboxEmailInput(
+      isDoctor
+        ? 'sb-merchant-jenkins@business.example.com'
+        : effectiveUserId === DEMO_USER_IDS.jordan_taylor
+          ? 'sb-customer-taylor@personal.example.com'
+          : 'sb-customer-rivera@personal.example.com'
+    );
+    setSandboxMerchantIdInput(
+      isDoctor
+        ? 'PAYPAL-SB-MERCHANT-JENKINS'
+        : effectiveUserId === DEMO_USER_IDS.jordan_taylor
+          ? 'SB-PAYER-JORDAN-1003'
+          : 'SB-PAYER-ALEX-1002'
+    );
+  }, [roleScope, effectiveUserId, propConnection, isDoctor]);
 
   const handleConnect = async () => {
     setErrorMsg(null);
@@ -128,19 +185,46 @@ export default function PayPalConnectCard({
       const { data, error } = await supabase.functions.invoke('paypal-billing', {
         body: {
           action: 'connect-account',
+          roleScope,
           role_scope: roleScope,
-          sandbox_email: sandboxEmailInput.trim(),
+          userId: effectiveUserId,
+          user_id: effectiveUserId,
+          merchantEmail: sandboxEmailInput.trim(),
+          merchant_email: sandboxEmailInput.trim(),
+          payerEmail: sandboxEmailInput.trim(),
+          payer_email: sandboxEmailInput.trim(),
+          merchantId: sandboxMerchantIdInput.trim(),
           merchant_id: sandboxMerchantIdInput.trim(),
         },
       });
-      if (error || data?.error) {
-        throw new Error(data?.message || error?.message || 'Unable to connect PayPal Sandbox');
+      if (error || data?.error || data?.ok === false) {
+        throw new Error(
+          data?.message || error?.message || 'Unable to connect PayPal Sandbox'
+        );
       }
-      if (data?.connection) {
-        setConn(data.connection as ConnectionRecord);
-      } else {
-        await loadStatus();
-      }
+      const nextConn: ConnectionRecord = data?.connection
+        ? (data.connection as ConnectionRecord)
+        : {
+            status: 'connected',
+            connection_type: isDoctor ? 'merchant' : 'payer',
+            environment: 'sandbox',
+            paypal_payer_id: sandboxMerchantIdInput.trim() || 'PAYPAL-SANDBOX',
+            paypal_email_masked: sandboxEmailInput.trim() || 'sb-***@sandbox.paypal.com',
+            paypal_verified: Boolean(data?.oauthVerified),
+            connected_at: new Date().toISOString(),
+          };
+      setConn(nextConn);
+      const summary: PayPalAccountConnectionSummary = {
+        connected: true,
+        environment: nextConn.environment === 'live' ? 'live' : 'sandbox',
+        connectionType: isDoctor ? 'merchant' : 'payer',
+        paypalEmailMasked: nextConn.paypal_email_masked,
+        paypalPayerIdMasked: nextConn.paypal_payer_id,
+        connectedAt: nextConn.connected_at || new Date().toISOString(),
+        sandboxCredentialsConfigured: false,
+      };
+      setPreloadedPayPalConnection(effectiveUserId, summary);
+      onConnectionChanged?.(summary);
       setShowConnectForm(false);
     } catch (err: any) {
       setErrorMsg(err?.message || 'PayPal Sandbox connection failed.');
@@ -156,17 +240,36 @@ export default function PayPalConnectCard({
       const { data, error } = await supabase.functions.invoke('paypal-billing', {
         body: {
           action: 'disconnect-account',
+          roleScope,
           role_scope: roleScope,
+          userId: effectiveUserId,
+          user_id: effectiveUserId,
         },
       });
-      if (error || data?.error) {
+      if (error || data?.error || data?.ok === false) {
         throw new Error(data?.message || error?.message || 'Unable to disconnect');
       }
-      if (data?.connection) {
-        setConn(data.connection as ConnectionRecord);
-      } else {
-        await loadStatus();
-      }
+      setConn({
+        status: 'revoked',
+        connection_type: isDoctor ? 'merchant' : 'payer',
+        environment: 'sandbox',
+        paypal_payer_id: null,
+        paypal_email_masked: null,
+        paypal_verified: false,
+        connected_at: null,
+      });
+      const disconnectedSummary: PayPalAccountConnectionSummary = {
+        connected: false,
+        environment: 'sandbox',
+        connectionType: isDoctor ? 'merchant' : 'payer',
+        paypalEmailMasked: null,
+        paypalPayerIdMasked: null,
+        connectedAt: null,
+        sandboxCredentialsConfigured: false,
+      };
+      setPreloadedPayPalConnection(effectiveUserId, disconnectedSummary);
+      onConnectionChanged?.(disconnectedSummary);
+      setShowConnectForm(false);
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to disconnect.');
     } finally {
@@ -203,7 +306,7 @@ export default function PayPalConnectCard({
           <Text
             style={[styles.statusBadgeText, isConnected && styles.statusBadgeTextConnected]}
           >
-            {isConnected ? 'SANDBOX CONNECTED' : 'SANDBOX READY'}
+            {isConnected ? 'SANDBOX CONNECTED' : 'DISCONNECTED'}
           </Text>
         </View>
       </View>
@@ -215,6 +318,23 @@ export default function PayPalConnectCard({
             ? 'Connect your PayPal Developer Sandbox merchant profile to issue invoices, capture customer payments, and process full or partial refunds.'
             : 'Connect your PayPal Developer Sandbox buyer account or launch PayPal Sandbox checkout directly from any open statement.'}
       </Text>
+
+      {isConnected ? (
+        <View
+          style={styles.connectedAccountBox}
+          testID="paypal-connected-account-summary"
+        >
+          <CheckCircle2 size={15} color="#047857" />
+          <Text style={styles.connectedAccountText}>
+            Linked Account: {conn?.paypal_email_masked || 'sb-***@sandbox.paypal.com'} •{' '}
+            {isDoctor ? 'Merchant ID' : 'Payer ID'}:{' '}
+            {conn?.paypal_payer_id || 'PAYPAL-SANDBOX'} •{' '}
+            {conn?.paypal_verified
+              ? 'PayPal OAuth 2.0 Verified'
+              : 'Sandbox Profile Linked'}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.guardrailStrip}>
         <ShieldCheck size={15} color="#047857" />
@@ -300,7 +420,9 @@ export default function PayPalConnectCard({
             ) : (
               <>
                 <Unlink size={14} color="#B91C1C" />
-                <Text style={styles.disconnectButtonText}>Disconnect Sandbox</Text>
+                <Text style={styles.disconnectButtonText}>
+                  Disconnect PayPal Sandbox
+                </Text>
               </>
             )}
           </Pressable>
@@ -310,15 +432,11 @@ export default function PayPalConnectCard({
             onPress={() => setShowConnectForm((prev) => !prev)}
             disabled={acting || loading}
             accessibilityRole="button"
-            accessibilityLabel={
-              isDoctor ? 'Connect PayPal Sandbox Merchant' : 'Link PayPal Sandbox Buyer'
-            }
+            accessibilityLabel="Connect PayPal Sandbox"
             testID="paypal-connect-cta-btn"
           >
             <Link2 size={15} color="#FFFFFF" />
-            <Text style={styles.connectButtonText}>
-              {isDoctor ? 'Connect PayPal Sandbox' : 'Link PayPal Sandbox'}
-            </Text>
+            <Text style={styles.connectButtonText}>Connect PayPal Sandbox</Text>
           </Pressable>
         )}
 
@@ -414,6 +532,24 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: '#4B5563',
     marginTop: 12,
+  },
+  connectedAccountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  connectedAccountText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
   },
   guardrailStrip: {
     flexDirection: 'row',

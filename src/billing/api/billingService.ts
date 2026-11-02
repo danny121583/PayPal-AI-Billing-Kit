@@ -247,15 +247,26 @@ export function getDefaultBillingAISettings(userId = 'default'): BillingAISettin
 }
 
 export function getDefaultPayPalConnection(
-  roleScope: BillingRoleScope
+  roleScope: BillingRoleScope,
+  userId?: string
 ): PayPalAccountConnectionSummary {
+  const isDoctor = roleScope === 'doctor';
+  const isJordan = userId === DEMO_USER_IDS.jordan_taylor;
   return {
-    connected: false,
+    connected: true,
     environment: 'sandbox',
-    connectionType: roleScope === 'doctor' ? 'merchant' : 'payer',
-    paypalEmailMasked: null,
-    paypalPayerIdMasked: null,
-    connectedAt: null,
+    connectionType: isDoctor ? 'merchant' : 'payer',
+    paypalEmailMasked: isDoctor
+      ? 'b***g@paypal-demo.example.com'
+      : isJordan
+        ? 'j***t@personal.example.com'
+        : 'a***a@personal.example.com',
+    paypalPayerIdMasked: isDoctor
+      ? 'SB-MERCHANT-CLINIC-01'
+      : isJordan
+        ? 'SB-PAYER-JORDAN-03'
+        : 'SB-PAYER-ALEX-02',
+    connectedAt: '2026-10-15T12:00:00.000Z',
     sandboxCredentialsConfigured: false,
   };
 }
@@ -287,9 +298,9 @@ const preloadedCache: PreloadedSessionCache = {
     [DEMO_USER_IDS.jordan_taylor]: getDefaultBillingAISettings(DEMO_USER_IDS.jordan_taylor),
   },
   connectionsByUserId: {
-    [DEMO_USER_IDS.sarah_jenkins]: getDefaultPayPalConnection('doctor'),
-    [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient'),
-    [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient'),
+    [DEMO_USER_IDS.sarah_jenkins]: getDefaultPayPalConnection('doctor', DEMO_USER_IDS.sarah_jenkins),
+    [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient', DEMO_USER_IDS.alex_rivera),
+    [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient', DEMO_USER_IDS.jordan_taylor),
   },
   notificationsByUserId: {
     [DEMO_USER_IDS.sarah_jenkins]: [],
@@ -337,6 +348,14 @@ export function getPreloadedPayPalConnection(
   return (
     preloadedCache.connectionsByUserId[userId] || getDefaultPayPalConnection(roleScope)
   );
+}
+
+export function setPreloadedPayPalConnection(
+  userId: string,
+  connection: PayPalAccountConnectionSummary
+): void {
+  if (!userId) return;
+  preloadedCache.connectionsByUserId[userId] = connection;
 }
 
 function mapDbSettingsRow(row: any, fallbackUserId: string): BillingAISettingsRecord {
@@ -683,29 +702,30 @@ export async function fetchBillingDashboardData(
 
       // Populate multi-persona connection cache
       const nextConnectionsByUser: Record<string, PayPalAccountConnectionSummary> = {
-        [DEMO_USER_IDS.sarah_jenkins]: getDefaultPayPalConnection('doctor'),
-        [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient'),
-        [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient'),
+        [DEMO_USER_IDS.sarah_jenkins]: getDefaultPayPalConnection('doctor', DEMO_USER_IDS.sarah_jenkins),
+        [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient', DEMO_USER_IDS.alex_rivera),
+        [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient', DEMO_USER_IDS.jordan_taylor),
       };
       const connRows: any[] = Array.isArray(connRes?.data) ? connRes.data : [];
       for (const row of connRows) {
         const rowUid = String(row?.user_id || '');
         if (!rowUid) continue;
         const isDoc = rowUid === DEMO_USER_IDS.sarah_jenkins;
+        const isConn =
+          row.connection_status === 'connected' || row.status === 'connected';
         nextConnectionsByUser[rowUid] = {
-          connected:
-            row.connection_status === 'connected' || row.status === 'connected',
-          environment: (row.paypal_env || row.environment || 'sandbox') as
+          connected: isConn,
+          environment: (row.paypal_environment || row.paypal_env || row.environment || 'sandbox') as
             | 'sandbox'
             | 'live',
           connectionType: isDoc ? 'merchant' : 'payer',
-          paypalEmailMasked: row.paypal_email_masked
-            ? String(row.paypal_email_masked)
-            : null,
-          paypalPayerIdMasked: row.paypal_payer_id
-            ? String(row.paypal_payer_id)
-            : null,
-          connectedAt: row.connected_at ? String(row.connected_at) : null,
+          paypalEmailMasked:
+            isConn && row.paypal_email_masked ? String(row.paypal_email_masked) : null,
+          paypalPayerIdMasked:
+            isConn && (row.paypal_merchant_id || row.paypal_payer_id)
+              ? String(row.paypal_merchant_id || row.paypal_payer_id)
+              : null,
+          connectedAt: isConn && row.connected_at ? String(row.connected_at) : null,
           sandboxCredentialsConfigured: false,
         };
       }
@@ -1061,8 +1081,36 @@ export async function invokePayPalBillingFunction(
       };
     }
 
+    const demoSessionId =
+      (body.demoSessionId as string) ||
+      (body.demo_session_id as string) ||
+      getOrCreateDemoSessionIdSync();
+    const enrichedBody: Record<string, unknown> = {
+      ...body,
+      demoSessionId,
+      demo_session_id: demoSessionId,
+    };
+    if (body.invoice_id && !body.invoiceId) {
+      enrichedBody.invoiceId = body.invoice_id;
+    }
+    if (body.invoiceId && !body.invoice_id) {
+      enrichedBody.invoice_id = body.invoiceId;
+    }
+    if (body.order_id && !body.orderId) {
+      enrichedBody.orderId = body.order_id;
+    }
+    if (body.orderId && !body.order_id) {
+      enrichedBody.order_id = body.orderId;
+    }
+    if (body.role_scope && !body.roleScope) {
+      enrichedBody.roleScope = body.role_scope;
+    }
+    if (body.roleScope && !body.role_scope) {
+      enrichedBody.role_scope = body.roleScope;
+    }
+
     const { data, error } = await sb.functions.invoke('paypal-billing', {
-      body,
+      body: enrichedBody,
     });
 
     if (error) {

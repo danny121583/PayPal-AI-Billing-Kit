@@ -131,13 +131,20 @@ async function main() {
   // 6. MCP tools/list strict schema verification
   const listRes = await mcpRpc('tools/list', {}, 5);
   const tools = listRes.json?.result?.tools || [];
-  const allowedTopKeys = new Set(['name', 'description', 'inputSchema', 'annotations', '_meta']);
+  const allowedTopKeys = new Set([
+    'name',
+    'description',
+    'inputSchema',
+    'securitySchemes',
+    'annotations',
+    '_meta',
+  ]);
   const strictSchemaValid =
-    tools.length === 15 &&
+    tools.length === 19 &&
     tools.every((t) => Object.keys(t).every((k) => allowedTopKeys.has(k)) && t._meta?.permissionTier);
   assert(
     strictSchemaValid,
-    `MCP \`tools/list\` exposes all 15 tools with strict MCP schema compliance (count=${tools.length})`
+    `MCP \`tools/list\` exposes all 19 tools with strict MCP schema compliance (count=${tools.length})`
   );
 
   // 7. Tool 1: discover_billing_capabilities
@@ -163,16 +170,22 @@ async function main() {
     `Tool 3 (\`search_invoices\`): returns canonical statements (count=${search.data?.count})`
   );
 
-  // 10. Tool 4: get_invoice_details (#PPB-INV-2026-1003)
+  // 10. Tool 4: get_invoice_details (#PPB-INV-2026-1003 & failed payment #PPB-INV-2026-1004)
   const details = await callTool('get_invoice_details', {
     invoice_number: 'PPB-INV-2026-1003',
+  });
+  const failedDetails = await callTool('get_invoice_details', {
+    invoice_number: 'PPB-INV-2026-1004',
   });
   assert(
     details.data?.ok === true &&
       details.data?.invoice?.invoice_number === 'PPB-INV-2026-1003' &&
       details.data?.explanation?.includes('What this invoice is for:') &&
-      details.data?.explanation?.includes('When services were provided'),
-    'Tool 4 (`get_invoice_details`): explains #PPB-INV-2026-1003 line items, service date, and settlement status'
+      failedDetails.data?.ok === true &&
+      failedDetails.data?.invoice?.payment_attempts?.some(
+        (a) => a.status === 'failed' && a.failure_code === 'INSTRUMENT_DECLINED'
+      ),
+    'Tool 4 (`get_invoice_details`): explains #PPB-INV-2026-1003 settlement and Jordan Taylor #PPB-INV-2026-1004 INSTRUMENT_DECLINED failed attempt'
   );
 
   // 11. Tool 5: create_invoice_proposal (Guardrail block > $500 + valid $35 proposal)
@@ -316,6 +329,50 @@ async function main() {
     'Tool 9 (`prepare_payment_proposal`): prepares PayPal Sandbox checkout proposal without charging autonomously'
   );
 
+  // 17b. Tool 16: create_paypal_checkout_order
+  const checkoutOrder = await callTool('create_paypal_checkout_order', {
+    proposal_id: payProp.data?.proposal?.id,
+    invoice_number: 'PPB-INV-2026-1001',
+    explicit_human_approval: true,
+  });
+  assert(
+    (checkoutOrder.data?.ok === true ||
+      checkoutOrder.data?.error_code === 'PAYPAL_SANDBOX_CREDENTIALS_MISSING') &&
+      checkoutOrder.data?.invoice_number === 'PPB-INV-2026-1001',
+    `Tool 16 (\`create_paypal_checkout_order\`): handles checkout order creation for #PPB-INV-2026-1001 (${
+      checkoutOrder.data?.ok ? `Order ${checkoutOrder.data?.order_id}` : checkoutOrder.data?.error_code
+    })`
+  );
+
+  // 17c. Tool 17: capture_paypal_checkout_order (isolated demo settlement on #PPB-INV-2026-1004)
+  const capturedSettlement = await callTool('capture_paypal_checkout_order', {
+    invoice_number: 'PPB-INV-2026-1004',
+    allow_demo_settlement_fallback: true,
+    explicit_human_approval: true,
+  });
+  assert(
+    capturedSettlement.data?.ok === true &&
+      capturedSettlement.data?.status === 'paid' &&
+      capturedSettlement.data?.balance_due_minor === 0 &&
+      capturedSettlement.data?.is_live_paypal_capture === false,
+    'Tool 17 (`capture_paypal_checkout_order`): settles #PPB-INV-2026-1004 ($50.00 -> $0.00 balance due) in isolated demo session with transparent non-live label'
+  );
+
+  // 17d. Tool 18: get_payment_receipt
+  const receipt1003 = await callTool('get_payment_receipt', {
+    invoice_number: 'PPB-INV-2026-1003',
+  });
+  const receipt1004 = await callTool('get_payment_receipt', {
+    invoice_number: 'PPB-INV-2026-1004',
+  });
+  assert(
+    receipt1003.data?.ok === true &&
+      receipt1003.data?.receipt?.amount_paid_minor === 12500 &&
+      receipt1004.data?.ok === true &&
+      receipt1004.data?.receipt?.amount_paid_minor === 5000,
+    'Tool 18 (`get_payment_receipt`): returns structured payment receipts for #PPB-INV-2026-1003 ($125.00) and settled #PPB-INV-2026-1004 ($50.00)'
+  );
+
   // 18. Tool 10: void_unpaid_invoice (Payment-State Protection on paid 1003 + void newly created invoice)
   const voidPaid = await callTool('void_unpaid_invoice', {
     invoice_number: 'PPB-INV-2026-1003',
@@ -348,6 +405,19 @@ async function main() {
       refundProp.data?.proposal?.kind === 'refund' &&
       refundProp.data?.proposal?.refund_amount_minor === 12500,
     'Tool 11 (`prepare_refund_proposal`): prepares $125.00 refund proposal for paid #PPB-INV-2026-1003'
+  );
+
+  // 19b. Tool 19: execute_approved_refund
+  const executedRefund = await callTool('execute_approved_refund', {
+    proposal_id: refundProp.data?.proposal?.id,
+    invoice_number: 'PPB-INV-2026-1003',
+    explicit_human_approval: true,
+  });
+  assert(
+    executedRefund.data?.ok === true &&
+      executedRefund.data?.status === 'refunded' &&
+      executedRefund.data?.refund_amount_minor === 12500,
+    'Tool 19 (`execute_approved_refund`): executes approved $125.00 refund for #PPB-INV-2026-1003 in isolated demo session'
   );
 
   // 20. Tool 12: get_financial_audit_history

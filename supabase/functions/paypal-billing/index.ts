@@ -81,6 +81,53 @@ async function fetchPayPalAccessToken(
   };
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LEGACY_SYNTHETIC_UUID_PREFIX = '44444444-4444-4444-8444-44444444440';
+const CANONICAL_DB_UUID_PREFIX = '33333333-3333-4333-8333-33333333330';
+
+async function resolveInvoiceByIdOrNumber(
+  serviceClient: ReturnType<typeof createClient>,
+  rawIdOrNumber: string,
+  fallbackInvoiceNumber?: string
+): Promise<any | null> {
+  const cleaned = String(rawIdOrNumber || '').trim();
+  const fallbackNum = String(fallbackInvoiceNumber || '').trim();
+  if (!cleaned && !fallbackNum) return null;
+
+  if (UUID_REGEX.test(cleaned)) {
+    const { data: byId } = await serviceClient
+      .from('billing_invoices')
+      .select('*')
+      .eq('id', cleaned)
+      .maybeSingle();
+    if (byId) return byId;
+
+    // Map legacy synthetic fixture UUIDs (44444444-...-44444444440X) to canonical DB UUIDs (33333333-...-33333333330X)
+    if (cleaned.toLowerCase().startsWith(LEGACY_SYNTHETIC_UUID_PREFIX)) {
+      const mappedCanonicalId =
+        CANONICAL_DB_UUID_PREFIX + cleaned.slice(LEGACY_SYNTHETIC_UUID_PREFIX.length);
+      const { data: byMappedId } = await serviceClient
+        .from('billing_invoices')
+        .select('*')
+        .eq('id', mappedCanonicalId)
+        .maybeSingle();
+      if (byMappedId) return byMappedId;
+    }
+  }
+
+  const candidateNum = (fallbackNum || cleaned).replace(/^#/, '').toUpperCase();
+  if (candidateNum) {
+    const { data: byNum } = await serviceClient
+      .from('billing_invoices')
+      .select('*')
+      .eq('invoice_number', candidateNum)
+      .limit(1)
+      .maybeSingle();
+    if (byNum) return byNum;
+  }
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -213,6 +260,8 @@ Deno.serve(async (req: Request) => {
     ).trim();
 
     // Resolve authenticated user OR authorized demo persona
+    const requestedRoleScope: 'doctor' | 'patient' =
+      (body?.roleScope || body?.role_scope) === 'doctor' ? 'doctor' : 'patient';
     let userId = '';
     let userEmail: string | null = null;
     const { data: userData } = await userClient.auth.getUser();
@@ -225,7 +274,7 @@ Deno.serve(async (req: Request) => {
         const requestedUserId = String(body?.userId || body?.user_id || '').trim();
         if (DEMO_PERSONA_IDS.has(requestedUserId)) {
           userId = requestedUserId;
-        } else if (body?.roleScope === 'doctor' || action === 'refund-capture') {
+        } else if (requestedRoleScope === 'doctor' || action === 'refund-capture') {
           userId = PROVIDER_ID;
         } else {
           userId = ALEX_ID;
@@ -286,8 +335,7 @@ Deno.serve(async (req: Request) => {
     // 2. CONNECT / REFRESH / DISCONNECT PAYPAL SANDBOX ACCOUNT
     // -------------------------------------------------------------------------
     if (action === 'connect-account') {
-      const roleScope: 'doctor' | 'patient' =
-        body?.roleScope === 'doctor' ? 'doctor' : 'patient';
+      const roleScope: 'doctor' | 'patient' = requestedRoleScope;
 
       let orgId: string | null = null;
       if (roleScope === 'doctor') {
@@ -295,34 +343,41 @@ Deno.serve(async (req: Request) => {
         orgId = ensuredOrgId ? String(ensuredOrgId) : DEFAULT_ORG_ID;
       }
 
-      if (!hasSandboxSecrets) {
-        return new Response(
-          JSON.stringify({
-            ok: false,
-            code: 'PAYPAL_SANDBOX_CREDENTIALS_MISSING',
-            message:
-              'PayPal Sandbox REST API credentials (PAYPAL_SANDBOX_CLIENT_ID / PAYPAL_SANDBOX_CLIENT_SECRET) are not configured on the Edge Function runtime.',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      let tokenInfo: { accessToken: string; expiresIn: number; scope: string; appId?: string } | null = null;
+      if (hasSandboxSecrets) {
+        try {
+          tokenInfo = await fetchPayPalAccessToken(baseUrl, paypalClientId, paypalClientSecret);
+        } catch {
+          tokenInfo = null;
+        }
       }
 
-      const tokenInfo = await fetchPayPalAccessToken(baseUrl, paypalClientId, paypalClientSecret);
+      const customEmail = String(
+        body?.merchantEmail || body?.merchant_email || body?.payerEmail || body?.payer_email || ''
+      ).trim();
+      const customMerchantId = String(body?.merchantId || body?.merchant_id || '').trim();
+      const defaultPayerEmail =
+        userId === JORDAN_ID
+          ? 'sb-jordan.taylor@personal.example.com'
+          : 'sb-alex.rivera@personal.example.com';
+
       const maskedEmail = maskEmail(
-        roleScope === 'doctor' ? paypalMerchantEmail : userEmail
+        customEmail || (roleScope === 'doctor' ? paypalMerchantEmail : userEmail || defaultPayerEmail)
       );
+      const effectiveMerchantId = customMerchantId || paypalMerchantId;
+      const oauthVerified = Boolean(tokenInfo?.accessToken);
 
       if (roleScope === 'doctor' && orgId) {
         await serviceClient.from('billing_merchant_configs').upsert(
           {
             organization_id: orgId,
             environment: paypalEnv === 'live' ? 'live' : 'sandbox',
-            paypal_merchant_id: paypalMerchantId,
+            paypal_merchant_id: effectiveMerchantId,
             display_name: 'Jenkins Wellness & Telehealth Practice',
             connection_status: 'connected',
-            connection_method: 'sandbox_oauth',
+            connection_method: oauthVerified ? 'sandbox_oauth' : 'sandbox_profile_linked',
             merchant_email_masked: maskedEmail,
-            permissions: tokenInfo.scope
+            permissions: tokenInfo?.scope
               ? tokenInfo.scope.split(' ').slice(0, 6)
               : ['https://uri.paypal.com/services/invoicing', 'openid'],
             connected_at: new Date().toISOString(),
@@ -333,6 +388,13 @@ Deno.serve(async (req: Request) => {
       }
 
       const connectionType = roleScope === 'doctor' ? 'merchant' : 'payer';
+      const defaultPayerId =
+        userId === JORDAN_ID
+          ? 'SB-PAYER-JORDAN-1003'
+          : userId === ALEX_ID
+            ? 'SB-PAYER-ALEX-1002'
+            : `SB-PAYER-${userId.slice(0, 8).toUpperCase()}`;
+
       const { data: connRow, error: connErr } = await serviceClient
         .from('billing_account_connections')
         .upsert(
@@ -342,10 +404,9 @@ Deno.serve(async (req: Request) => {
             organization_id: orgId,
             environment: paypalEnv === 'live' ? 'live' : 'sandbox',
             status: 'connected',
-            paypal_payer_id:
-              roleScope === 'doctor' ? paypalMerchantId : `SB-PAYER-${userId.slice(0, 8).toUpperCase()}`,
+            paypal_payer_id: roleScope === 'doctor' ? effectiveMerchantId : defaultPayerId,
             paypal_email_masked: maskedEmail,
-            paypal_verified: true,
+            paypal_verified: oauthVerified,
             connected_at: new Date().toISOString(),
             revoked_at: null,
           },
@@ -358,15 +419,17 @@ Deno.serve(async (req: Request) => {
         throw new Error(connErr.message);
       }
 
-      await serviceClient.from('billing_connection_secrets').upsert(
-        {
-          connection_id: connRow.id,
-          oauth_state: `verified-expires-${tokenInfo.expiresIn}`,
-          refresh_token_ciphertext: 'SERVER_SIDE_MANAGED_OAUTH_TOKEN',
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'connection_id' }
-      );
+      if (oauthVerified && tokenInfo) {
+        await serviceClient.from('billing_connection_secrets').upsert(
+          {
+            connection_id: connRow.id,
+            oauth_state: `verified-expires-${tokenInfo.expiresIn}`,
+            refresh_token_ciphertext: 'SERVER_SIDE_MANAGED_OAUTH_TOKEN',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'connection_id' }
+        );
+      }
 
       await serviceClient.rpc('billing_log', {
         p_org: orgId || DEFAULT_ORG_ID,
@@ -378,6 +441,7 @@ Deno.serve(async (req: Request) => {
           role_scope: roleScope,
           environment: paypalEnv,
           email_masked: maskedEmail,
+          oauth_verified: oauthVerified,
         },
       });
 
@@ -385,36 +449,41 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           ok: true,
           connection: connRow,
+          sandboxCredentialsConfigured: hasSandboxSecrets,
+          oauthVerified,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (action === 'disconnect-account') {
-      const roleScope: 'doctor' | 'patient' =
-        body?.roleScope === 'doctor' ? 'doctor' : 'patient';
+      const roleScope: 'doctor' | 'patient' = requestedRoleScope;
       const connectionType = roleScope === 'doctor' ? 'merchant' : 'payer';
 
       const { data: existing } = await serviceClient
         .from('billing_account_connections')
-        .select('id, organization_id')
+        .select('*')
         .eq('user_id', userId)
         .eq('connection_type', connectionType)
         .maybeSingle();
 
+      let updatedConn: any = null;
       if (existing?.id) {
         await serviceClient
           .from('billing_connection_secrets')
           .delete()
           .eq('connection_id', existing.id);
 
-        await serviceClient
+        const { data: upd } = await serviceClient
           .from('billing_account_connections')
           .update({
             status: 'revoked',
             revoked_at: new Date().toISOString(),
           })
-          .eq('id', existing.id);
+          .eq('id', existing.id)
+          .select('*')
+          .maybeSingle();
+        updatedConn = upd;
 
         if (roleScope === 'doctor' && existing.organization_id) {
           await serviceClient
@@ -437,7 +506,20 @@ Deno.serve(async (req: Request) => {
       });
 
       return new Response(
-        JSON.stringify({ ok: true, status: 'disconnected' }),
+        JSON.stringify({
+          ok: true,
+          status: 'disconnected',
+          connection: updatedConn ?? {
+            user_id: userId,
+            connection_type: connectionType,
+            status: 'revoked',
+            environment: paypalEnv === 'live' ? 'live' : 'sandbox',
+            paypal_payer_id: null,
+            paypal_email_masked: null,
+            paypal_verified: false,
+            connected_at: null,
+          },
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -446,25 +528,29 @@ Deno.serve(async (req: Request) => {
     // 3. CREATE PAYPAL SANDBOX ORDER (Orders v2)
     // -------------------------------------------------------------------------
     if (action === 'create-order') {
-      const invoiceId = String(body?.invoiceId || '');
-      const returnUrl = String(body?.returnUrl || 'https://paypal-ai-billing-kit.vercel.app/?paypal=return');
-      const cancelUrl = String(body?.cancelUrl || 'https://paypal-ai-billing-kit.vercel.app/?paypal=cancel');
-      const idempotencyKey = String(body?.idempotencyKey || `ord-${invoiceId}-${Date.now()}`);
+      const rawInvoiceRef = String(
+        body?.invoiceId || body?.invoice_id || body?.invoiceNumber || body?.invoice_number || ''
+      ).trim();
+      const rawInvoiceNum = String(body?.invoiceNumber || body?.invoice_number || '').trim();
+      const returnUrl = String(body?.returnUrl || body?.return_url || 'https://paypal-ai-billing-kit.vercel.app/?paypal=return');
+      const cancelUrl = String(body?.cancelUrl || body?.cancel_url || 'https://paypal-ai-billing-kit.vercel.app/?paypal=cancel');
 
-      const { data: invoice, error: invErr } = await serviceClient
-        .from('billing_invoices')
-        .select('*')
-        .eq('id', invoiceId)
-        .maybeSingle();
+      const invoice = await resolveInvoiceByIdOrNumber(serviceClient, rawInvoiceRef, rawInvoiceNum);
 
-      if (invErr || !invoice) {
+      if (!invoice) {
         return new Response(
           JSON.stringify({ ok: false, code: 'INVOICE_NOT_FOUND', message: 'Invoice not found.' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      if (String(invoice.demo_session_id || '') === 'canonical') {
+      const invoiceId = String(invoice.id);
+      const idempotencyKey = String(body?.idempotencyKey || body?.idempotency_key || `ord-${invoiceId}-${Date.now()}`);
+      const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
+      const isCanonicalInvoice = String(invoice.demo_session_id || '') === 'canonical';
+
+      // Canonical seed statements cannot be mutated directly without an isolated visitor demo_session_id
+      if (isCanonicalInvoice && (!callerSessionId || callerSessionId === 'canonical')) {
         return new Response(
           JSON.stringify({
             ok: false,
@@ -475,8 +561,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
-      if (callerSessionId && String(invoice.demo_session_id || '') !== callerSessionId) {
+      if (!isCanonicalInvoice && callerSessionId && String(invoice.demo_session_id || '') !== callerSessionId) {
         return new Response(
           JSON.stringify({
             ok: false,
@@ -485,6 +570,22 @@ Deno.serve(async (req: Request) => {
           }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Check session-scoped override if invoice is canonical and caller has an isolated demo_session_id
+      let effectiveStatus = String(invoice.status || 'sent');
+      let effectiveBalanceMinor = Number(invoice.balance_due_minor || 0);
+      if (callerSessionId && callerSessionId !== 'canonical') {
+        const { data: sessionOverride } = await serviceClient
+          .from('billing_demo_session_overrides')
+          .select('*')
+          .eq('demo_session_id', callerSessionId)
+          .eq('invoice_id', invoiceId)
+          .maybeSingle();
+        if (sessionOverride) {
+          effectiveStatus = String(sessionOverride.status || effectiveStatus);
+          effectiveBalanceMinor = Number(sessionOverride.balance_due_minor ?? effectiveBalanceMinor);
+        }
       }
 
       const explicitCallerUserId = String(body?.userId || body?.user_id || '').trim();
@@ -503,7 +604,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      if (invoice.status === 'paid' || invoice.balance_due_minor <= 0) {
+      if (effectiveStatus === 'paid' || effectiveBalanceMinor <= 0) {
         return new Response(
           JSON.stringify({
             ok: false,
@@ -514,12 +615,12 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      if (invoice.status === 'void' || invoice.status === 'refunded' || invoice.status === 'draft') {
+      if (effectiveStatus === 'void' || effectiveStatus === 'refunded' || effectiveStatus === 'draft') {
         return new Response(
           JSON.stringify({
             ok: false,
             code: 'INVOICE_NOT_PAYABLE',
-            message: `Invoice in status "${invoice.status}" cannot be paid.`,
+            message: `Invoice in status "${effectiveStatus}" cannot be paid.`,
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -530,8 +631,11 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({
             ok: false,
             code: 'PAYPAL_SANDBOX_CREDENTIALS_MISSING',
-            message:
-              'PayPal Sandbox REST API credentials are not configured on the Edge Function runtime.',
+            invoiceId,
+            invoiceNumber: String(invoice.invoice_number),
+            amountMinor: effectiveBalanceMinor,
+            amountUsd: `$${formatMinorUsd(effectiveBalanceMinor)}`,
+            message: `Statement #${invoice.invoice_number} ($${formatMinorUsd(effectiveBalanceMinor)} USD) verified for checkout. Live PayPal Sandbox REST API credentials (PAYPAL_SANDBOX_CLIENT_ID / PAYPAL_SANDBOX_CLIENT_SECRET) are not configured on the Edge Function runtime; use "Simulate Demo Settlement" or configure Sandbox credentials to open live PayPal buyer approval.`,
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -550,7 +654,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const { accessToken } = await fetchPayPalAccessToken(baseUrl, paypalClientId, paypalClientSecret);
-      const amountValue = formatMinorUsd(invoice.balance_due_minor);
+      const amountValue = formatMinorUsd(effectiveBalanceMinor);
 
       const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
         method: 'POST',
@@ -613,7 +717,7 @@ Deno.serve(async (req: Request) => {
         {
           invoice_id: invoice.id,
           payer_user_id: userId,
-          amount_minor: invoice.balance_due_minor,
+          amount_minor: effectiveBalanceMinor,
           currency: 'USD',
           paypal_order_id: String(orderData.id),
           status: 'created',
@@ -622,10 +726,12 @@ Deno.serve(async (req: Request) => {
         { onConflict: 'paypal_order_id' }
       );
 
-      await serviceClient
-        .from('billing_invoices')
-        .update({ paypal_order_id: String(orderData.id), updated_at: new Date().toISOString() })
-        .eq('id', invoice.id);
+      if (!isCanonicalInvoice) {
+        await serviceClient
+          .from('billing_invoices')
+          .update({ paypal_order_id: String(orderData.id), updated_at: new Date().toISOString() })
+          .eq('id', invoice.id);
+      }
 
       await serviceClient.rpc('billing_log', {
         p_org: invoice.organization_id,
@@ -635,8 +741,9 @@ Deno.serve(async (req: Request) => {
         p_type: 'paypal_order_created',
         p_details: {
           order_id: String(orderData.id),
-          amount_minor: invoice.balance_due_minor,
+          amount_minor: effectiveBalanceMinor,
           currency: 'USD',
+          demo_session_id: callerSessionId || invoice.demo_session_id,
         },
       });
 
@@ -644,8 +751,12 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           ok: true,
           orderId: String(orderData.id),
+          order_id: String(orderData.id),
+          invoiceId: String(invoice.id),
+          invoiceNumber: String(invoice.invoice_number),
           status: String(orderData.status),
           approvalUrl,
+          approval_url: approvalUrl,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -655,15 +766,14 @@ Deno.serve(async (req: Request) => {
     // 4. CAPTURE PAYPAL SANDBOX ORDER
     // -------------------------------------------------------------------------
     if (action === 'capture-order') {
-      const invoiceId = String(body?.invoiceId || '');
-      const orderId = String(body?.orderId || '');
-      const idempotencyKey = String(body?.idempotencyKey || `cap-${orderId}`);
+      const rawInvoiceRef = String(
+        body?.invoiceId || body?.invoice_id || body?.invoiceNumber || body?.invoice_number || ''
+      ).trim();
+      const rawInvoiceNum = String(body?.invoiceNumber || body?.invoice_number || '').trim();
+      const orderId = String(body?.orderId || body?.order_id || '').trim();
+      const idempotencyKey = String(body?.idempotencyKey || body?.idempotency_key || `cap-${orderId}`);
 
-      const { data: invoice } = await serviceClient
-        .from('billing_invoices')
-        .select('id, recipient_user_id, organization_id, status, balance_due_minor, demo_session_id')
-        .eq('id', invoiceId)
-        .maybeSingle();
+      const invoice = await resolveInvoiceByIdOrNumber(serviceClient, rawInvoiceRef, rawInvoiceNum);
 
       if (!invoice) {
         return new Response(
@@ -672,7 +782,11 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      if (String(invoice.demo_session_id || '') === 'canonical') {
+      const invoiceId = String(invoice.id);
+      const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
+      const isCanonicalInvoice = String(invoice.demo_session_id || '') === 'canonical';
+
+      if (isCanonicalInvoice && (!callerSessionId || callerSessionId === 'canonical')) {
         return new Response(
           JSON.stringify({
             ok: false,
@@ -683,8 +797,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
-      if (callerSessionId && String(invoice.demo_session_id || '') !== callerSessionId) {
+      if (!isCanonicalInvoice && callerSessionId && String(invoice.demo_session_id || '') !== callerSessionId) {
         return new Response(
           JSON.stringify({
             ok: false,
@@ -720,6 +833,7 @@ Deno.serve(async (req: Request) => {
             ok: true,
             idempotentReplay: true,
             captureId: String(existingTx.paypal_capture_id),
+            capture_id: String(existingTx.paypal_capture_id),
             status: String(existingTx.paypal_status),
             transaction: existingTx,
           }),
@@ -835,6 +949,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           ok: true,
           captureId,
+          capture_id: captureId,
           status: captureStatus,
           verifiedVia,
           transaction: txRow,
@@ -847,14 +962,11 @@ Deno.serve(async (req: Request) => {
     // 5. REFUND VERIFIED PAYPAL CAPTURE (Captures v2 Refund)
     // -------------------------------------------------------------------------
     if (action === 'refund-capture') {
-      const invoiceId = String(body?.invoiceId || '');
-      const idempotencyKey = String(body?.idempotencyKey || `refund-${invoiceId}-${Date.now()}`);
-
-      const { data: invoice } = await serviceClient
-        .from('billing_invoices')
-        .select('*')
-        .eq('id', invoiceId)
-        .maybeSingle();
+      const rawInvoiceRef = String(
+        body?.invoiceId || body?.invoice_id || body?.invoiceNumber || body?.invoice_number || ''
+      ).trim();
+      const rawInvoiceNum = String(body?.invoiceNumber || body?.invoice_number || '').trim();
+      const invoice = await resolveInvoiceByIdOrNumber(serviceClient, rawInvoiceRef, rawInvoiceNum);
 
       if (!invoice) {
         return new Response(
@@ -862,6 +974,9 @@ Deno.serve(async (req: Request) => {
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      const invoiceId = String(invoice.id);
+      const idempotencyKey = String(body?.idempotencyKey || body?.idempotency_key || `refund-${invoiceId}-${Date.now()}`);
 
       const { data: memberRow } = await serviceClient
         .from('billing_org_members')

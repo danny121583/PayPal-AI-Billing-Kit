@@ -35,6 +35,7 @@ const READ_ONLY_TOOLS = [
   'get_invoice_details',
   'explain_outstanding_balances',
   'get_transaction_history',
+  'get_payment_receipt',
   'get_financial_audit_history',
   'get_paypal_sandbox_status',
   'get_business_metrics',
@@ -48,6 +49,9 @@ const PROPOSAL_ONLY_TOOLS = [
 
 const CONFIRMED_WRITE_TOOLS = [
   'create_approved_invoice',
+  'create_paypal_checkout_order',
+  'capture_paypal_checkout_order',
+  'execute_approved_refund',
   'void_unpaid_invoice',
   'reset_demo_session',
 ];
@@ -184,12 +188,12 @@ export default function BillingMaaSMcpModal({
         <View style={styles.sectionHeaderRow}>
           <Terminal size={15} color="#1D4ED8" />
           <Text style={styles.sectionTitle}>
-            15 Exposed Tools by Permission Tier
+            19 Exposed Tools by Permission Tier
           </Text>
         </View>
 
         <Text style={styles.tierLabel}>
-          1. Read-Only Discovery & Inspection (9 Tools)
+          1. Read-Only Discovery, Receipts & Inspection (10 Tools)
         </Text>
         <View style={styles.chipWrap}>
           {READ_ONLY_TOOLS.map((t) => (
@@ -211,7 +215,7 @@ export default function BillingMaaSMcpModal({
         </View>
 
         <Text style={styles.tierLabel}>
-          3. Confirmed Demo Session Writes (3 Tools)
+          3. Confirmed Financial Workflows & Demo Session Writes (6 Tools)
         </Text>
         <View style={styles.chipWrap}>
           {CONFIRMED_WRITE_TOOLS.map((t) => (

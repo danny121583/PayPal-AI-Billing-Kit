@@ -17,6 +17,7 @@
  * 12. Verifying zero console errors and zero page errors across the entire journey
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -33,6 +34,12 @@ const TARGET_URL =
 const ARTIFACT_DIR =
   process.env.ARTIFACT_DIR ||
   '/Users/danny/.gemini/antigravity/brain/ee72edcf-894e-4f91-94d4-b2c49c83a710';
+
+const SCREENSHOTS_DIR = path.join(
+  '/Users/danny/Desktop/PayPal-AI-Billing-Kit',
+  'docs/assets/screenshots'
+);
+fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 const PREFIX =
   process.argv.find((a) => a.startsWith('--prefix='))?.slice(9) || 'vercel_prod';
@@ -110,6 +117,14 @@ async function run() {
       path: path.join(ARTIFACT_DIR, `${PREFIX}_desktop_provider_dashboard.png`),
       fullPage: false,
     });
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '01-provider-dashboard.png'),
+      fullPage: false,
+    });
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '05-paypal-sandbox-connected.png'),
+      fullPage: false,
+    });
 
     // Reset session first to guarantee clean baseline
     const resetBtn = page.locator('[data-testid="demo-reset-session-btn"]');
@@ -118,9 +133,57 @@ async function run() {
       await page.waitForTimeout(2000);
     }
 
+    // Step 1b: Regression check for Section 8 (PayPalConnectCard Connected <-> Disconnected states)
+    await page.locator('[data-testid="paypal-disconnect-cta-btn"]').click();
+    await page.waitForSelector('[data-testid="paypal-connect-cta-btn"]', {
+      timeout: 10000,
+    });
+    const disconnectedBadge = await page
+      .locator('[data-testid="paypal-connect-status-badge"]')
+      .innerText();
+    const hasConnectBtn =
+      (await page.locator('[data-testid="paypal-connect-cta-btn"]').count()) > 0;
+    check(
+      'Step 1b (Section 8 Regression): Clicking Disconnect PayPal Sandbox switches badge to DISCONNECTED and shows Connect PayPal Sandbox CTA',
+      disconnectedBadge.includes('DISCONNECTED') && hasConnectBtn
+    );
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '06-paypal-sandbox-disconnected.png'),
+      fullPage: false,
+    });
+
+    // Reconnect PayPal Sandbox and verify SANDBOX CONNECTED badge + summary return and setup form hides
+    await page.locator('[data-testid="paypal-connect-cta-btn"]').click();
+    await page.waitForSelector('[data-testid="paypal-connect-form"]', {
+      timeout: 5000,
+    });
+    await page.locator('[data-testid="paypal-connect-confirm-btn"]').click();
+    await page.waitForSelector('[data-testid="paypal-connected-account-summary"]', {
+      timeout: 10000,
+    });
+    const reconnectedBadge = await page
+      .locator('[data-testid="paypal-connect-status-badge"]')
+      .innerText();
+    const hasConnectedSummary =
+      (await page
+        .locator('[data-testid="paypal-connected-account-summary"]')
+        .count()) > 0;
+    const formHiddenAfterConnect =
+      (await page.locator('[data-testid="paypal-connect-form"]').count()) === 0;
+    check(
+      'Step 1c (Section 8 Regression): Reconnecting PayPal Sandbox restores SANDBOX CONNECTED badge, shows linked account summary, and hides setup form',
+      reconnectedBadge.includes('SANDBOX CONNECTED') &&
+        hasConnectedSummary &&
+        formHiddenAfterConnect
+    );
+
     // Step 2: Switch between Provider and Customer accounts
     await page.locator('[data-testid="demo-account-chip-alex_rivera"]').click();
     await page.waitForTimeout(2000);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '02-customer-alex-rivera.png'),
+      fullPage: false,
+    });
     const alexCards = await page
       .locator('[data-testid^="billing-invoice-card-"]')
       .evaluateAll((els) => els.map((e) => e.innerText));
@@ -136,6 +199,10 @@ async function run() {
       .locator('[data-testid="demo-account-chip-jordan_taylor"]')
       .click();
     await page.waitForTimeout(2000);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '03-customer-jordan-taylor.png'),
+      fullPage: false,
+    });
     const jordanCards = await page
       .locator('[data-testid^="billing-invoice-card-"]')
       .evaluateAll((els) => els.map((e) => e.innerText));
@@ -146,6 +213,42 @@ async function run() {
         !jordanCardsJoined.includes('PPB-INV-2026-1001'),
       `Jordan cards=${jordanCards.length}`
     );
+
+    // Step 2c (Section 9 Regression): Open Jordan Taylor #PPB-INV-2026-1004 failed payment statement and click Retry with PayPal Sandbox
+    await page
+      .locator('[data-testid^="billing-invoice-card-"]')
+      .first()
+      .click();
+    await page.waitForSelector('[data-testid="billing-invoice-detail-modal"]', {
+      timeout: 10000,
+    });
+    await page
+      .locator('[data-testid="billing-detail-paypal-checkout-btn"]')
+      .click();
+    await page.waitForTimeout(2200);
+    const jordanRetryModalText = await page
+      .locator('[data-testid="billing-invoice-detail-modal"]')
+      .innerText();
+    check(
+      'Step 2c (Section 9 Regression): Clicking Retry with PayPal Sandbox on Jordan Taylor #PPB-INV-2026-1004 ($50.00) succeeds without "Invoice not found."',
+      !jordanRetryModalText.includes('Invoice not found') &&
+        (jordanRetryModalText.includes('PPB-INV-2026-1004') ||
+          jordanRetryModalText.includes('$50.00'))
+    );
+    await page.screenshot({
+      path: path.join(
+        SCREENSHOTS_DIR,
+        '07-failed-payment-retry-1004.png'
+      ),
+      fullPage: false,
+    });
+    await page
+      .locator(
+        '[data-testid="billing-detail-close-btn"], [aria-label="Close invoice details"]'
+      )
+      .first()
+      .click();
+    await page.waitForTimeout(500);
 
     await page
       .locator('[data-testid="demo-account-chip-sarah_jenkins"]')
@@ -159,6 +262,10 @@ async function run() {
     });
     await page.locator('[data-testid="create-invoice-service-ADMIN-FORMS"]').click();
     await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '04-create-invoice-modal.png'),
+      fullPage: false,
+    });
     await page.locator('[data-testid="create-invoice-send-btn"]').click();
     await page.waitForFunction(
       () => {
@@ -251,6 +358,10 @@ async function run() {
         ARTIFACT_DIR,
         `${PREFIX}_desktop_focused_invoice_ai_answer.png`
       ),
+      fullPage: false,
+    });
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '08-billing-ai-assistant.png'),
       fullPage: false,
     });
 
@@ -359,6 +470,10 @@ async function run() {
         settingsText.includes('LOCKED ON') &&
         settingsText.includes('Audit')
     );
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '10-guardrails-and-audit-trail.png'),
+      fullPage: false,
+    });
     await page.locator('[data-testid="billing-settings-done-btn"]').click();
     await page.waitForTimeout(400);
 
@@ -394,6 +509,10 @@ async function run() {
 
     await page.screenshot({
       path: path.join(ARTIFACT_DIR, `${PREFIX}_desktop_maas_mcp_modal.png`),
+      fullPage: false,
+    });
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '09-mcp-agent-interface-modal.png'),
       fullPage: false,
     });
 

@@ -502,6 +502,144 @@ const MCP_TOOLS: MCPToolDef[] = [
       },
     },
   },
+  {
+    name: 'create_paypal_checkout_order',
+    description:
+      'Create a protected PayPal Sandbox checkout order (`POST /v2/checkout/orders`) for an unpaid statement or approved `payment_checkout` proposal (`proposal_id`). Requires `explicit_human_approval: true`. Returns the PayPal Order ID and buyer approval URL when live Sandbox credentials are configured, or explicit Sandbox readiness status.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Create PayPal Sandbox Checkout Order',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        proposal_id: {
+          type: 'string',
+          description: 'Optional UUID of a pending payment_checkout proposal prepared by prepare_payment_proposal.',
+        },
+        invoice_number: {
+          type: 'string',
+          description: 'Unpaid invoice number (e.g., "PPB-INV-2026-1001" or "PPB-INV-2026-1004").',
+        },
+        explicit_human_approval: {
+          type: 'boolean',
+          description: 'Must be true to confirm human approval before creating a PayPal checkout order.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'capture_paypal_checkout_order',
+    description:
+      'Capture an approved PayPal Sandbox checkout order (`order_id`) after buyer approval, or execute an explicitly labeled Demo Settlement (`allow_demo_settlement_fallback: true`) in an isolated demo session (`demo_session_id`). Updates the ledger and issues a receipt.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Capture Approved PayPal Order or Settle Demo Invoice',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['invoice_number'],
+      properties: {
+        invoice_number: {
+          type: 'string',
+          description: 'Invoice number being settled (e.g., "PPB-INV-2026-1001" or "PPB-INV-2026-1004").',
+        },
+        order_id: {
+          type: 'string',
+          description: 'PayPal Sandbox Order ID returned by create_paypal_checkout_order after buyer approval.',
+        },
+        allow_demo_settlement_fallback: {
+          type: 'boolean',
+          description: 'When true and live PayPal Sandbox buyer capture is not provided, settles the invoice in the isolated demo session clearly marked as a Sample Demo Record (never fabricated as a live PayPal capture).',
+        },
+        explicit_human_approval: {
+          type: 'boolean',
+          description: 'Must be true to confirm human approval of settlement.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_payment_receipt',
+    description:
+      'Retrieve the structured payment receipt and PayPal confirmation metadata for a paid or refunded statement (`invoice_number`), clearly distinguishing verified PayPal Sandbox captures from sample demo settlements.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'Get Payment Receipt & Confirmation',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['invoice_number'],
+      properties: {
+        invoice_number: {
+          type: 'string',
+          description: 'Paid or refunded invoice number (e.g., "PPB-INV-2026-1003").',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'execute_approved_refund',
+    description:
+      'Execute an approved provider refund for a paid statement (`invoice_number` or `proposal_id` from `prepare_refund_proposal`) with `explicit_human_approval: true`. Issues a PayPal Captures v2 refund when a verified PayPal capture exists, or records a demo session refund in the isolated `demo_session_id`.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Execute Approved Refund',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        proposal_id: {
+          type: 'string',
+          description: 'UUID of a pending refund proposal created by prepare_refund_proposal.',
+        },
+        invoice_number: {
+          type: 'string',
+          description: 'Paid invoice number to refund (e.g., "PPB-INV-2026-1003").',
+        },
+        amount_minor: {
+          type: 'integer',
+          description: 'Optional refund amount in USD cents (defaults to full paid balance).',
+        },
+        explicit_human_approval: {
+          type: 'boolean',
+          description: 'Must be true to confirm human approval before executing the refund.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
 ];
 
 async function fetchSessionInvoices(admin: any, demoSessionId: string) {
@@ -678,6 +816,9 @@ async function executeTool(
     'void_unpaid_invoice',
     'prepare_refund_proposal',
     'reset_demo_session',
+    'create_paypal_checkout_order',
+    'capture_paypal_checkout_order',
+    'execute_approved_refund',
   ]);
   if (MUTATING_TOOLS.has(toolName) && demoSessionId.toLowerCase() === 'canonical') {
     return {
@@ -722,6 +863,7 @@ async function executeTool(
             'get_invoice_details',
             'explain_outstanding_balances',
             'get_transaction_history',
+            'get_payment_receipt',
             'get_financial_audit_history',
             'get_paypal_sandbox_status',
             'get_business_metrics',
@@ -733,6 +875,9 @@ async function executeTool(
           ],
           confirmed_demo_write: [
             'create_approved_invoice',
+            'create_paypal_checkout_order',
+            'capture_paypal_checkout_order',
+            'execute_approved_refund',
             'void_unpaid_invoice',
             'reset_demo_session',
           ],
@@ -1673,6 +1818,541 @@ async function executeTool(
         demo_session_id: demoSessionId,
         reset_result: resetRes,
         message: `Demo session "${demoSessionId}" has been reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).`,
+      };
+    }
+
+    case 'create_paypal_checkout_order': {
+      if (args?.explicit_human_approval !== true) {
+        return {
+          ok: false,
+          error_code: 'HUMAN_APPROVAL_REQUIRED',
+          message:
+            'Creating a PayPal checkout order requires `explicit_human_approval: true`. Call `prepare_payment_proposal` first if you need to present a proposal to the customer.',
+        };
+      }
+
+      let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
+      const proposalId = String(args?.proposal_id || '').trim();
+
+      if (proposalId) {
+        const { data: propRow } = await admin
+          .from('billing_ai_proposals')
+          .select('*')
+          .eq('id', proposalId)
+          .maybeSingle();
+
+        if (!propRow) {
+          return {
+            ok: false,
+            error_code: 'PROPOSAL_NOT_FOUND',
+            message: `Payment proposal "${proposalId}" was not found.`,
+          };
+        }
+
+        if (String(propRow.demo_session_id || '') !== demoSessionId) {
+          return {
+            ok: false,
+            error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+            message: 'Proposal belongs to a different demo_session_id.',
+          };
+        }
+
+        if (!rawNum && propRow.payload?.invoice_number) {
+          rawNum = String(propRow.payload.invoice_number).replace(/^#/, '');
+        }
+      }
+
+      const invoices = await fetchSessionInvoices(admin, demoSessionId);
+      const target = invoices.find(
+        (i: any) =>
+          i.invoice_number.toLowerCase() === rawNum.toLowerCase() ||
+          i.invoice_number.toLowerCase().endsWith(rawNum.toLowerCase()) ||
+          i.id.toLowerCase() === rawNum.toLowerCase()
+      );
+
+      if (!target) {
+        return {
+          ok: false,
+          error_code: 'INVOICE_NOT_FOUND',
+          message: `Statement "${rawNum}" was not found in demo session "${demoSessionId}".`,
+        };
+      }
+
+      if (target.balance_due_minor <= 0 || target.status === 'paid' || target.status === 'void' || target.status === 'refunded') {
+        return {
+          ok: false,
+          error_code: 'INVOICE_NOT_PAYABLE',
+          message: `Statement #${target.invoice_number} has status ${target.status.toUpperCase()} with ${target.balance_due_usd} balance due and cannot be paid.`,
+        };
+      }
+
+      // Invoke paypal-billing create-order
+      const orderResp = await fetch(`${SUPABASE_URL}/functions/v1/paypal-billing`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'create-order',
+          invoiceId: target.id,
+          invoice_id: target.id,
+          invoiceNumber: target.invoice_number,
+          invoice_number: target.invoice_number,
+          demoSessionId,
+          demo_session_id: demoSessionId,
+          userId: target.customer_id,
+          user_id: target.customer_id,
+        }),
+      });
+      const orderData = await orderResp.json().catch(() => ({}));
+
+      if (proposalId) {
+        await admin
+          .from('billing_ai_proposals')
+          .update({
+            status: 'approved',
+            decided_at: new Date().toISOString(),
+          })
+          .eq('id', proposalId);
+      }
+
+      if (orderData?.ok && (orderData?.orderId || orderData?.order_id)) {
+        const orderId = String(orderData.orderId || orderData.order_id);
+        const approvalUrl = orderData.approvalUrl || orderData.approval_url || null;
+        return {
+          ok: true,
+          demo_session_id: demoSessionId,
+          checkout_mode: 'paypal_sandbox_live',
+          invoice_id: target.id,
+          invoice_number: target.invoice_number,
+          customer_name: target.customer_name,
+          amount_minor: target.balance_due_minor,
+          amount_usd: target.balance_due_usd,
+          order_id: orderId,
+          order_status: String(orderData.status || 'CREATED'),
+          approval_url: approvalUrl,
+          message: approvalUrl
+            ? `PayPal Sandbox Order ${orderId} created for Statement #${target.invoice_number} (${target.balance_due_usd} USD). Open the approval_url to authorize as the Sandbox buyer, then call \`capture_paypal_checkout_order\`.`
+            : `PayPal Sandbox Order ${orderId} created for Statement #${target.invoice_number} (${target.balance_due_usd} USD).`,
+        };
+      }
+
+      return {
+        ok: true,
+        demo_session_id: demoSessionId,
+        checkout_mode: 'sandbox_credentials_pending',
+        paypal_sandbox_api_credentials_configured: false,
+        invoice_id: target.id,
+        invoice_number: target.invoice_number,
+        customer_name: target.customer_name,
+        amount_minor: target.balance_due_minor,
+        amount_usd: target.balance_due_usd,
+        order_id: null,
+        approval_url: null,
+        demo_settlement_available: true,
+        message:
+          orderData?.message ||
+          `Statement #${target.invoice_number} (${target.balance_due_usd} USD) verified for checkout. Live PayPal Sandbox REST API credentials are not configured on the server; call \`capture_paypal_checkout_order\` with \`allow_demo_settlement_fallback: true\` to record an isolated Sample Demo Settlement, or configure PayPal Sandbox credentials to generate a live buyer approval URL.`,
+      };
+    }
+
+    case 'capture_paypal_checkout_order': {
+      if (args?.explicit_human_approval !== true) {
+        return {
+          ok: false,
+          error_code: 'HUMAN_APPROVAL_REQUIRED',
+          message: 'Capturing or settling an invoice requires `explicit_human_approval: true`.',
+        };
+      }
+
+      const rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
+      const orderId = String(args?.order_id || '').trim();
+      const allowDemoFallback = Boolean(args?.allow_demo_settlement_fallback);
+
+      const invoices = await fetchSessionInvoices(admin, demoSessionId);
+      const target = invoices.find(
+        (i: any) =>
+          i.invoice_number.toLowerCase() === rawNum.toLowerCase() ||
+          i.invoice_number.toLowerCase().endsWith(rawNum.toLowerCase()) ||
+          i.id.toLowerCase() === rawNum.toLowerCase()
+      );
+
+      if (!target) {
+        return {
+          ok: false,
+          error_code: 'INVOICE_NOT_FOUND',
+          message: `Statement "${rawNum}" was not found in demo session "${demoSessionId}".`,
+        };
+      }
+
+      if (target.status === 'paid' || target.balance_due_minor <= 0) {
+        return {
+          ok: true,
+          demo_session_id: demoSessionId,
+          idempotent_replay: true,
+          invoice_number: target.invoice_number,
+          status: 'paid',
+          settlement_reference: target.settlement_reference,
+          settlement_verification: target.settlement_verification,
+          balance_due_usd: '$0.00',
+          message: `Statement #${target.invoice_number} is already settled (${target.settlement_reference || 'PAID'}).`,
+        };
+      }
+
+      if (orderId) {
+        const capResp = await fetch(`${SUPABASE_URL}/functions/v1/paypal-billing`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            action: 'capture-order',
+            invoiceId: target.id,
+            invoice_id: target.id,
+            invoiceNumber: target.invoice_number,
+            invoice_number: target.invoice_number,
+            orderId,
+            order_id: orderId,
+            demoSessionId,
+            demo_session_id: demoSessionId,
+            userId: target.customer_id,
+            user_id: target.customer_id,
+          }),
+        });
+        const capData = await capResp.json().catch(() => ({}));
+        if (capData?.ok && (capData?.captureId || capData?.capture_id)) {
+          const captureId = String(capData.captureId || capData.capture_id);
+          return {
+            ok: true,
+            demo_session_id: demoSessionId,
+            settlement_mode: 'paypal_sandbox_verified',
+            is_live_paypal_capture: true,
+            invoice_id: target.id,
+            invoice_number: target.invoice_number,
+            customer_name: target.customer_name,
+            order_id: orderId,
+            capture_id: captureId,
+            settlement_reference: captureId,
+            settlement_verification: 'paypal_sandbox_verified',
+            amount_paid_minor: target.total_minor,
+            amount_paid_usd: target.total_usd,
+            balance_due_minor: 0,
+            balance_due_usd: '$0.00',
+            status: 'paid',
+            message: `Verified PayPal Sandbox Capture ${captureId} completed for Statement #${target.invoice_number} (${target.total_usd} USD). Remaining balance is $0.00.`,
+          };
+        }
+
+        if (!allowDemoFallback) {
+          return {
+            ok: false,
+            error_code: capData?.code || 'PAYPAL_CAPTURE_NOT_COMPLETED',
+            message:
+              capData?.message ||
+              `PayPal Sandbox order ${orderId} could not be captured (ensure buyer approved the order in PayPal Sandbox, or pass \`allow_demo_settlement_fallback: true\` for isolated demo session settlement).`,
+          };
+        }
+      }
+
+      if (!allowDemoFallback) {
+        return {
+          ok: false,
+          error_code: 'ORDER_ID_OR_DEMO_FALLBACK_REQUIRED',
+          message:
+            'Provide an approved PayPal `order_id` to capture a live PayPal Sandbox order, or set `allow_demo_settlement_fallback: true` to record an explicitly labeled Sample Demo Settlement in this isolated demo session.',
+        };
+      }
+
+      const { data: simRes, error: simErr } = await admin.rpc('billing_simulate_demo_settlement', {
+        p_invoice: target.id,
+        p_demo_session_id: demoSessionId,
+      });
+
+      if (simErr) {
+        return {
+          ok: false,
+          error_code: 'DEMO_SETTLEMENT_FAILED',
+          message: simErr.message,
+        };
+      }
+
+      const simRef = String(
+        simRes?.paypal_capture_id || simRes?.capture_id || `DEMO-SIM-${target.invoice_number}`
+      );
+
+      return {
+        ok: true,
+        demo_session_id: demoSessionId,
+        settlement_mode: 'sample_demo_settlement_not_live_paypal',
+        is_live_paypal_capture: false,
+        verification_badge: 'Sample Demo Record — Not a Live PayPal Capture',
+        invoice_id: target.id,
+        invoice_number: target.invoice_number,
+        customer_name: target.customer_name,
+        order_id: null,
+        capture_id: null,
+        settlement_reference: simRef,
+        settlement_verification: 'sample_demo_settlement_not_live_paypal',
+        amount_paid_minor: target.total_minor,
+        amount_paid_usd: target.total_usd,
+        balance_due_minor: 0,
+        balance_due_usd: '$0.00',
+        status: 'paid',
+        message: `Demo Settlement (${simRef}) recorded for Statement #${target.invoice_number} (${target.total_usd} USD) in isolated session "${demoSessionId}" — clearly labeled as a Sample Demo Record (Not a Live PayPal Capture).`,
+      };
+    }
+
+    case 'get_payment_receipt': {
+      const invoices = await fetchSessionInvoices(admin, demoSessionId);
+      const rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
+      const target = invoices.find(
+        (i: any) =>
+          i.invoice_number.toLowerCase() === rawNum.toLowerCase() ||
+          i.invoice_number.toLowerCase().endsWith(rawNum.toLowerCase()) ||
+          i.id.toLowerCase() === rawNum.toLowerCase()
+      );
+
+      if (!target) {
+        return {
+          ok: false,
+          error_code: 'INVOICE_NOT_FOUND',
+          message: `Statement "${rawNum}" was not found in demo session "${demoSessionId}".`,
+        };
+      }
+
+      if (target.status !== 'paid' && target.status !== 'refunded' && target.amount_paid_minor <= 0) {
+        return {
+          ok: false,
+          error_code: 'RECEIPT_UNAVAILABLE_UNPAID_INVOICE',
+          message: `Statement #${target.invoice_number} has status ${target.status.toUpperCase()} (${target.balance_due_usd} balance due) and has no completed payment receipt yet.`,
+        };
+      }
+
+      const isVerifiedPayPal = target.settlement_verification === 'paypal_sandbox_verified';
+      const receiptRef =
+        target.settlement_reference ||
+        (isVerifiedPayPal ? 'PAYPAL-VERIFIED' : `SAMPLE-DEMO-SETTLEMENT-${target.invoice_number}`);
+
+      return {
+        ok: true,
+        demo_session_id: demoSessionId,
+        receipt: {
+          receipt_number: receiptRef,
+          invoice_id: target.id,
+          invoice_number: target.invoice_number,
+          status: target.status,
+          organization_name: 'Jenkins Wellness & Telehealth Practice',
+          provider_name: target.provider_name,
+          customer_name: target.customer_name,
+          currency: 'USD',
+          total_minor: target.total_minor,
+          total_usd: target.total_usd,
+          amount_paid_minor: target.amount_paid_minor,
+          amount_paid_usd: target.amount_paid_usd,
+          amount_refunded_minor: target.amount_refunded_minor,
+          amount_refunded_usd: target.amount_refunded_usd,
+          balance_due_minor: target.balance_due_minor,
+          balance_due_usd: target.balance_due_usd,
+          service_date: target.service_date,
+          paid_at: target.paid_at,
+          refunded_at: target.refunded_at,
+          settlement_reference: receiptRef,
+          paypal_capture_id: isVerifiedPayPal ? receiptRef : null,
+          settlement_verification: target.settlement_verification,
+          is_live_paypal_capture: isVerifiedPayPal,
+          verification_badge: isVerifiedPayPal
+            ? 'Verified PayPal Sandbox Capture'
+            : 'Sample Demo Record — Not a Live PayPal Capture',
+          line_items: target.line_items,
+        },
+      };
+    }
+
+    case 'execute_approved_refund': {
+      if (args?.explicit_human_approval !== true) {
+        return {
+          ok: false,
+          error_code: 'HUMAN_APPROVAL_REQUIRED',
+          message:
+            'Executing a refund requires `explicit_human_approval: true`. Call `prepare_refund_proposal` first to prepare a refund proposal.',
+        };
+      }
+
+      let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
+      let requestedAmountMinor = Number(args?.amount_minor || 0);
+      const proposalId = String(args?.proposal_id || '').trim();
+
+      if (proposalId) {
+        const { data: propRow } = await admin
+          .from('billing_ai_proposals')
+          .select('*')
+          .eq('id', proposalId)
+          .maybeSingle();
+
+        if (!propRow) {
+          return {
+            ok: false,
+            error_code: 'PROPOSAL_NOT_FOUND',
+            message: `Refund proposal "${proposalId}" was not found.`,
+          };
+        }
+
+        if (String(propRow.demo_session_id || '') !== demoSessionId) {
+          return {
+            ok: false,
+            error_code: 'CROSS_SESSION_PROPOSAL_ACCESS_DENIED',
+            message: 'Proposal belongs to a different demo_session_id.',
+          };
+        }
+
+        if (propRow.status === 'executed' || propRow.status === 'approved') {
+          return {
+            ok: false,
+            error_code: 'DUPLICATE_APPROVAL_BLOCKED',
+            message: `Refund proposal "${proposalId}" has already been executed.`,
+          };
+        }
+
+        if (!rawNum && propRow.payload?.invoice_number) {
+          rawNum = String(propRow.payload.invoice_number).replace(/^#/, '');
+        }
+        if (!requestedAmountMinor && propRow.amount_minor) {
+          requestedAmountMinor = Number(propRow.amount_minor);
+        }
+      }
+
+      const invoices = await fetchSessionInvoices(admin, demoSessionId);
+      const target = invoices.find(
+        (i: any) =>
+          i.invoice_number.toLowerCase() === rawNum.toLowerCase() ||
+          i.invoice_number.toLowerCase().endsWith(rawNum.toLowerCase()) ||
+          i.id.toLowerCase() === rawNum.toLowerCase()
+      );
+
+      if (!target) {
+        return {
+          ok: false,
+          error_code: 'INVOICE_NOT_FOUND',
+          message: `Statement "${rawNum}" was not found in demo session "${demoSessionId}".`,
+        };
+      }
+
+      if (target.status === 'refunded') {
+        return {
+          ok: true,
+          demo_session_id: demoSessionId,
+          idempotent_replay: true,
+          invoice_number: target.invoice_number,
+          status: 'refunded',
+          amount_refunded_usd: target.amount_refunded_usd,
+          balance_due_usd: '$0.00',
+          message: `Statement #${target.invoice_number} has already been refunded (${target.amount_refunded_usd}).`,
+        };
+      }
+
+      if (target.status !== 'paid' && target.amount_paid_minor <= 0) {
+        return {
+          ok: false,
+          error_code: 'INVOICE_NOT_PAID',
+          message: `Statement #${target.invoice_number} has status ${target.status.toUpperCase()} ($0.00 captured) and cannot be refunded.`,
+        };
+      }
+
+      const refundMinor = requestedAmountMinor > 0 ? requestedAmountMinor : Number(target.amount_paid_minor);
+
+      // If this invoice was settled via a live PayPal Sandbox capture, attempt live PayPal refund first
+      if (target.settlement_verification === 'paypal_sandbox_verified') {
+        const refResp = await fetch(`${SUPABASE_URL}/functions/v1/paypal-billing`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({
+            action: 'refund-capture',
+            invoiceId: target.id,
+            invoice_id: target.id,
+            invoiceNumber: target.invoice_number,
+            invoice_number: target.invoice_number,
+            amountMinor: refundMinor,
+            roleScope: 'doctor',
+            userId: PROVIDER_ID,
+            demoSessionId,
+          }),
+        });
+        const refData = await refResp.json().catch(() => ({}));
+        if (refData?.ok && refData?.refundId) {
+          if (proposalId) {
+            await admin
+              .from('billing_ai_proposals')
+              .update({ status: 'executed', decided_at: new Date().toISOString() })
+              .eq('id', proposalId);
+          }
+          return {
+            ok: true,
+            demo_session_id: demoSessionId,
+            refund_mode: 'paypal_sandbox_verified',
+            is_live_paypal_refund: true,
+            invoice_id: target.id,
+            invoice_number: target.invoice_number,
+            customer_name: target.customer_name,
+            refund_id: String(refData.refundId),
+            refund_amount_minor: refundMinor,
+            refund_amount_usd: formatUsd(refundMinor),
+            balance_due_minor: 0,
+            balance_due_usd: '$0.00',
+            status: 'refunded',
+            message: `Verified PayPal Sandbox Refund ${refData.refundId} (${formatUsd(refundMinor)} USD) completed for Statement #${target.invoice_number}. Remaining balance is $0.00.`,
+          };
+        }
+      }
+
+      // Otherwise execute isolated demo session refund via RPC
+      const { data: demoRefRes, error: demoRefErr } = await admin.rpc('billing_simulate_demo_refund', {
+        p_invoice: target.id,
+        p_amount_minor: refundMinor,
+        p_demo_session_id: demoSessionId,
+      });
+
+      if (demoRefErr) {
+        return {
+          ok: false,
+          error_code: 'REFUND_FAILED',
+          message: demoRefErr.message,
+        };
+      }
+
+      if (proposalId) {
+        await admin
+          .from('billing_ai_proposals')
+          .update({ status: 'executed', decided_at: new Date().toISOString() })
+          .eq('id', proposalId);
+      }
+
+      const refundRef = String(
+        demoRefRes?.paypal_refund_id || demoRefRes?.refund_id || `DEMO-REFUND-${target.invoice_number}`
+      );
+
+      return {
+        ok: true,
+        demo_session_id: demoSessionId,
+        refund_mode: 'sample_demo_refund_not_live_paypal',
+        is_live_paypal_refund: false,
+        invoice_id: target.id,
+        invoice_number: target.invoice_number,
+        customer_name: target.customer_name,
+        refund_id: refundRef,
+        refund_amount_minor: refundMinor,
+        refund_amount_usd: formatUsd(refundMinor),
+        balance_due_minor: 0,
+        balance_due_usd: '$0.00',
+        status: 'refunded',
+        message: `Refund ${refundRef} (${formatUsd(refundMinor)} USD) processed for Statement #${target.invoice_number} in isolated demo session "${demoSessionId}". Remaining balance is $0.00.`,
       };
     }
 
