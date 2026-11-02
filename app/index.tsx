@@ -45,10 +45,13 @@ import {
   resolveBillingDeepLinkInvoice,
 } from '../src/billing/data/syntheticBillingFixtures';
 import {
+  DEFAULT_BILLABLE_PATIENTS,
   DEFAULT_SERVICE_CATALOG,
   fetchBillingDashboardData,
   getDefaultBillingAISettings,
   getOrCreateDemoSessionId,
+  getOrCreateDemoSessionIdSync,
+  getPreloadedBillingSnapshot,
   markBillingNotificationRead,
   resetBillingDemoSession,
   type BillablePatientOption,
@@ -95,6 +98,12 @@ export default function BillingScreen() {
   const roleScope: BillingRoleScope = activePreset.roleScope;
   const isDoctorRole = roleScope === 'doctor';
 
+  const initialSnap = useMemo(
+    () => getPreloadedBillingSnapshot(roleScope, activePreset.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoice, setSelectedInvoice] =
@@ -106,32 +115,62 @@ export default function BillingScreen() {
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showMaasModal, setShowMaasModal] = useState(false);
-  const [demoSessionId, setDemoSessionId] = useState('canonical');
+  const [demoSessionId, setDemoSessionId] = useState(() =>
+    getOrCreateDemoSessionIdSync()
+  );
   const [isResettingDemo, setIsResettingDemo] = useState(false);
   const [resetBannerText, setResetBannerText] = useState<string | null>(null);
 
   const [liveInvoices, setLiveInvoices] = useState<
     SyntheticBillingInvoice[] | null
-  >(null);
+  >(() => initialSnap.invoices);
   const [hasLoadedLiveOnce, setHasLoadedLiveOnce] = useState(
     process.env.NODE_ENV === 'test'
   );
   const [catalog, setCatalog] = useState<BillingServiceCatalogItem[]>(
-    DEFAULT_SERVICE_CATALOG
+    () => initialSnap.catalog || DEFAULT_SERVICE_CATALOG
   );
   const [billablePatients, setBillablePatients] = useState<
     BillablePatientOption[]
-  >([]);
+  >(() => initialSnap.billablePatients || DEFAULT_BILLABLE_PATIENTS);
   const [aiSettings, setAiSettings] = useState<BillingAISettingsRecord>(() =>
-    getDefaultBillingAISettings(activePreset.id)
+    initialSnap.settings || getDefaultBillingAISettings(activePreset.id)
   );
   const [connection, setConnection] =
-    useState<PayPalAccountConnectionSummary | null>(null);
-  const [auditEvents, setAuditEvents] = useState<BillingAuditEventItem[]>([]);
+    useState<PayPalAccountConnectionSummary | null>(() => initialSnap.connection);
+  const [auditEvents, setAuditEvents] = useState<BillingAuditEventItem[]>(
+    () => initialSnap.auditEvents
+  );
   const [notifications, setNotifications] = useState<BillingNotificationItem[]>(
-    []
+    () => initialSnap.notifications
   );
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleSelectDemoAccount = useCallback(
+    (key: DemoAccountKey) => {
+      if (key === activePreset.key) return;
+      const targetPreset = DEMO_ACCOUNT_PRESETS[key];
+      if (!targetPreset) return;
+      // Synchronously apply preloaded persona state before render to prevent any flicker
+      const snap = getPreloadedBillingSnapshot(
+        targetPreset.roleScope,
+        targetPreset.id
+      );
+      setSelectedInvoice(null);
+      setFocusedAiInvoice(null);
+      setResetBannerText(null);
+      setSearchQuery('');
+      setLiveInvoices(snap.invoices);
+      setCatalog(snap.catalog);
+      setBillablePatients(snap.billablePatients);
+      setAiSettings(snap.settings);
+      setConnection(snap.connection);
+      setAuditEvents(snap.auditEvents);
+      setNotifications(snap.notifications);
+      void switchDemoAccount(key);
+    },
+    [activePreset.key, switchDemoAccount]
+  );
 
   useEffect(() => {
     if (
@@ -140,28 +179,35 @@ export default function BillingScreen() {
         rawAccount === 'jordan_taylor') &&
       rawAccount !== activePreset.key
     ) {
-      void switchDemoAccount(rawAccount as DemoAccountKey);
+      handleSelectDemoAccount(rawAccount as DemoAccountKey);
     }
-  }, [activePreset.key, rawAccount, switchDemoAccount]);
+  }, [activePreset.key, handleSelectDemoAccount, rawAccount]);
 
-  const refreshBillingData = useCallback(async () => {
-    try {
-      const sid = await getOrCreateDemoSessionId();
-      setDemoSessionId(sid);
-      const dash = await fetchBillingDashboardData(roleScope, activePreset.id);
-      setLiveInvoices(dash.invoices);
-      setCatalog(dash.catalog);
-      setBillablePatients(dash.billablePatients);
-      setAiSettings(dash.settings);
-      setConnection(dash.connection);
-      setAuditEvents(dash.auditEvents);
-      setNotifications(dash.notifications);
-    } catch (err) {
-      console.error('refreshBillingData error:', err);
-    } finally {
-      setHasLoadedLiveOnce(true);
-    }
-  }, [activePreset.id, roleScope]);
+  const refreshBillingData = useCallback(
+    async (forceRefresh = true) => {
+      try {
+        const sid = await getOrCreateDemoSessionId();
+        setDemoSessionId(sid);
+        const dash = await fetchBillingDashboardData(
+          roleScope,
+          activePreset.id,
+          { forceRefresh }
+        );
+        setLiveInvoices(dash.invoices);
+        setCatalog(dash.catalog);
+        setBillablePatients(dash.billablePatients);
+        setAiSettings(dash.settings);
+        setConnection(dash.connection);
+        setAuditEvents(dash.auditEvents);
+        setNotifications(dash.notifications);
+      } catch (err) {
+        console.error('refreshBillingData error:', err);
+      } finally {
+        setHasLoadedLiveOnce(true);
+      }
+    },
+    [activePreset.id, roleScope]
+  );
 
   const handleResetDemoSession = useCallback(async () => {
     if (isResettingDemo) return;
@@ -172,7 +218,7 @@ export default function BillingScreen() {
       clearBillingAIClientCacheForTests();
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
-      await refreshBillingData();
+      await refreshBillingData(true);
       setResetBannerText(
         'Demo session reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).'
       );
@@ -188,19 +234,29 @@ export default function BillingScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await refreshBillingData();
+      await refreshBillingData(true);
     } finally {
       setRefreshing(false);
     }
   }, [refreshBillingData]);
 
+  // Initial silent preload of all 3 demo personas on mount
   useEffect(() => {
-    setSelectedInvoice(null);
-    setFocusedAiInvoice(null);
-    setResetBannerText(null);
-    setSearchQuery('');
-    void refreshBillingData();
-  }, [activePreset.id, refreshBillingData]);
+    void refreshBillingData(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Synchronize persona slice from memory cache if activePreset changes externally
+  useEffect(() => {
+    const snap = getPreloadedBillingSnapshot(roleScope, activePreset.id);
+    setLiveInvoices(snap.invoices);
+    setCatalog(snap.catalog);
+    setBillablePatients(snap.billablePatients);
+    setAiSettings(snap.settings);
+    setConnection(snap.connection);
+    setAuditEvents(snap.auditEvents);
+    setNotifications(snap.notifications);
+  }, [activePreset.id, roleScope]);
 
   useEffect(() => {
     if (!selectedInvoice || !liveInvoices) return;
@@ -217,26 +273,26 @@ export default function BillingScreen() {
     let channel: any = null;
     try {
       channel = sbAny
-        .channel(`billing-kit-live-${activePreset.id}-${roleScope}`)
+        .channel(`billing-kit-live-session-${demoSessionId}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'billing_invoices' },
-          () => void refreshBillingData()
+          () => void refreshBillingData(true)
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'billing_transactions' },
-          () => void refreshBillingData()
+          () => void refreshBillingData(true)
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'billing_payment_attempts' },
-          () => void refreshBillingData()
+          () => void refreshBillingData(true)
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'billing_notifications' },
-          () => void refreshBillingData()
+          () => void refreshBillingData(true)
         )
         .subscribe();
     } catch {
@@ -250,7 +306,7 @@ export default function BillingScreen() {
         // Ignore cleanup errors
       }
     };
-  }, [activePreset.id, refreshBillingData, roleScope]);
+  }, [demoSessionId, refreshBillingData]);
 
   const roleInvoices = useMemo(() => {
     const source =
@@ -369,7 +425,7 @@ export default function BillingScreen() {
                     styles.demoAccountChip,
                     isSelected && styles.demoAccountChipActive,
                   ]}
-                  onPress={() => void switchDemoAccount(acct.key)}
+                  onPress={() => handleSelectDemoAccount(acct.key)}
                   disabled={isSwitchingAccount}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSelected }}
@@ -391,12 +447,12 @@ export default function BillingScreen() {
               style={styles.demoActionChip}
               onPress={() => setShowMaasModal(true)}
               accessibilityRole="button"
-              accessibilityLabel="Open MaaS and MCP API Interface"
+              accessibilityLabel="Open MCP Agent Interface"
               testID="demo-open-maas-mcp-btn"
             >
               <Cpu size={12} color="#FEF3C7" />
               <Text style={styles.demoActionChipText} numberOfLines={1}>
-                MaaS / MCP API
+                MCP Agent Interface
               </Text>
             </Pressable>
             <Pressable
@@ -420,7 +476,11 @@ export default function BillingScreen() {
             <Text style={styles.title} testID="billing-header-title">
               {isDoctorRole ? 'Provider Billing' : 'Customer Billing'}
             </Text>
-            <Text style={styles.subtitle} testID="billing-header-subtitle">
+            <Text
+              style={styles.subtitle}
+              numberOfLines={1}
+              testID="billing-header-subtitle"
+            >
               {isDoctorRole
                 ? `${activePreset.fullName} • Manage invoices, PayPal Sandbox & Billing AI`
                 : `${activePreset.fullName} • View statements, PayPal Sandbox & Billing AI`}

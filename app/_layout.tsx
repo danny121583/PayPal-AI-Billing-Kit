@@ -15,8 +15,8 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: '#F8F9FC' },
           }}
         >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="billing" />
+          <Stack.Screen name="index" options={{ title: 'PayPal AI Billing Kit' }} />
+          <Stack.Screen name="billing" options={{ title: 'PayPal AI Billing Kit' }} />
         </Stack>
       </StandaloneAuthProvider>
     </SafeAreaProvider>

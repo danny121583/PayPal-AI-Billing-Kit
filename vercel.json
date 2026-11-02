@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "framework": null,
-  "buildCommand": "npx expo export --platform web",
+  "installCommand": "echo 'Using prebuilt dist'",
+  "buildCommand": "echo 'Using prebuilt dist'",
   "outputDirectory": "dist",
   "rewrites": [
     {

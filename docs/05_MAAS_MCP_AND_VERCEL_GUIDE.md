@@ -1,14 +1,14 @@
-# PayPal AI Billing Kit — MaaS / MCP Architecture, Vercel Deployment & Independent AI Testing Guide
+# PayPal AI Billing Kit — MCP Agent Interface Architecture, Vercel Deployment & Independent AI Testing Guide
 
 ## 1. Public Production Endpoints
 
 | Resource | Public URL | Protocol / Format |
 | :--- | :--- | :--- |
 | **Interactive Web Demo (Vercel Hobby)** | `https://paypal-ai-billing-kit.vercel.app` | React Native Web / Expo Router SPA (No login required) |
-| **MCP JSON-RPC 2.0 Endpoint (Vercel Proxy)** | `https://paypal-ai-billing-kit.vercel.app/api/mcp` | Model Context Protocol (`2024-11-05`) JSON-RPC 2.0 + REST |
-| **MaaS REST Tool Endpoint (Vercel Proxy)** | `https://paypal-ai-billing-kit.vercel.app/api/maas` | Direct JSON REST (`GET` & `POST`) |
-| **OpenAPI 3.1.0 Specification** | `https://paypal-ai-billing-kit.vercel.app/api/openapi.json` | OpenAPI 3.1.0 JSON for ChatGPT Actions / Custom GPTs |
-| **Direct Supabase Edge Function** | `https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp` | Direct Edge Function (`verify_jwt: false`, public CORS `*`) |
+| **Dedicated Cloudflare Worker MCP Endpoint** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp` | Model Context Protocol (`2025-06-18` / `2026-07-28`) JSON-RPC 2.0 + REST |
+| **Web App MCP Endpoint (Vercel Proxy)** | `https://paypal-ai-billing-kit.vercel.app/api/mcp` | Model Context Protocol (`2025-06-18`) JSON-RPC 2.0 + REST |
+| **OpenAPI 3.1.0 Specification** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json` | OpenAPI 3.1.0 JSON for ChatGPT Actions / Custom GPTs |
+| **Interactive MCP Documentation** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/docs/mcp` | HTML & JSON Tool Catalog |
 
 ---
 
@@ -33,7 +33,7 @@
 
 ---
 
-## 3. MaaS / MCP Tool Catalog & Permission Tiers
+## 3. MCP Agent Interface Tool Catalog & Permission Tiers
 
 All 15 tools are exposed via both MCP JSON-RPC 2.0 (`tools/list`, `tools/call`) and REST (`POST /api/mcp` with `{"tool": "<name>", "arguments": {...}}`):
 

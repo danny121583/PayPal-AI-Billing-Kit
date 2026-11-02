@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * PayPal AI Billing Kit — Public Deployment & MaaS E2E Verification Suite
+ * PayPal AI Billing Kit — Public Deployment & MCP Agent Interface E2E Verification Suite
  *
- * Tests all 12 required verification workflows on Desktop & Mobile viewports:
+ * Tests all required verification workflows on Desktop & Mobile viewports:
  * 1. Direct entry to Billing dashboard without login/password prompt
  * 2. Instant account switching (Dr. Sarah Jenkins, Alex Rivera, Jordan Taylor)
  * 3. Creating & sending a $35.00 Forms Completion invoice as Provider
@@ -12,8 +12,8 @@
  * 7. Asking Billing AI to prepare a payment proposal and approving it
  * 8. Testing PayPal Sandbox checkout & Demo Settlement Simulation (verifying Sample Demo Record badge)
  * 9. Viewing notifications & full financial audit history (> 5 items, formatted labels)
- * 10. Opening the MaaS / MCP API modal and running a live MCP tool test
- * 11. Clicking Reset Demo and verifying session reset back to 6 canonical seed statements
+ * 10. Opening the MCP Agent Interface modal, verifying zero MaaS branding, and running a live MCP tool test
+ * 11. Clicking Reset Demo, verifying session reset back to 6 canonical seed statements, and executing 21 rapid consecutive account switches with 0 duplicate network calls or UI flicker
  * 12. Verifying zero console errors and zero page errors across the entire journey
  */
 
@@ -362,22 +362,34 @@ async function run() {
     await page.locator('[data-testid="billing-settings-done-btn"]').click();
     await page.waitForTimeout(400);
 
-    // Step 10: Open MaaS / MCP API modal and click "Test Live MCP Tool Call"
+    // Step 10: Open MCP Agent Interface modal, verify branding, and click "Test Live MCP Tool Call"
+    const mcpBtnText = await page.locator('[data-testid="demo-open-maas-mcp-btn"]').innerText();
     await page.locator('[data-testid="demo-open-maas-mcp-btn"]').click();
     await page.waitForSelector('[data-testid="billing-maas-mcp-modal"]', {
       timeout: 10000,
     });
+    const modalText = await page.locator('[data-testid="billing-maas-mcp-modal"]').innerText();
+    check(
+      'Step 10a: Header navigation pill and modal title use "MCP Agent Interface" with zero MaaS branding',
+      mcpBtnText.includes('MCP Agent Interface') &&
+        !mcpBtnText.includes('MaaS') &&
+        modalText.includes('MCP Agent Interface') &&
+        modalText.includes('Connect AI agents to billing tools through Model Context Protocol (MCP).') &&
+        !modalText.includes('MaaS') &&
+        !modalText.includes('Model-as-a-Service')
+    );
+
     await page.locator('[data-testid="billing-maas-mcp-test-btn"]').click();
     await page.waitForSelector('[data-testid="maas-live-test-result"]', {
       timeout: 15000,
     });
-    const maasOutput = await page
+    const mcpOutput = await page
       .locator('[data-testid="maas-live-test-result"]')
       .innerText();
     check(
-      'Step 10: MaaS / MCP API modal executes live MCP JSON-RPC `get_invoice_details` call',
-      maasOutput.includes('PPB-INV-2026-1003') &&
-        maasOutput.includes('ADMIN-OFFICE')
+      'Step 10b: MCP Agent Interface modal executes live MCP JSON-RPC `get_invoice_details` call',
+      mcpOutput.includes('PPB-INV-2026-1003') &&
+        mcpOutput.includes('ADMIN-OFFICE')
     );
 
     await page.screenshot({
@@ -392,17 +404,54 @@ async function run() {
     await page
       .locator('[data-testid="demo-account-chip-sarah_jenkins"]')
       .click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(500);
 
     // Step 11: Click Reset Demo and confirm session resets back to $275.00 / 6 canonical invoices
     await page.locator('[data-testid="demo-reset-session-btn"]').click();
     await page.waitForTimeout(2400);
     const afterResetText = await page.locator('body').innerText();
     check(
-      'Step 11: Reset Demo button restores canonical 6 statements ($275.00 Outstanding)',
+      'Step 11a: Reset Demo button restores canonical 6 statements ($275.00 Outstanding)',
       afterResetText.includes('$275.00') &&
         afterResetText.includes('PPB-INV-2026-1001') &&
         afterResetText.includes('PPB-INV-2026-1006')
+    );
+
+    // Step 11b: 21 rapid consecutive account switches (Provider -> Customer 1 -> Customer 2 x 7 cycles)
+    // Verify 0 duplicate Supabase REST/RPC network calls and 0 blank screens / flicker during rapid switching
+    const switchNetworkCalls = [];
+    const onReq = (req) => {
+      const u = req.url();
+      if (u.includes('supabase.co/rest/') || u.includes('supabase.co/auth/')) {
+        switchNetworkCalls.push(u);
+      }
+    };
+    page.on('request', onReq);
+
+    const switchTargets = [
+      { chip: 'demo-account-chip-alex_rivera', expectedAmount: '$225.00', expectedHeader: 'Customer Billing' },
+      { chip: 'demo-account-chip-jordan_taylor', expectedAmount: '$50.00', expectedHeader: 'Customer Billing' },
+      { chip: 'demo-account-chip-sarah_jenkins', expectedAmount: '$275.00', expectedHeader: 'Provider Billing' },
+    ];
+    let blankOrInconsistentFrames = 0;
+    for (let i = 0; i < 21; i++) {
+      const t = switchTargets[i % switchTargets.length];
+      await page.locator(`[data-testid="${t.chip}"]`).click();
+      const snapText = await page.locator('body').innerText();
+      if (
+        !snapText.includes(t.expectedAmount) ||
+        !snapText.includes(t.expectedHeader) ||
+        !snapText.includes('PPB-INV-2026-')
+      ) {
+        blankOrInconsistentFrames++;
+      }
+    }
+    page.off('request', onReq);
+
+    check(
+      'Step 11b: 21 rapid consecutive demo account switches complete synchronously from memory with 0 blank states and 0 Supabase network calls',
+      blankOrInconsistentFrames === 0 && switchNetworkCalls.length === 0,
+      `switches=21, blankFrames=${blankOrInconsistentFrames}, networkCalls=${switchNetworkCalls.length}`
     );
 
     // Mobile viewport screenshot check

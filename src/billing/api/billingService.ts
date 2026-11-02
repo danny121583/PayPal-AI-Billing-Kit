@@ -14,6 +14,18 @@ const sb = supabase as any;
 const DEMO_SESSION_STORAGE_KEY = '@ppb_demo_session_id_v1';
 let activeDemoSessionCache: string | null = null;
 
+export const DEMO_USER_IDS = {
+  sarah_jenkins: '11111111-1111-4111-8111-111111111101',
+  alex_rivera: '11111111-1111-4111-8111-111111111102',
+  jordan_taylor: '11111111-1111-4111-8111-111111111103',
+} as const;
+
+const ALL_DEMO_USER_IDS = [
+  DEMO_USER_IDS.sarah_jenkins,
+  DEMO_USER_IDS.alex_rivera,
+  DEMO_USER_IDS.jordan_taylor,
+];
+
 function readWebStorage(key: string): string | null {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -35,7 +47,7 @@ function writeWebStorage(key: string, value: string): void {
   }
 }
 
-export async function getOrCreateDemoSessionId(): Promise<string> {
+export function getOrCreateDemoSessionIdSync(): string {
   if (process.env.NODE_ENV === 'test') {
     return 'canonical';
   }
@@ -69,6 +81,10 @@ export async function getOrCreateDemoSessionId(): Promise<string> {
     }
     return activeDemoSessionCache;
   }
+}
+
+export async function getOrCreateDemoSessionId(): Promise<string> {
+  return getOrCreateDemoSessionIdSync();
 }
 
 export async function rotateDemoSessionId(): Promise<string> {
@@ -142,6 +158,19 @@ export interface BillingDashboardData {
   notifications: BillingNotificationItem[];
   isLiveStagingData: boolean;
 }
+
+export const DEFAULT_BILLABLE_PATIENTS: BillablePatientOption[] = [
+  {
+    patientId: DEMO_USER_IDS.alex_rivera,
+    fullName: 'Alex Rivera',
+    emailMasked: 'a***@demo.paypal-billing-kit.local',
+  },
+  {
+    patientId: DEMO_USER_IDS.jordan_taylor,
+    fullName: 'Jordan Taylor',
+    emailMasked: 'j***@demo.paypal-billing-kit.local',
+  },
+];
 
 export const DEFAULT_SERVICE_CATALOG: BillingServiceCatalogItem[] = [
   {
@@ -217,6 +246,99 @@ export function getDefaultBillingAISettings(userId = 'default'): BillingAISettin
   };
 }
 
+export function getDefaultPayPalConnection(
+  roleScope: BillingRoleScope
+): PayPalAccountConnectionSummary {
+  return {
+    connected: false,
+    environment: 'sandbox',
+    connectionType: roleScope === 'doctor' ? 'merchant' : 'payer',
+    paypalEmailMasked: null,
+    paypalPayerIdMasked: null,
+    connectedAt: null,
+    sandboxCredentialsConfigured: false,
+  };
+}
+
+interface PreloadedSessionCache {
+  sessionId: string | null;
+  loadedAt: number;
+  isLiveStagingData: boolean;
+  invoices: SyntheticBillingInvoice[];
+  catalog: BillingServiceCatalogItem[];
+  billablePatients: BillablePatientOption[];
+  auditEvents: BillingAuditEventItem[];
+  settingsByUserId: Record<string, BillingAISettingsRecord>;
+  connectionsByUserId: Record<string, PayPalAccountConnectionSummary>;
+  notificationsByUserId: Record<string, BillingNotificationItem[]>;
+}
+
+const preloadedCache: PreloadedSessionCache = {
+  sessionId: null,
+  loadedAt: 0,
+  isLiveStagingData: false,
+  invoices: getSyntheticInvoicesForRole('doctor'),
+  catalog: DEFAULT_SERVICE_CATALOG,
+  billablePatients: DEFAULT_BILLABLE_PATIENTS,
+  auditEvents: [],
+  settingsByUserId: {
+    [DEMO_USER_IDS.sarah_jenkins]: getDefaultBillingAISettings(DEMO_USER_IDS.sarah_jenkins),
+    [DEMO_USER_IDS.alex_rivera]: getDefaultBillingAISettings(DEMO_USER_IDS.alex_rivera),
+    [DEMO_USER_IDS.jordan_taylor]: getDefaultBillingAISettings(DEMO_USER_IDS.jordan_taylor),
+  },
+  connectionsByUserId: {
+    [DEMO_USER_IDS.sarah_jenkins]: getDefaultPayPalConnection('doctor'),
+    [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient'),
+    [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient'),
+  },
+  notificationsByUserId: {
+    [DEMO_USER_IDS.sarah_jenkins]: [],
+    [DEMO_USER_IDS.alex_rivera]: [],
+    [DEMO_USER_IDS.jordan_taylor]: [],
+  },
+};
+
+let inflightPreloadPromise: Promise<BillingDashboardData> | null = null;
+
+export function getPreloadedBillingSnapshot(
+  roleScope: BillingRoleScope,
+  targetUserId?: string
+): BillingDashboardData {
+  const userId =
+    targetUserId ||
+    (roleScope === 'doctor' ? DEMO_USER_IDS.sarah_jenkins : DEMO_USER_IDS.alex_rivera);
+
+  const allInvoices =
+    preloadedCache.invoices.length > 0
+      ? preloadedCache.invoices
+      : getSyntheticInvoicesForRole(roleScope);
+
+  return {
+    invoices: allInvoices,
+    catalog: preloadedCache.catalog,
+    billablePatients: preloadedCache.billablePatients,
+    settings:
+      preloadedCache.settingsByUserId[userId] || getDefaultBillingAISettings(userId),
+    connection:
+      preloadedCache.connectionsByUserId[userId] || getDefaultPayPalConnection(roleScope),
+    auditEvents: preloadedCache.auditEvents,
+    notifications: preloadedCache.notificationsByUserId[userId] || [],
+    isLiveStagingData: preloadedCache.isLiveStagingData,
+  };
+}
+
+export function getPreloadedPayPalConnection(
+  roleScope: BillingRoleScope,
+  targetUserId?: string
+): PayPalAccountConnectionSummary {
+  const userId =
+    targetUserId ||
+    (roleScope === 'doctor' ? DEMO_USER_IDS.sarah_jenkins : DEMO_USER_IDS.alex_rivera);
+  return (
+    preloadedCache.connectionsByUserId[userId] || getDefaultPayPalConnection(roleScope)
+  );
+}
+
 function mapDbSettingsRow(row: any, fallbackUserId: string): BillingAISettingsRecord {
   if (!row) return getDefaultBillingAISettings(fallbackUserId);
   return {
@@ -265,36 +387,18 @@ function mapDbInvoiceStatus(
 
 export async function fetchBillingDashboardData(
   roleScope: BillingRoleScope,
-  targetUserId?: string
+  targetUserId?: string,
+  options?: { forceRefresh?: boolean }
 ): Promise<BillingDashboardData> {
   const fallbackInvoices = getSyntheticInvoicesForRole(roleScope);
-  const defaultConnection: PayPalAccountConnectionSummary = {
-    connected: false,
-    environment: 'sandbox',
-    connectionType: roleScope === 'doctor' ? 'merchant' : 'payer',
-    paypalEmailMasked: null,
-    paypalPayerIdMasked: null,
-    connectedAt: null,
-    sandboxCredentialsConfigured: false,
-  };
+  const defaultConnection = getDefaultPayPalConnection(roleScope);
 
   try {
     if (process.env.NODE_ENV === 'test' || !sb?.from || !sb?.rpc) {
       return {
         invoices: fallbackInvoices,
         catalog: DEFAULT_SERVICE_CATALOG,
-        billablePatients: [
-          {
-            patientId: '11111111-1111-4111-8111-111111111102',
-            fullName: 'Alex Rivera',
-            emailMasked: 'a***@demo.paypal-billing-kit.local',
-          },
-          {
-            patientId: '11111111-1111-4111-8111-111111111103',
-            fullName: 'Jordan Taylor',
-            emailMasked: 'j***@demo.paypal-billing-kit.local',
-          },
-        ],
+        billablePatients: DEFAULT_BILLABLE_PATIENTS,
         settings: getDefaultBillingAISettings(),
         connection: defaultConnection,
         auditEvents: [],
@@ -305,342 +409,322 @@ export async function fetchBillingDashboardData(
 
     let userId: string | undefined = targetUserId;
     if (!userId) {
-      if (typeof supabase.auth.getSession === 'function') {
-        const { data: sessData } = await supabase.auth.getSession();
-        userId = sessData?.session?.user?.id;
-      } else if (typeof supabase.auth.getUser === 'function') {
-        const { data: authData } = await supabase.auth.getUser();
-        userId = authData?.user?.id;
-      }
-    }
-    if (!userId) {
       userId =
         roleScope === 'doctor'
-          ? '11111111-1111-4111-8111-111111111101'
-          : '11111111-1111-4111-8111-111111111102';
-    }
-
-    if (roleScope === 'doctor') {
-      try {
-        await sb.rpc('billing_ensure_org');
-      } catch {
-        // Best effort
-      }
-    }
-    try {
-      await sb.rpc('billing_refresh_overdue');
-    } catch {
-      // Best effort
+          ? DEMO_USER_IDS.sarah_jenkins
+          : DEMO_USER_IDS.alex_rivera;
     }
 
     const demoSessionId = await getOrCreateDemoSessionId();
-    const sessionScope =
-      demoSessionId === 'canonical' ? ['canonical'] : ['canonical', demoSessionId];
 
-    const [
-      invRes,
-      itemsRes,
-      attemptsRes,
-      txRes,
-      orgsRes,
-      catalogRes,
-      settingsRes,
-      connRes,
-      auditRes,
-      patientsRes,
-      notifRes,
-      overridesRes,
-    ] = await Promise.all([
-      sb
-        .from('billing_invoices')
-        .select('*')
-        .in('demo_session_id', sessionScope)
-        .order('created_at', { ascending: false })
-        .limit(100),
-      sb.from('billing_invoice_items').select('*').order('position', { ascending: true }),
-      sb.from('billing_payment_attempts').select('*').order('created_at', { ascending: false }),
-      sb.from('billing_transactions').select('*').order('captured_at', { ascending: false }),
-      sb.from('billing_organizations').select('id, name, owner_user_id'),
-      sb.from('billing_service_catalog').select('*').eq('active', true).order('code', { ascending: true }),
-      sb.rpc('billing_effective_ai_settings', { p_user: userId }),
-      sb
-        .from('billing_account_connections')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('connection_type', roleScope === 'doctor' ? 'merchant' : 'payer')
-        .maybeSingle(),
-      sb
-        .from('billing_audit_events')
-        .select('id, event_type, actor_kind, created_at, details')
-        .in('demo_session_id', sessionScope)
-        .order('created_at', { ascending: false })
-        .limit(100),
-      roleScope === 'doctor'
-        ? sb.rpc('billing_list_billable_patients')
-        : Promise.resolve({ data: [] }),
-      sb
-        .from('billing_notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .in('demo_session_id', sessionScope)
-        .order('created_at', { ascending: false })
-        .limit(25),
-      demoSessionId !== 'canonical'
-        ? sb
-            .from('billing_demo_session_overrides')
-            .select('*')
-            .eq('demo_session_id', demoSessionId)
-        : Promise.resolve({ data: [] }),
-    ]);
-
-    const rawDbInvoices: any[] = Array.isArray(invRes?.data) ? invRes.data : [];
-    const dbOverrides: any[] = Array.isArray(overridesRes?.data) ? overridesRes.data : [];
-    const overrideMap = new Map<string, any>();
-    for (const ov of dbOverrides) {
-      if (ov?.invoice_id) {
-        overrideMap.set(String(ov.invoice_id), ov);
-      }
+    // Serve immediately from preloaded memory cache when switching demo personas
+    if (
+      !options?.forceRefresh &&
+      preloadedCache.sessionId === demoSessionId &&
+      preloadedCache.loadedAt > 0
+    ) {
+      return getPreloadedBillingSnapshot(roleScope, userId);
     }
 
-    const dbInvoices: any[] = rawDbInvoices.map((raw) => {
-      const ov = overrideMap.get(String(raw.id));
-      if (!ov) return raw;
-      return {
-        ...raw,
-        status: ov.status ?? raw.status,
-        amount_paid_minor: ov.amount_paid_minor ?? raw.amount_paid_minor,
-        amount_refunded_minor: ov.amount_refunded_minor ?? raw.amount_refunded_minor,
-        balance_due_minor: ov.balance_due_minor ?? raw.balance_due_minor,
-        paid_at: ov.paid_at ?? raw.paid_at,
-        voided_at: ov.voided_at ?? raw.voided_at,
-        refunded_at: ov.refunded_at ?? raw.refunded_at,
-        _session_override: ov,
-      };
-    });
-    const dbItems: any[] = Array.isArray(itemsRes?.data) ? itemsRes.data : [];
-    const dbAttempts: any[] = Array.isArray(attemptsRes?.data) ? attemptsRes.data : [];
-    const dbTx: any[] = Array.isArray(txRes?.data) ? txRes.data : [];
-    const dbOrgs: any[] = Array.isArray(orgsRes?.data) ? orgsRes.data : [];
+    if (inflightPreloadPromise && !options?.forceRefresh) {
+      await inflightPreloadPromise;
+      return getPreloadedBillingSnapshot(roleScope, userId);
+    }
 
-    const counterpartyIds = Array.from(
-      new Set(
-        dbInvoices
-          .flatMap((i) => [i.issuer_user_id, i.recipient_user_id])
-          .filter(Boolean)
-      )
-    );
-    const nameMap = new Map<string, string>([
-      ['11111111-1111-4111-8111-111111111101', 'Dr. Sarah Jenkins'],
-      ['11111111-1111-4111-8111-111111111102', 'Alex Rivera'],
-      ['11111111-1111-4111-8111-111111111103', 'Jordan Taylor'],
-      ['11111111-1111-4111-8111-111111111104', 'Marcus Vance'],
-    ]);
-    if (counterpartyIds.length > 0) {
-      let namesData: any[] = [];
-      try {
-        const res = await sb.rpc('billing_counterparty_names', { p_ids: counterpartyIds });
-        namesData = Array.isArray(res?.data) ? res.data : [];
-      } catch {
-        namesData = [];
-      }
-      for (const n of namesData) {
-        if (n?.user_id && n?.full_name) {
-          nameMap.set(String(n.user_id), String(n.full_name));
+    const loadTask = (async (): Promise<BillingDashboardData> => {
+      const sessionScope =
+        demoSessionId === 'canonical' ? ['canonical'] : ['canonical', demoSessionId];
+
+      const [
+        invRes,
+        itemsRes,
+        attemptsRes,
+        txRes,
+        orgsRes,
+        catalogRes,
+        settingsRes,
+        connRes,
+        auditRes,
+        patientsRes,
+        notifRes,
+        overridesRes,
+      ] = await Promise.all([
+        sb
+          .from('billing_invoices')
+          .select('*')
+          .in('demo_session_id', sessionScope)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        sb.from('billing_invoice_items').select('*').order('position', { ascending: true }),
+        sb.from('billing_payment_attempts').select('*').order('created_at', { ascending: false }),
+        sb.from('billing_transactions').select('*').order('captured_at', { ascending: false }),
+        sb.from('billing_organizations').select('id, name, owner_user_id'),
+        sb
+          .from('billing_service_catalog')
+          .select('*')
+          .eq('active', true)
+          .order('code', { ascending: true }),
+        sb.rpc('billing_effective_ai_settings', { p_user: userId }),
+        sb
+          .from('billing_account_connections')
+          .select('*')
+          .in('user_id', ALL_DEMO_USER_IDS),
+        sb
+          .from('billing_audit_events')
+          .select('id, event_type, actor_kind, created_at, details')
+          .in('demo_session_id', sessionScope)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        sb.rpc('billing_list_billable_patients'),
+        sb
+          .from('billing_notifications')
+          .select('*')
+          .in('user_id', ALL_DEMO_USER_IDS)
+          .in('demo_session_id', sessionScope)
+          .order('created_at', { ascending: false })
+          .limit(60),
+        demoSessionId !== 'canonical'
+          ? sb
+              .from('billing_demo_session_overrides')
+              .select('*')
+              .eq('demo_session_id', demoSessionId)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const rawDbInvoices: any[] = Array.isArray(invRes?.data) ? invRes.data : [];
+      const dbOverrides: any[] = Array.isArray(overridesRes?.data) ? overridesRes.data : [];
+      const overrideMap = new Map<string, any>();
+      for (const ov of dbOverrides) {
+        if (ov?.invoice_id) {
+          overrideMap.set(String(ov.invoice_id), ov);
         }
       }
-    }
 
-    const orgNameMap = new Map<string, string>();
-    for (const o of dbOrgs) {
-      if (o?.id && o?.name) orgNameMap.set(String(o.id), String(o.name));
-    }
+      const dbInvoices: any[] = rawDbInvoices.map((raw) => {
+        const ov = overrideMap.get(String(raw.id));
+        if (!ov) return raw;
+        return {
+          ...raw,
+          status: ov.status ?? raw.status,
+          amount_paid_minor: ov.amount_paid_minor ?? raw.amount_paid_minor,
+          amount_refunded_minor: ov.amount_refunded_minor ?? raw.amount_refunded_minor,
+          balance_due_minor: ov.balance_due_minor ?? raw.balance_due_minor,
+          paid_at: ov.paid_at ?? raw.paid_at,
+          voided_at: ov.voided_at ?? raw.voided_at,
+          refunded_at: ov.refunded_at ?? raw.refunded_at,
+          _session_override: ov,
+        };
+      });
+      const dbItems: any[] = Array.isArray(itemsRes?.data) ? itemsRes.data : [];
+      const dbAttempts: any[] = Array.isArray(attemptsRes?.data) ? attemptsRes.data : [];
+      const dbTx: any[] = Array.isArray(txRes?.data) ? txRes.data : [];
+      const dbOrgs: any[] = Array.isArray(orgsRes?.data) ? dbOrgsFromRes(orgsRes.data) : [];
 
-    const mappedDbInvoices: SyntheticBillingInvoice[] = dbInvoices.map((inv) => {
-      const invItems: SyntheticInvoiceLineItem[] = dbItems
-        .filter((it) => it.invoice_id === inv.id)
-        .map((it) => ({
-          id: String(it.id),
-          serviceCode: String(it.service_code),
-          description: String(it.description),
-          quantity: Number(it.quantity || 1),
-          unitAmountCents: Number(it.unit_amount_minor || 0),
-          lineTotalCents: Number(
-            it.line_total_minor ?? Number(it.quantity || 1) * Number(it.unit_amount_minor || 0)
-          ),
-        }));
+      const nameMap = new Map<string, string>([
+        [DEMO_USER_IDS.sarah_jenkins, 'Dr. Sarah Jenkins'],
+        [DEMO_USER_IDS.alex_rivera, 'Alex Rivera'],
+        [DEMO_USER_IDS.jordan_taylor, 'Jordan Taylor'],
+        ['11111111-1111-4111-8111-111111111104', 'Marcus Vance'],
+      ]);
 
-      const matchingTx = dbTx.find((t) => t.invoice_id === inv.id);
-      const isSampleSeedSettlement = matchingTx?.verified_via === 'seed_demo';
-      const isPayPalVerifiedSettlement =
-        matchingTx &&
-        (matchingTx.verified_via === 'capture_api' ||
-          matchingTx.verified_via === 'order_lookup' ||
-          matchingTx.verified_via === 'webhook');
+      const orgNameMap = new Map<string, string>();
+      for (const o of dbOrgs) {
+        if (o?.id && o?.name) orgNameMap.set(String(o.id), String(o.name));
+      }
 
-      const invAttempts: SyntheticPaymentAttempt[] = dbAttempts
-        .filter((at) => at.invoice_id === inv.id)
-        .map((at) => {
-          const isFailed =
-            at.status === 'failed' || at.status === 'cancelled' || at.status === 'expired';
-          const isCompleted = at.status === 'completed';
-          return {
-            id: String(at.id),
-            attemptedAt: String(at.created_at),
-            amountCents: Number(at.amount_minor || 0),
-            currencyCode: 'USD' as const,
-            status: isFailed
-              ? 'failed_demo'
-              : isCompleted
-                ? 'simulated_paid_demo'
-                : 'pending_demo',
-            statusLabel: isFailed
-              ? 'Unsuccessful PayPal Attempt'
-              : isCompleted
-                ? isSampleSeedSettlement
-                  ? 'Sample Demo Settlement (Seeded)'
-                  : 'Verified PayPal Sandbox Capture'
-                : 'PayPal Checkout Initiated',
-            failureReason: at.failure_message ? String(at.failure_message) : undefined,
-            demoReferenceCode: String(at.paypal_order_id || at.request_id || at.id),
-          };
-        });
+      const mappedDbInvoices: SyntheticBillingInvoice[] = dbInvoices.map((inv) => {
+        const invItems: SyntheticInvoiceLineItem[] = dbItems
+          .filter((it) => it.invoice_id === inv.id)
+          .map((it) => ({
+            id: String(it.id),
+            serviceCode: String(it.service_code),
+            description: String(it.description),
+            quantity: Number(it.quantity || 1),
+            unitAmountCents: Number(it.unit_amount_minor || 0),
+            lineTotalCents: Number(
+              it.line_total_minor ?? Number(it.quantity || 1) * Number(it.unit_amount_minor || 0)
+            ),
+          }));
 
-      const hasFailedAttempt = invAttempts.some((a) => a.status === 'failed_demo');
-      const dueDateStr = String(inv.due_date || new Date().toISOString().slice(0, 10));
-      const mappedStatus = mapDbInvoiceStatus(inv.status, dueDateStr, hasFailedAttempt);
+        const matchingTx = dbTx.find((t) => t.invoice_id === inv.id);
+        const isSampleSeedSettlement = matchingTx?.verified_via === 'seed_demo';
+        const isPayPalVerifiedSettlement =
+          matchingTx &&
+          (matchingTx.verified_via === 'capture_api' ||
+            matchingTx.verified_via === 'order_lookup' ||
+            matchingTx.verified_via === 'webhook');
 
-      const primarySummary =
-        invItems[0]?.description || 'Administrative Service Statement';
+        const invAttempts: SyntheticPaymentAttempt[] = dbAttempts
+          .filter((at) => at.invoice_id === inv.id)
+          .map((at) => {
+            const isFailed =
+              at.status === 'failed' || at.status === 'cancelled' || at.status === 'expired';
+            const isCompleted = at.status === 'completed';
+            return {
+              id: String(at.id),
+              attemptedAt: String(at.created_at),
+              amountCents: Number(at.amount_minor || 0),
+              currencyCode: 'USD' as const,
+              status: isFailed
+                ? 'failed_demo'
+                : isCompleted
+                  ? 'simulated_paid_demo'
+                  : 'pending_demo',
+              statusLabel: isFailed
+                ? 'Unsuccessful PayPal Attempt'
+                : isCompleted
+                  ? isSampleSeedSettlement
+                    ? 'Sample Demo Settlement (Seeded)'
+                    : 'Verified PayPal Sandbox Capture'
+                  : 'PayPal Checkout Initiated',
+              failureReason: at.failure_message ? String(at.failure_message) : undefined,
+              demoReferenceCode: String(at.paypal_order_id || at.request_id || at.id),
+            };
+          });
 
-      const computedBalanceDueCents =
-        mappedStatus === 'void' || mappedStatus === 'refunded'
-          ? 0
-          : Number(
-              inv.balance_due_minor ??
-                Math.max(Number(inv.total_minor || 0) - Number(inv.amount_paid_minor || 0), 0)
-            );
+        const hasFailedAttempt = invAttempts.some((a) => a.status === 'failed_demo');
+        const dueDateStr = String(inv.due_date || new Date().toISOString().slice(0, 10));
+        const mappedStatus = mapDbInvoiceStatus(inv.status, dueDateStr, hasFailedAttempt);
 
-      return {
-        id: String(inv.id),
-        invoiceNumber: String(inv.invoice_number),
-        organizationId: String(inv.organization_id),
-        organizationName:
-          orgNameMap.get(String(inv.organization_id)) ||
-          'Jenkins Wellness & Telehealth Practice',
-        issuerDoctorName:
-          nameMap.get(String(inv.issuer_user_id)) || 'Dr. Sarah Jenkins',
-        patientDisplayName:
-          nameMap.get(String(inv.recipient_user_id)) || 'Authorized Customer',
-        allowedRoleScopes: ['doctor', 'patient'],
-        authorizedDoctorScope: 'org_primary_demo',
-        authorizedPatientScope: 'patient_primary_demo',
-        status: mappedStatus,
-        currencyCode: 'USD',
-        subtotalCents: Number(inv.subtotal_minor || 0),
-        taxCents: Number(inv.tax_minor || 0),
-        totalCents: Number(inv.total_minor || 0),
-        amountPaidCents: Number(inv.amount_paid_minor || 0),
-        amountRefundedCents: Number(inv.amount_refunded_minor || 0),
-        balanceDueCents: computedBalanceDueCents,
-        issuedAt: String(inv.sent_at || inv.created_at),
-        dueDate: `${dueDateStr}T23:59:59Z`,
-        paidAt: inv.paid_at ? String(inv.paid_at) : undefined,
-        refundedAt: inv.refunded_at ? String(inv.refunded_at) : undefined,
-        receiptNumber: matchingTx?.paypal_capture_id
-          ? isSampleSeedSettlement
-            ? String(matchingTx.paypal_capture_id)
-            : `PP-CAP-${matchingTx.paypal_capture_id}`
-          : undefined,
-        settlementVerificationStatus: isPayPalVerifiedSettlement
-          ? 'paypal_verified'
-          : isSampleSeedSettlement
-            ? 'sample_demo'
-            : 'unpaid',
-        administrativeSummary: primarySummary,
-        statementMemoSafe:
-          'Administrative billing statement stored in dedicated Supabase project with Row-Level Security.',
-        isSyntheticDemoRecord: true,
-        verificationNotice: isPayPalVerifiedSettlement
-          ? `Verified PayPal Sandbox Capture (${matchingTx.paypal_capture_id})`
-          : isSampleSeedSettlement
-            ? `Fictional Sample Record — Seeded demo settlement (${matchingTx.paypal_capture_id}), not a live PayPal Sandbox capture.`
-            : mappedStatus === 'void'
-              ? 'Voided Statement — Archived with $0.00 remaining balance.'
-              : mappedStatus === 'refunded'
-                ? 'Refunded Statement — Refund completed with $0.00 remaining balance.'
-                : 'PayPal Sandbox Statement — Administrative billing fields only.',
-        lineItems: invItems,
-        paymentAttempts: invAttempts,
+        const primarySummary =
+          invItems[0]?.description || 'Administrative Service Statement';
+
+        const computedBalanceDueCents =
+          mappedStatus === 'void' || mappedStatus === 'refunded'
+            ? 0
+            : Number(
+                inv.balance_due_minor ??
+                  Math.max(Number(inv.total_minor || 0) - Number(inv.amount_paid_minor || 0), 0)
+              );
+
+        return {
+          id: String(inv.id),
+          invoiceNumber: String(inv.invoice_number),
+          organizationId: String(inv.organization_id),
+          organizationName:
+            orgNameMap.get(String(inv.organization_id)) ||
+            'Jenkins Wellness & Telehealth Practice',
+          issuerDoctorName:
+            nameMap.get(String(inv.issuer_user_id)) || 'Dr. Sarah Jenkins',
+          patientDisplayName:
+            nameMap.get(String(inv.recipient_user_id)) || 'Authorized Customer',
+          allowedRoleScopes: ['doctor', 'patient'],
+          authorizedDoctorScope: 'org_primary_demo',
+          authorizedPatientScope: 'patient_primary_demo',
+          status: mappedStatus,
+          currencyCode: 'USD',
+          subtotalCents: Number(inv.subtotal_minor || 0),
+          taxCents: Number(inv.tax_minor || 0),
+          totalCents: Number(inv.total_minor || 0),
+          amountPaidCents: Number(inv.amount_paid_minor || 0),
+          amountRefundedCents: Number(inv.amount_refunded_minor || 0),
+          balanceDueCents: computedBalanceDueCents,
+          issuedAt: String(inv.sent_at || inv.created_at),
+          dueDate: `${dueDateStr}T23:59:59Z`,
+          paidAt: inv.paid_at ? String(inv.paid_at) : undefined,
+          refundedAt: inv.refunded_at ? String(inv.refunded_at) : undefined,
+          receiptNumber: matchingTx?.paypal_capture_id
+            ? isSampleSeedSettlement
+              ? String(matchingTx.paypal_capture_id)
+              : `PP-CAP-${matchingTx.paypal_capture_id}`
+            : undefined,
+          settlementVerificationStatus: isPayPalVerifiedSettlement
+            ? 'paypal_verified'
+            : isSampleSeedSettlement
+              ? 'sample_demo'
+              : 'unpaid',
+          administrativeSummary: primarySummary,
+          statementMemoSafe:
+            'Administrative billing statement stored in dedicated Supabase project with Row-Level Security.',
+          isSyntheticDemoRecord: true,
+          verificationNotice: isPayPalVerifiedSettlement
+            ? `Verified PayPal Sandbox Capture (${matchingTx.paypal_capture_id})`
+            : isSampleSeedSettlement
+              ? `Fictional Sample Record — Seeded demo settlement (${matchingTx.paypal_capture_id}), not a live PayPal Sandbox capture.`
+              : mappedStatus === 'void'
+                ? 'Voided Statement — Archived with $0.00 remaining balance.'
+                : mappedStatus === 'refunded'
+                  ? 'Refunded Statement — Refund completed with $0.00 remaining balance.'
+                  : 'PayPal Sandbox Statement — Administrative billing fields only.',
+          lineItems: invItems,
+          paymentAttempts: invAttempts,
+        };
+      });
+
+      const catalog: BillingServiceCatalogItem[] =
+        Array.isArray(catalogRes?.data) && catalogRes.data.length > 0
+          ? catalogRes.data.map((c: any) => ({
+              code: String(c.code),
+              title: String(c.title || c.description || c.code),
+              description: String(c.description),
+              defaultAmountMinor: Number(c.default_amount_minor || 5000),
+              currency: 'USD' as const,
+            }))
+          : DEFAULT_SERVICE_CATALOG;
+
+      const billablePatients: BillablePatientOption[] =
+        Array.isArray(patientsRes?.data) && patientsRes.data.length > 0
+          ? patientsRes.data.map((p: any) => ({
+              patientId: String(p.patient_id),
+              fullName: String(p.full_name || 'Authorized Customer'),
+              emailMasked: p.email_masked ? String(p.email_masked) : null,
+            }))
+          : DEFAULT_BILLABLE_PATIENTS;
+
+      const auditEvents: BillingAuditEventItem[] = Array.isArray(auditRes?.data)
+        ? auditRes.data.map((a: any) => ({
+            id: Number(a.id),
+            eventType: String(a.event_type),
+            actorKind: (a.actor_kind || 'system') as BillingAuditEventItem['actorKind'],
+            createdAt: String(a.created_at),
+            details: a.details && typeof a.details === 'object' ? a.details : {},
+          }))
+        : [];
+
+      // Populate multi-persona connection cache
+      const nextConnectionsByUser: Record<string, PayPalAccountConnectionSummary> = {
+        [DEMO_USER_IDS.sarah_jenkins]: getDefaultPayPalConnection('doctor'),
+        [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient'),
+        [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient'),
       };
-    });
-
-    const catalog: BillingServiceCatalogItem[] =
-      Array.isArray(catalogRes?.data) && catalogRes.data.length > 0
-        ? catalogRes.data.map((c: any) => ({
-            code: String(c.code),
-            title: String(c.title || c.description || c.code),
-            description: String(c.description),
-            defaultAmountMinor: Number(c.default_amount_minor || 5000),
-            currency: 'USD' as const,
-          }))
-        : DEFAULT_SERVICE_CATALOG;
-
-    const billablePatients: BillablePatientOption[] =
-      Array.isArray(patientsRes?.data) && patientsRes.data.length > 0
-        ? patientsRes.data.map((p: any) => ({
-            patientId: String(p.patient_id),
-            fullName: String(p.full_name || 'Authorized Customer'),
-            emailMasked: p.email_masked ? String(p.email_masked) : null,
-          }))
-        : [
-            {
-              patientId: '11111111-1111-4111-8111-111111111102',
-              fullName: 'Alex Rivera',
-              emailMasked: 'a***@demo.paypal-billing-kit.local',
-            },
-            {
-              patientId: '11111111-1111-4111-8111-111111111103',
-              fullName: 'Jordan Taylor',
-              emailMasked: 'j***@demo.paypal-billing-kit.local',
-            },
-          ];
-
-    const connRow = connRes?.data;
-    const connection: PayPalAccountConnectionSummary = connRow
-      ? {
+      const connRows: any[] = Array.isArray(connRes?.data) ? connRes.data : [];
+      for (const row of connRows) {
+        const rowUid = String(row?.user_id || '');
+        if (!rowUid) continue;
+        const isDoc = rowUid === DEMO_USER_IDS.sarah_jenkins;
+        nextConnectionsByUser[rowUid] = {
           connected:
-            connRow.connection_status === 'connected' || connRow.status === 'connected',
-          environment: (connRow.paypal_env || connRow.environment || 'sandbox') as
+            row.connection_status === 'connected' || row.status === 'connected',
+          environment: (row.paypal_env || row.environment || 'sandbox') as
             | 'sandbox'
             | 'live',
-          connectionType: (roleScope === 'doctor' ? 'merchant' : 'payer') as
-            | 'merchant'
-            | 'payer',
-          paypalEmailMasked: connRow.paypal_email_masked
-            ? String(connRow.paypal_email_masked)
+          connectionType: isDoc ? 'merchant' : 'payer',
+          paypalEmailMasked: row.paypal_email_masked
+            ? String(row.paypal_email_masked)
             : null,
-          paypalPayerIdMasked: connRow.paypal_payer_id
-            ? String(connRow.paypal_payer_id)
+          paypalPayerIdMasked: row.paypal_payer_id
+            ? String(row.paypal_payer_id)
             : null,
-          connectedAt: connRow.connected_at ? String(connRow.connected_at) : null,
+          connectedAt: row.connected_at ? String(row.connected_at) : null,
           sandboxCredentialsConfigured: false,
+        };
+      }
+
+      // Populate multi-persona notification cache
+      const nextNotificationsByUser: Record<string, BillingNotificationItem[]> = {
+        [DEMO_USER_IDS.sarah_jenkins]: [],
+        [DEMO_USER_IDS.alex_rivera]: [],
+        [DEMO_USER_IDS.jordan_taylor]: [],
+      };
+      const notifRows: any[] = Array.isArray(notifRes?.data) ? notifRes.data : [];
+      for (const n of notifRows) {
+        const recUid = String(n.user_id || DEMO_USER_IDS.sarah_jenkins);
+        if (!nextNotificationsByUser[recUid]) {
+          nextNotificationsByUser[recUid] = [];
         }
-      : defaultConnection;
-
-    const auditEvents: BillingAuditEventItem[] = Array.isArray(auditRes?.data)
-      ? auditRes.data.map((a: any) => ({
-          id: Number(a.id),
-          eventType: String(a.event_type),
-          actorKind: (a.actor_kind || 'system') as BillingAuditEventItem['actorKind'],
-          createdAt: String(a.created_at),
-          details: a.details && typeof a.details === 'object' ? a.details : {},
-        }))
-      : [];
-
-    const notifications: BillingNotificationItem[] = Array.isArray(notifRes?.data)
-      ? notifRes.data.map((n: any) => ({
+        nextNotificationsByUser[recUid].push({
           id: String(n.id),
-          recipientUserId: String(n.user_id || userId),
+          recipientUserId: recUid,
           invoiceId: n.metadata?.invoiceId
             ? String(n.metadata.invoiceId)
             : n.invoice_id
@@ -652,35 +736,63 @@ export async function fetchBillingDashboardData(
           deepLink: String(n.metadata?.route || n.deep_link || '/billing'),
           isRead: Boolean(n.read ?? n.is_read),
           createdAt: String(n.created_at || new Date().toISOString()),
-        }))
-      : [];
+        });
+      }
 
-    return {
-      invoices: mappedDbInvoices.length > 0 ? mappedDbInvoices : fallbackInvoices,
-      catalog,
-      billablePatients,
-      settings: mapDbSettingsRow(settingsRes?.data, userId),
-      connection,
-      auditEvents,
-      notifications,
-      isLiveStagingData: mappedDbInvoices.length > 0,
-    };
+      const mappedSettings = mapDbSettingsRow(settingsRes?.data, userId!);
+      preloadedCache.sessionId = demoSessionId;
+      preloadedCache.loadedAt = Date.now();
+      preloadedCache.isLiveStagingData = mappedDbInvoices.length > 0;
+      preloadedCache.invoices =
+        mappedDbInvoices.length > 0 ? mappedDbInvoices : fallbackInvoices;
+      preloadedCache.catalog = catalog;
+      preloadedCache.billablePatients = billablePatients;
+      preloadedCache.auditEvents = auditEvents;
+      preloadedCache.settingsByUserId = {
+        ...preloadedCache.settingsByUserId,
+        [DEMO_USER_IDS.sarah_jenkins]: mapDbSettingsRow(
+          settingsRes?.data,
+          DEMO_USER_IDS.sarah_jenkins
+        ),
+        [DEMO_USER_IDS.alex_rivera]: mapDbSettingsRow(
+          settingsRes?.data,
+          DEMO_USER_IDS.alex_rivera
+        ),
+        [DEMO_USER_IDS.jordan_taylor]: mapDbSettingsRow(
+          settingsRes?.data,
+          DEMO_USER_IDS.jordan_taylor
+        ),
+        [userId!]: mappedSettings,
+      };
+      preloadedCache.connectionsByUserId = nextConnectionsByUser;
+      preloadedCache.notificationsByUserId = nextNotificationsByUser;
+
+      return getPreloadedBillingSnapshot(roleScope, userId);
+    })();
+
+    inflightPreloadPromise = loadTask;
+    try {
+      return await loadTask;
+    } finally {
+      inflightPreloadPromise = null;
+    }
   } catch (err) {
     console.error('fetchBillingDashboardData error:', err);
-    return {
-      invoices: fallbackInvoices,
-      catalog: DEFAULT_SERVICE_CATALOG,
-      billablePatients: [],
-      settings: getDefaultBillingAISettings(),
-      connection: defaultConnection,
-      auditEvents: [],
-      notifications: [],
-      isLiveStagingData: false,
-    };
+    return getPreloadedBillingSnapshot(roleScope, targetUserId);
   }
 }
 
+function dbOrgsFromRes(data: any[]): any[] {
+  return Array.isArray(data) ? data : [];
+}
+
 export async function markBillingNotificationRead(notificationId: string): Promise<void> {
+  // Immediately update preloaded memory cache
+  for (const uid of Object.keys(preloadedCache.notificationsByUserId)) {
+    preloadedCache.notificationsByUserId[uid] = (
+      preloadedCache.notificationsByUserId[uid] || []
+    ).map((n) => (n.id === notificationId ? { ...n, isRead: true } : n));
+  }
   if (!notificationId || !sb?.from) return;
   try {
     await sb
@@ -725,6 +837,8 @@ export async function createBillingInvoice(params: {
     throw new Error(error?.message || 'Could not create invoice.');
   }
 
+  preloadedCache.loadedAt = 0;
+
   return {
     id: String(data.id),
     invoiceNumber: String(data.invoice_number),
@@ -739,6 +853,7 @@ export async function sendDraftBillingInvoice(invoiceId: string): Promise<void> 
   if (error) {
     throw new Error(error.message || 'Could not send invoice.');
   }
+  preloadedCache.loadedAt = 0;
 }
 
 export async function voidBillingInvoice(invoiceId: string): Promise<void> {
@@ -750,6 +865,19 @@ export async function voidBillingInvoice(invoiceId: string): Promise<void> {
   if (error) {
     throw new Error(error.message || 'Could not void invoice.');
   }
+  // Optimistically update preloaded cache immediately
+  preloadedCache.invoices = preloadedCache.invoices.map((inv) =>
+    inv.id === invoiceId
+      ? {
+          ...inv,
+          status: 'void',
+          balanceDueCents: 0,
+          verificationNotice:
+            'Voided Statement — Archived with $0.00 remaining balance.',
+        }
+      : inv
+  );
+  preloadedCache.loadedAt = 0;
 }
 
 export async function sendBillingPaymentReminder(invoiceId: string): Promise<void> {
@@ -761,6 +889,7 @@ export async function sendBillingPaymentReminder(invoiceId: string): Promise<voi
   if (error) {
     throw new Error(error.message || 'Could not send payment reminder.');
   }
+  preloadedCache.loadedAt = 0;
 }
 
 export async function simulateBillingDemoSettlement(invoiceId: string): Promise<{
@@ -775,8 +904,27 @@ export async function simulateBillingDemoSettlement(invoiceId: string): Promise<
   if (error || !data) {
     throw new Error(error?.message || 'Could not simulate demo settlement.');
   }
+  const captureId = String(
+    data.paypal_capture_id || data.capture_id || 'SAMPLE-DEMO-SETTLEMENT'
+  );
+  // Optimistically update preloaded cache
+  preloadedCache.invoices = preloadedCache.invoices.map((inv) =>
+    inv.id === invoiceId
+      ? {
+          ...inv,
+          status: 'paid',
+          amountPaidCents: inv.totalCents,
+          balanceDueCents: 0,
+          paidAt: new Date().toISOString(),
+          receiptNumber: captureId,
+          settlementVerificationStatus: 'sample_demo',
+          verificationNotice: `Fictional Sample Record — Seeded demo settlement (${captureId}), not a live PayPal Sandbox capture.`,
+        }
+      : inv
+  );
+  preloadedCache.loadedAt = 0;
   return {
-    captureId: String(data.capture_id || 'SAMPLE-DEMO-SETTLEMENT'),
+    captureId,
     invoiceNumber: String(data.invoice_number || ''),
   };
 }
@@ -797,8 +945,21 @@ export async function simulateBillingDemoRefund(
   if (error || !data) {
     throw new Error(error?.message || 'Could not process demo refund.');
   }
+  const refundId = String(data.paypal_refund_id || data.refund_id || 'DEMO-REFUND');
+  preloadedCache.invoices = preloadedCache.invoices.map((inv) =>
+    inv.id === invoiceId
+      ? {
+          ...inv,
+          status: 'refunded',
+          amountRefundedCents: amountMinor ?? inv.amountPaidCents,
+          balanceDueCents: 0,
+          refundedAt: new Date().toISOString(),
+        }
+      : inv
+  );
+  preloadedCache.loadedAt = 0;
   return {
-    refundId: String(data.refund_id || 'DEMO-REFUND'),
+    refundId,
     invoiceNumber: String(data.invoice_number || ''),
   };
 }
@@ -811,6 +972,8 @@ export async function resetBillingDemoSession(): Promise<void> {
   if (error) {
     throw new Error(error.message || 'Could not reset demo session.');
   }
+  preloadedCache.invoices = getSyntheticInvoicesForRole('doctor');
+  preloadedCache.loadedAt = 0;
 }
 
 export async function updateBillingAISettings(
@@ -875,7 +1038,9 @@ export async function updateBillingAISettings(
     throw new Error(error?.message || 'Failed to update Billing AI settings.');
   }
 
-  return mapDbSettingsRow(data, String(data.user_id || 'default'));
+  const updated = mapDbSettingsRow(data, String(data.user_id || 'default'));
+  preloadedCache.settingsByUserId[updated.userId] = updated;
+  return updated;
 }
 
 export async function invokePayPalBillingFunction(

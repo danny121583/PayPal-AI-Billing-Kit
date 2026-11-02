@@ -100,7 +100,7 @@ export default function BillingMaaSMcpModal({
       );
     } catch (err: any) {
       setLiveOutput(
-        `Error invoking MaaS endpoint: ${err?.message || 'Unknown error'}`
+        `Error invoking MCP endpoint: ${err?.message || 'Unknown error'}`
       );
     } finally {
       setTestingTool(false);
@@ -111,11 +111,11 @@ export default function BillingMaaSMcpModal({
     <BillingModalShell
       visible={visible}
       onClose={onClose}
-      title="MaaS & MCP Agent Interface"
-      subtitle="Model-as-a-Service (JSON-RPC 2.0 MCP + REST + OpenAPI 3.1.0)"
+      title="MCP Agent Interface"
+      subtitle="Connect AI agents to billing tools through Model Context Protocol (MCP)."
       testID="billing-maas-mcp-modal"
       closeTestID="billing-maas-mcp-close-btn"
-      closeAccessibilityLabel="Close MaaS and MCP modal"
+      closeAccessibilityLabel="Close MCP Agent Interface modal"
       footer={
         <ModalActionButtons
           actions={[

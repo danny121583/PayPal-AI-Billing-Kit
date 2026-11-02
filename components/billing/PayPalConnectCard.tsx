@@ -18,6 +18,7 @@ import {
 import { shadows } from '../../src/lib/shadow';
 import { supabase } from '../../src/lib/supabase';
 import type { BillingRoleScope } from '../../src/billing/types';
+import { getPreloadedPayPalConnection } from '../../src/billing/api/billingService';
 
 export interface PayPalConnectCardProps {
   roleScope: BillingRoleScope;
@@ -39,9 +40,21 @@ export default function PayPalConnectCard({
   onOpenSettings,
 }: PayPalConnectCardProps) {
   const isDoctor = roleScope === 'doctor';
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [acting, setActing] = useState(false);
-  const [conn, setConn] = useState<ConnectionRecord | null>(null);
+  const [conn, setConn] = useState<ConnectionRecord | null>(() => {
+    const pre = getPreloadedPayPalConnection(roleScope);
+    if (!pre || !pre.connected) return null;
+    return {
+      status: 'connected',
+      connection_type: pre.connectionType,
+      environment: pre.environment,
+      paypal_payer_id: pre.paypalPayerIdMasked,
+      paypal_email_masked: pre.paypalEmailMasked,
+      paypal_verified: true,
+      connected_at: pre.connectedAt,
+    };
+  });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showConnectForm, setShowConnectForm] = useState(false);
   const [sandboxEmailInput, setSandboxEmailInput] = useState(
@@ -52,15 +65,25 @@ export default function PayPalConnectCard({
   );
 
   const loadStatus = useCallback(async () => {
+    const pre = getPreloadedPayPalConnection(roleScope);
+    if (pre && pre.connected) {
+      setConn({
+        status: 'connected',
+        connection_type: pre.connectionType,
+        environment: pre.environment,
+        paypal_payer_id: pre.paypalPayerIdMasked,
+        paypal_email_masked: pre.paypalEmailMasked,
+        paypal_verified: true,
+        connected_at: pre.connectedAt,
+      });
+      return;
+    }
+    if (process.env.NODE_ENV === 'test') return;
     try {
-      setLoading(true);
       let userId: string | undefined;
       if (typeof supabase.auth.getSession === 'function') {
         const { data: sessRes } = await supabase.auth.getSession();
         userId = sessRes?.session?.user?.id;
-      } else if (typeof supabase.auth.getUser === 'function') {
-        const { data: userRes } = await supabase.auth.getUser();
-        userId = userRes?.user?.id;
       }
       if (!userId) return;
 
@@ -78,14 +101,25 @@ export default function PayPalConnectCard({
       }
     } catch {
       // Non-fatal in unit tests / offline mode
-    } finally {
-      setLoading(false);
     }
   }, [roleScope]);
 
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    const pre = getPreloadedPayPalConnection(roleScope);
+    if (pre?.connected) {
+      setConn({
+        status: 'connected',
+        connection_type: pre.connectionType,
+        environment: pre.environment,
+        paypal_payer_id: pre.paypalPayerIdMasked,
+        paypal_email_masked: pre.paypalEmailMasked,
+        paypal_verified: true,
+        connected_at: pre.connectedAt,
+      });
+    } else {
+      setConn(null);
+    }
+  }, [roleScope]);
 
   const handleConnect = async () => {
     setErrorMsg(null);

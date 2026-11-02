@@ -79,7 +79,7 @@ const MCP_TOOLS: MCPToolDef[] = [
   {
     name: 'discover_billing_capabilities',
     description:
-      'Discover all PayPal AI Billing Kit MaaS/MCP capabilities, guardrails ($500 single-action / $2,500 daily limits), demo personas, service catalog codes, and permission tiers.',
+      'Discover all PayPal AI Billing Kit MCP Agent Interface capabilities, guardrails ($500 single-action / $2,500 daily limits), demo personas, service catalog codes, and permission tiers.',
     permissionTier: 'read_only',
     annotations: {
       title: 'Discover Billing Capabilities',
@@ -93,7 +93,7 @@ const MCP_TOOLS: MCPToolDef[] = [
       properties: {
         demo_session_id: {
           type: 'string',
-          description: 'Optional isolated visitor/agent demo session ID (default: maas-public-demo).',
+          description: 'Optional isolated visitor/agent demo session ID (default: mcp-public-demo).',
         },
       },
     },
@@ -663,7 +663,7 @@ async function executeTool(
 
       return {
         ok: true,
-        service: 'PayPal AI Billing Kit — MaaS & MCP Server',
+        service: 'PayPal AI Billing Kit — MCP Agent Interface Server',
         version: '2.0.0',
         protocol_support: ['MCP JSON-RPC 2.0 (2025-03-26)', 'REST JSON POST/GET', 'OpenAPI 3.1.0'],
         demo_session_id: demoSessionId,
@@ -876,7 +876,7 @@ async function executeTool(
           user_id: PROVIDER_ID,
           organization_id: ORG_ID,
           role_scope: 'doctor',
-          title: `MaaS Session (${demoSessionId})`,
+          title: `MCP Session (${demoSessionId})`,
           demo_session_id: demoSessionId,
         })
         .select('id')
@@ -1177,7 +1177,7 @@ async function executeTool(
           user_id: target.customer_id,
           organization_id: ORG_ID,
           role_scope: 'patient',
-          title: `MaaS Payment Proposal (${demoSessionId})`,
+          title: `MCP Payment Proposal (${demoSessionId})`,
           demo_session_id: demoSessionId,
         })
         .select('id')
@@ -1217,7 +1217,7 @@ async function executeTool(
         demo_session_id: demoSessionId,
         requires_paypal_buyer_authorization: true,
         safeguard_notice:
-          'Billing AI and MaaS agents cannot autonomously charge customer funds. The customer must approve this proposal and complete checkout in PayPal Sandbox.',
+          'Billing AI and MCP agents cannot autonomously charge customer funds. The customer must approve this proposal and complete checkout in PayPal Sandbox.',
         workflow_stages: [
           '1. Proposal Prepared (Complete)',
           '2. Customer Approval Required (Pending)',
@@ -1288,7 +1288,7 @@ async function executeTool(
             user_id: PROVIDER_ID,
             organization_id: ORG_ID,
             role_scope: 'doctor',
-            title: `MaaS Void Proposal (${demoSessionId})`,
+            title: `MCP Void Proposal (${demoSessionId})`,
             demo_session_id: demoSessionId,
           })
           .select('id')
@@ -1302,7 +1302,7 @@ async function executeTool(
           invoice_number: target.invoice_number,
           amount_minor: target.total_minor,
           patient_name: target.customer_name,
-          reason: args?.reason || 'Administrative void requested via MaaS',
+          reason: args?.reason || 'Administrative void requested via MCP',
           demo_session_id: demoSessionId,
         };
 
@@ -1398,7 +1398,7 @@ async function executeTool(
           user_id: PROVIDER_ID,
           organization_id: ORG_ID,
           role_scope: 'doctor',
-          title: `MaaS Refund Proposal (${demoSessionId})`,
+          title: `MCP Refund Proposal (${demoSessionId})`,
           demo_session_id: demoSessionId,
         })
         .select('id')
@@ -1579,7 +1579,7 @@ async function executeTool(
       return {
         ok: false,
         error_code: 'UNKNOWN_TOOL',
-        message: `Unknown MaaS/MCP tool "${toolName}". Call \`discover_billing_capabilities\` or \`tools/list\` for supported tools.`,
+        message: `Unknown MCP tool "${toolName}". Call \`discover_billing_capabilities\` or \`tools/list\` for supported tools.`,
       };
   }
 }
@@ -1588,22 +1588,22 @@ function buildOpenApiSpec(baseUrl: string) {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'PayPal AI Billing Kit — MaaS & MCP API',
+      title: 'PayPal AI Billing Kit — MCP Agent Interface API',
       version: '2.0.0',
       description:
-        'Public Model-as-a-Service (MaaS) and Model Context Protocol (MCP) interface for the standalone PayPal AI Billing Kit hackathon demonstration. Supports JSON-RPC 2.0 MCP (`tools/list`, `tools/call`) and direct REST tool invocation with isolated `demo_session_id` sandboxes.',
+        'Public Model Context Protocol (MCP) Agent Interface for the standalone PayPal AI Billing Kit hackathon demonstration. Supports JSON-RPC 2.0 MCP (`tools/list`, `tools/call`) and direct REST tool invocation with isolated `demo_session_id` sandboxes.',
     },
     servers: [
       {
         url: baseUrl,
-        description: 'PayPal AI Billing Kit MaaS / MCP Endpoint',
+        description: 'PayPal AI Billing Kit MCP Endpoint',
       },
     ],
     paths: {
       '/': {
         get: {
           operationId: 'discoverBillingCapabilitiesGet',
-          summary: 'Discover PayPal AI Billing Kit MaaS capabilities, tools, personas, and guardrails',
+          summary: 'Discover PayPal AI Billing Kit MCP capabilities, tools, personas, and guardrails',
           parameters: [
             {
               name: 'format',
@@ -1614,12 +1614,12 @@ function buildOpenApiSpec(baseUrl: string) {
           ],
           responses: {
             '200': {
-              description: 'MaaS & MCP capability manifest or OpenAPI 3.1.0 specification',
+              description: 'MCP Agent Interface capability manifest or OpenAPI 3.1.0 specification',
             },
           },
         },
         post: {
-          operationId: 'invokeBillingMaaSToolOrMcp',
+          operationId: 'invokeBillingMcpTool',
           summary:
             'Invoke any of the 15 PayPal AI Billing Kit tools via REST `{ tool, arguments, demo_session_id }` or MCP JSON-RPC 2.0 `{ jsonrpc: "2.0", method: "tools/call", params: { name, arguments } }`',
           requestBody: {
@@ -1632,7 +1632,7 @@ function buildOpenApiSpec(baseUrl: string) {
                     tool: {
                       type: 'string',
                       enum: MCP_TOOLS.map((t) => t.name),
-                      description: 'Name of the MaaS billing tool to invoke (REST mode).',
+                      description: 'Name of the MCP billing tool to invoke (REST mode).',
                     },
                     arguments: {
                       type: 'object',
@@ -1808,7 +1808,7 @@ Deno.serve(async (req: Request) => {
                 tools: { listChanged: false },
               },
               serverInfo: {
-                name: 'paypal-ai-billing-kit-maas',
+                name: 'paypal-ai-billing-kit-mcp',
                 version: '2.0.0',
               },
               instructions:
@@ -1920,7 +1920,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Handle Direct REST MaaS Tool Invocation
+    // Handle Direct REST MCP Tool Invocation
     const toolName = String(body?.tool || body?.action || 'discover_billing_capabilities');
     const toolArgs =
       body?.arguments && typeof body.arguments === 'object'
@@ -1940,8 +1940,8 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         ok: false,
-        error_code: 'INTERNAL_MAAS_ERROR',
-        message: err instanceof Error ? err.message : 'Unexpected MaaS server error',
+        error_code: 'INTERNAL_MCP_ERROR',
+        message: err instanceof Error ? err.message : 'Unexpected MCP server error',
       }),
       {
         status: 500,

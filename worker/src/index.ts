@@ -1,8 +1,8 @@
 /**
- * Standalone PayPal AI Billing Kit — Dedicated Cloudflare Worker MaaS/MCP Gateway
+ * Standalone PayPal AI Billing Kit — Dedicated Cloudflare Worker MCP Gateway
  * File: worker/src/index.ts
  *
- * Dedicated, independent Model Context Protocol (MCP) and Model-as-a-Service (MaaS)
+ * Dedicated, independent Model Context Protocol (MCP) Agent Interface
  * gateway for the PayPal AI Hackathon 2026.
  *
  * Supported Protocols & Standards:
@@ -112,7 +112,7 @@ const MCP_TOOLS_CATALOG = [
   {
     name: 'discover_billing_capabilities',
     description:
-      '[READ_ONLY] Discover all PayPal AI Billing Kit MaaS/MCP capabilities, guardrails ($500 single-action / $2,500 daily limits), demo personas, service catalog codes, and permission tiers.',
+      '[READ_ONLY] Discover all PayPal AI Billing Kit MCP Agent Interface capabilities, guardrails ($500 single-action / $2,500 daily limits), demo personas, service catalog codes, and permission tiers.',
     permissionTier: 'read_only',
     annotations: {
       title: 'Discover Billing Capabilities',
@@ -126,7 +126,7 @@ const MCP_TOOLS_CATALOG = [
       properties: {
         demo_session_id: {
           type: 'string',
-          description: 'Optional isolated visitor/agent demo session ID (default: maas-public-demo).',
+          description: 'Optional isolated visitor/agent demo session ID (default: mcp-public-demo).',
         },
       },
     },
@@ -178,7 +178,7 @@ const MCP_TOOLS_CATALOG = [
         },
         demo_session_id: {
           type: 'string',
-          description: 'Demo session identifier (default: maas-public-demo).',
+          description: 'Demo session identifier (default: mcp-public-demo).',
         },
       },
     },
@@ -580,7 +580,7 @@ function buildOpenApiSpec(origin: string) {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'PayPal AI Billing Kit — Model-as-a-Service & MCP API',
+      title: 'PayPal AI Billing Kit — MCP Agent Interface API',
       version: '2.0.0',
       description:
         'Official MCP & REST tool API for the standalone PayPal AI Billing Kit. Enables AI agents (ChatGPT, Claude, Gemini) to inspect invoices, calculate balances, propose invoices, void statements, and manage sandbox settlements with $500 single-action guardrails.',
@@ -841,7 +841,7 @@ export default {
 </head>
 <body>
   <div class="container">
-    <h1>⚡ PayPal AI Billing Kit — MCP & MaaS Gateway</h1>
+    <h1>⚡ PayPal AI Billing Kit — MCP Agent Interface Gateway</h1>
     <p class="subtitle">Dedicated Cloudflare Worker Gateway for PayPal AI Hackathon 2026</p>
     <div style="margin-bottom: 20px;">
       <span class="badge">15 MCP Tools</span>
@@ -944,7 +944,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
         const body = JSON.stringify(
           {
             ok: true,
-            service: 'PayPal AI Billing Kit — MaaS & MCP Server',
+            service: 'PayPal AI Billing Kit — MCP Agent Interface Server',
             version: '2.0.0',
             protocol_support: [
               'MCP JSON-RPC 2.0 (2025-06-18 / 2025-03-26 / 2024-11-05)',
@@ -1018,7 +1018,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
                   logging: {},
                 },
                 serverInfo: {
-                  name: 'paypal-ai-billing-kit-maas',
+                  name: 'paypal-ai-billing-kit-mcp',
                   version: '2.0.0',
                 },
                 instructions:
@@ -1149,7 +1149,7 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
               jsonrpc: '2.0',
               id: jsonRpcId,
               result: {
-                service: 'PayPal AI Billing Kit — MaaS & MCP Server',
+                service: 'PayPal AI Billing Kit — MCP Agent Interface Server',
                 version: '2.0.0',
                 protocols: ['2026-07-28', '2025-06-18', '2025-03-26'],
                 tools: formatStandardMcpTools(),
@@ -1401,7 +1401,18 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
             body: forwardBody,
           });
 
-          const upstreamText = await upstreamRes.text();
+          const rawUpstreamText = await upstreamRes.text();
+          const upstreamText = rawUpstreamText
+            .replace(/MaaS\s*&\s*MCP/gi, 'MCP Agent Interface')
+            .replace(/MaaS\/MCP/gi, 'MCP')
+            .replace(/Model-as-a-Service\s*\(MaaS\)\s*and\s*/gi, '')
+            .replace(/Model-as-a-Service/gi, 'Model Context Protocol (MCP)')
+            .replace(/Billing AI and MaaS agents/gi, 'Billing AI and MCP agents')
+            .replace(/via MaaS/gi, 'via MCP')
+            .replace(/MaaS Session/g, 'MCP Session')
+            .replace(/MaaS Payment Proposal/g, 'MCP Payment Proposal')
+            .replace(/MaaS Void Proposal/g, 'MCP Void Proposal')
+            .replace(/MaaS Refund Proposal/g, 'MCP Refund Proposal');
           let upstreamJson: any = null;
           try {
             upstreamJson = JSON.parse(upstreamText);

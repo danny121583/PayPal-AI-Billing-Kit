@@ -1,10 +1,11 @@
-# PayPal AI Billing Kit (`@paypal-ai/billing-kit`)
+# PayPal AI Billing Kit — AI-Powered Invoicing, PayPal Sandbox Payments & MCP Agent Integration (`@paypal-ai/billing-kit`)
 
 **Workspace:** `/Users/danny/Desktop/PayPal-AI-Billing-Kit`  
 **Target Competition:** PayPal AI Hackathon 2026 & Reusable Developer Product  
 **Public Live Demo (Vercel Hobby):** [`https://paypal-ai-billing-kit.vercel.app`](https://paypal-ai-billing-kit.vercel.app)  
-**Public MaaS / MCP Endpoint (JSON-RPC 2.0 & REST):** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
-**Public OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-kit.vercel.app/api/openapi.json`  
+**Dedicated Cloudflare Worker MCP Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`  
+**Public Web App MCP Endpoint (JSON-RPC 2.0 & REST):** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
+**Public OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json`  
 **Dedicated Supabase Project:** `paypal-ai-billing-kit` (`dvzfesfvefggnunkjhom` • `https://dvzfesfvefggnunkjhom.supabase.co`)  
 **Platforms:** Public Web (`https://paypal-ai-billing-kit.vercel.app`), Local Web (`npx expo start --web`), & Mobile (`Expo Go` on iOS / Android)
 
@@ -46,8 +47,8 @@ npm run verify:security
 # Live 9-step Provider <-> Customer E2E workflow verification
 npm run verify:workflow
 
-# Live 20-check MaaS / MCP JSON-RPC 2.0 & REST verification
-npm run verify:maas
+# Live 26-check MCP JSON-RPC 2.0 & REST verification
+npm run verify:mcp
 
 # Source secret & project-isolation scan
 npm run scan:secrets

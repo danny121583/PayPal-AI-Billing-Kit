@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Independent MaaS & MCP Verification Suite
+ * Independent MCP Agent Interface Verification Suite
  * Exercises:
  * - MCP JSON-RPC 2.0 (`initialize`, `notifications/initialized`, `ping`, `prompts/list`, `resources/list`, `tools/list`, `tools/call`)
  * - OpenAPI 3.1.0 schema discovery, HEAD probes, `/robots.txt`, and OAuth 2.1 DCR
@@ -11,7 +11,7 @@
 const endpointArg = process.argv.find((a) => a.startsWith('--url='))?.split('=')[1];
 const MCP_URL =
   endpointArg ||
-  process.env.MAAS_MCP_URL ||
+  process.env.MCP_URL ||
   'https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp';
 
 const BASE_ORIGIN = new URL(MCP_URL).origin;
@@ -80,15 +80,17 @@ async function callTool(name, args = {}, sessionOverride = TEST_SESSION, headerO
 }
 
 async function main() {
-  console.log(`\n🔌 Running Independent MaaS / MCP Verification against: ${MCP_URL}`);
+  console.log(`\n🔌 Running Independent MCP Agent Interface Verification against: ${MCP_URL}`);
   console.log(`   Isolated Test Session ID: ${TEST_SESSION}\n`);
 
   // 1. OpenAPI 3.1.0 GET
   const openApiRes = await fetch(`${MCP_URL}?format=openapi`);
   const openApiJson = await openApiRes.json();
   assert(
-    openApiRes.status === 200 && openApiJson.openapi === '3.1.0',
-    'OpenAPI 3.1.0 specification endpoint returns valid schema'
+    openApiRes.status === 200 &&
+      openApiJson.openapi === '3.1.0' &&
+      !JSON.stringify(openApiJson.info || {}).includes('MaaS'),
+    'OpenAPI 3.1.0 specification endpoint returns valid schema with MCP Agent Interface branding'
   );
 
   // 2. HEAD /mcp & /robots.txt
@@ -103,9 +105,9 @@ async function main() {
   const initRes = await mcpRpc('initialize', { protocolVersion: '2025-06-18' }, 1);
   assert(
     initRes.status === 200 &&
-      initRes.json?.result?.serverInfo?.name === 'paypal-ai-billing-kit-maas' &&
+      initRes.json?.result?.serverInfo?.name === 'paypal-ai-billing-kit-mcp' &&
       initRes.json?.result?.protocolVersion === '2025-06-18',
-    'MCP JSON-RPC 2.0 `initialize` handshake succeeds (protocol 2025-06-18)'
+    'MCP JSON-RPC 2.0 `initialize` handshake succeeds (protocol 2025-06-18, serverInfo=paypal-ai-billing-kit-mcp)'
   );
 
   // 4. MCP notifications/initialized (without id -> HTTP 202 Accepted)
@@ -382,7 +384,7 @@ async function main() {
     `Tool 15 (\`reset_demo_session\`): resets session "${TEST_SESSION}" back to exactly 6 canonical seed invoices`
   );
 
-  console.log(`\n📊 MaaS / MCP Verification Summary: ${passed} passed, ${failed} failed\n`);
+  console.log(`\n📊 MCP Agent Interface Verification Summary: ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
 }
 
