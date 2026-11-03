@@ -514,9 +514,8 @@ export default function BillingInvoiceDetailModal({
                   Sample Demo Settlement Record (Not a Live PayPal Capture)
                 </Text>
                 <Text style={styles.sampleSettlementSub}>
-                  Reference ID {effectiveReceiptNumber} is a seeded demonstration
-                  fixture. Live PayPal Sandbox captures display verified PayPal
-                  capture IDs.
+                  {invoice.organizationName} • Sample Demo Receipt — Not a Real PayPal
+                  Payment (Reference ID: {effectiveReceiptNumber}).
                 </Text>
               </View>
             </>
@@ -525,10 +524,11 @@ export default function BillingInvoiceDetailModal({
               <CheckCircle2 size={16} color="#047857" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.liveSettlementTitle}>
-                  Verified PayPal Sandbox Settlement
+                  Verified PayPal Sandbox Settlement • Payment processed through PayPal
                 </Text>
                 <Text style={styles.liveSettlementSub}>
-                  Capture ID: {effectiveReceiptNumber}
+                  {invoice.organizationName} (Provider: {invoice.issuerDoctorName}) • Capture ID:{' '}
+                  {effectiveReceiptNumber} (PayPal Sandbox Test Transaction)
                 </Text>
               </View>
             </>

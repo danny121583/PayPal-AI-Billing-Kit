@@ -6,3 +6,4 @@ export * from './client';
 export * from './conversationalAuth';
 export * from './pdfReceipt';
 export * from './mcpRegistry';
+export * from './geminiCompat';

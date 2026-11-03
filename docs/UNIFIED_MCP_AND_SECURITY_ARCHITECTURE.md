@@ -1,6 +1,6 @@
-# Unified PayPal MCP Gateway, Automated Sandbox Card Checkout, Conversational Authorization & PDF Receipt Architecture
+# Unified PayPal MCP Gateway, Gemini 3.5 Flash-Lite AI, Automated Sandbox Card Checkout & Merchant-Branded PDF Receipt Architecture
 
-**Project:** PayPal AI Billing Kit (`v1.7.0`)  
+**Project:** PayPal AI Billing Kit (`v1.8.0`)  
 **Unified MCP Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`  
 **Vercel MCP Mirror:** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
 **OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json`  
@@ -66,14 +66,27 @@ When a user gives a direct, unambiguous action command in ChatGPT or the in-app 
 
 ---
 
-## 3. Downloadable PDF Receipt Engine
+## 3. Professional Merchant-Branded PDF 1.4 Receipt Engine (`v1.8.0`)
 
-Every paid, partially refunded, or refunded invoice has a structured JSON receipt (`get_payment_receipt`) and a valid **PDF 1.4 binary receipt** (`packages/paypal-billing-kit/src/pdfReceipt.ts`) containing:
-- Receipt Number & Invoice Number (`PPB-INV-2026-1003`)
-- Customer & Provider Organization details
-- Line item breakdown, subtotal, discount, tax, total, amount paid, and refunded amount
-- Authentic PayPal Sandbox Order ID, Capture ID, and Refund IDs
-- Direct download endpoint: `GET https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/:invoice_number.pdf` (`Content-Type: application/pdf`).
+Every paid, partially refunded, or refunded invoice has a structured JSON receipt (`get_payment_receipt`, `generate_receipt_pdf`) and a merchant-branded **PDF 1.4 binary receipt** (`packages/paypal-billing-kit/src/pdfReceipt.ts`) containing:
+- **Merchant-First Header:** Configurable `MerchantBrandingConfig` displaying **Jenkins Wellness & Telehealth Practice**, **Provider: Dr. Sarah Jenkins**, and customer support contact (`sarah.jenkins@demo.paypal-billing-kit.local`), with optional monogram logo badge or clean text-based header (never inventing unconfigured addresses or telephone numbers).
+- **4 Distinct Receipt Presentation States (+ Unpaid Refusal):**
+  1. `Payment Receipt — Paid` (Verified PayPal Sandbox capture)
+  2. `Payment & Refund Receipt — Refunded` (Verified full PayPal Sandbox refund)
+  3. `Payment Receipt — Partially Refunded` (Partial refund with `Net Payment Retained` and `Remaining Balance`)
+  4. `Sample Demo Receipt — Not a Real PayPal Payment` (Simulated demo settlement)
+  5. Unpaid / draft / void invoices are refused (`RECEIPT_UNAVAILABLE_UNPAID_INVOICE`).
+- **PayPal Verification & Attribution:** Payment method, card brand and last four digits (when paid by card), PayPal Capture ID, PayPal Order ID, Refund IDs & dates, explicit **PayPal Sandbox Test Transaction** labeling, and modest **"Payment processed through PayPal"** attribution.
+- **Customer-Facing Footer:** `"This receipt was generated electronically. Please retain it for your records."` (zero internal MCP, database, or Zero-PHI terminology on customer-facing documents).
+- **Direct Download Endpoint:** `GET https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/:invoice_number.pdf` (`Content-Type: application/pdf`).
+
+---
+
+## 3b. Gemini 3.5 Flash-Lite Compatibility Architecture (`v1.8.0`)
+
+Ahead of Google AI Studio's December 1, 2026 automatic redirect from `gemini-2.5-flash` to `gemini-3.5-flash-lite`:
+- `supabase/functions/billing-ai-assistant/index.ts` and `packages/paypal-billing-kit/src/geminiCompat.ts` target `gemini-3.5-flash-lite` using `thinkingConfig: { thinkingLevel: "MEDIUM" }` and `maxOutputTokens: 1536` (replacing deprecated `thinkingBudget: 0` and custom `temperature: 0.1`).
+- Multi-turn `thoughtSignature` values from model `functionCall` parts are persisted in `public.billing_ai_messages.tool_calls` JSONB and replayed only on matching-model turns (`sanitizeMultiTurnContents`), while `buildOrderedFunctionResponseTurn` guarantees 1-to-1 ordered `functionResponse` matching by `id` and `name`.
 
 ---
 

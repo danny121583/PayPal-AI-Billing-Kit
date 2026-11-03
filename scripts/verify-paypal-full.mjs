@@ -694,7 +694,9 @@ async function main() {
     paidPdfStr.includes(createdInvoiceNumber) &&
     paidPdfStr.includes(cardCaptureId) &&
     paidPdfStr.includes(cardOrderId) &&
-    paidPdfStr.includes('Jenkins Wellness') &&
+    paidPdfStr.includes('Jenkins Wellness & Telehealth Practice') &&
+    paidPdfStr.includes('This receipt was generated electronically. Please retain it for your records.') &&
+    !paidPdfStr.includes('Zero PHI Administrative Ledger') &&
     paidPdfStr.includes('Alex Rivera') &&
     paidPngRendered &&
     demoReceiptRes.data?.ok === true &&
@@ -804,7 +806,8 @@ async function main() {
     postRefundInv.data?.invoice?.balance_due_minor === 0 &&
     postRefundMetrics.data?.provider_metrics?.refunded_invoices_count >= 2 &&
     postRefundPdfStr.includes(cardRefundId) &&
-    postRefundPdfStr.includes('REFUNDED') &&
+    postRefundPdfStr.includes('Payment & Refund Receipt - Refunded') &&
+    !postRefundPdfStr.includes('Zero PHI Administrative Ledger') &&
     refundPngRendered;
   recordStage(
     23,
@@ -896,7 +899,7 @@ async function main() {
   }
   const updatedProof = {
     ...existingProof,
-    proof_version: '1.7.0',
+    proof_version: '1.8.0',
     verified_at: new Date().toISOString(),
     unified_mcp_endpoint: MCP_URL,
     automated_sandbox_direct_card_lifecycle_proof: {

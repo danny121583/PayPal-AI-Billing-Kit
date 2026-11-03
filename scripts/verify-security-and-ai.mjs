@@ -56,18 +56,18 @@ async function callEdgeFunction(slug, body) {
 
 async function main() {
   console.log('======================================================================');
-  console.log('PayPal AI Billing Kit — Gemini 2.5 Flash AI & Security Audit Suite');
+  console.log('PayPal AI Billing Kit — Gemini 3.5 Flash-Lite AI & Security Audit Suite');
   console.log('======================================================================\n');
 
   const sessionA = `sec-ai-a-${Date.now()}`;
   const sessionB = `sec-ai-b-${Date.now()}`;
 
   // ---------------------------------------------------------------------------
-  // PART 1: GENUINE GEMINI 2.5 FLASH AI VERIFICATION (SECTION 6)
+  // PART 1: GENUINE GEMINI 3.5 FLASH-LITE AI VERIFICATION (SECTION 6)
   // ---------------------------------------------------------------------------
-  console.log('1. Live Gemini 2.5 Flash Conversational Billing AI (Section 6)');
+  console.log('1. Live Gemini 3.5 Flash-Lite Conversational Billing AI (Section 6)');
 
-  // 1a. Natural-language analytical question -> invokes gemini-2.5-flash
+  // 1a. Natural-language analytical question -> invokes gemini-3.5-flash-lite
   const q1 = await callEdgeFunction('billing-ai-assistant', {
     roleScope: 'doctor',
     userId: PROVIDER_ID,
@@ -78,10 +78,11 @@ async function main() {
   assert(
     q1.status === 200 &&
       q1.data?.geminiConfigured === true &&
-      q1.data?.aiEngine === 'gemini-2.5-flash' &&
+      q1.data?.aiEngine === 'gemini-3.5-flash-lite' &&
+      q1.data?.geminiCompatibility?.thinkingLevel === 'MEDIUM' &&
       /1002|1004|Jordan|PAYPAL_INSTRUMENT_DECLINED|overdue/i.test(q1Text),
-    'Gemini 2.5 Flash live inference on contextual billing question',
-    `aiEngine=${q1.data?.aiEngine}, geminiConfigured=${q1.data?.geminiConfigured}`
+    'Gemini 3.5 Flash-Lite live inference on contextual billing question',
+    `aiEngine=${q1.data?.aiEngine}, thinkingLevel=${q1.data?.geminiCompatibility?.thinkingLevel}, geminiConfigured=${q1.data?.geminiConfigured}`
   );
 
   // 1b. Natural-language invoice creation phrasing

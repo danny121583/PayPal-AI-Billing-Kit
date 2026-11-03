@@ -9,6 +9,222 @@ const corsHeaders = {
 const CLINICAL_REFUSAL_REGEX =
   /\b(?:diagnos(?:is|es|e)|symptom|medication|prescri(?:be|ption)|dosage|blood\s+pressure|heart\s+rate|lab\s+result|radiology|x-?ray|mri|ct\s+scan|allergy|allergies|treatment\s+plan|clinical\s+note|health\s+log|doctor\s+log|medical\s+advice)\b/i;
 
+const GEMINI_PREVIOUS_MODEL = 'gemini-2.5-flash';
+const GEMINI_TARGET_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_DEFAULT_THINKING_LEVEL = 'MEDIUM';
+
+function buildSanitizedGeminiConfig(options?: {
+  thinkingLevel?: 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
+  maxOutputTokens?: number;
+  responseMimeType?: string;
+  responseSchema?: Record<string, unknown>;
+  includeThinkingLevel?: boolean;
+}) {
+  const cfg: Record<string, unknown> = {
+    maxOutputTokens: options?.maxOutputTokens ?? 1024,
+  };
+  if (options?.includeThinkingLevel !== false) {
+    cfg.thinkingConfig = {
+      thinkingLevel: options?.thinkingLevel || GEMINI_DEFAULT_THINKING_LEVEL,
+    };
+  }
+  if (options?.responseMimeType) {
+    cfg.responseMimeType = options.responseMimeType;
+  }
+  if (options?.responseSchema) {
+    cfg.responseSchema = options.responseSchema;
+  }
+  return cfg;
+}
+
+function extractGeminiThoughtSignatures(candidateContent?: any): string[] {
+  if (!candidateContent || !Array.isArray(candidateContent.parts)) return [];
+  const sigs: string[] = [];
+  for (const part of candidateContent.parts) {
+    const sig = part?.thoughtSignature || part?.thought_signature;
+    if (typeof sig === 'string' && sig.trim().length > 0) {
+      sigs.push(sig.trim());
+    }
+  }
+  return sigs;
+}
+
+function buildOrderedFunctionResponseTurn(
+  functionCalls: Array<{ id?: string; name: string; args?: Record<string, unknown> }>,
+  resultsByCall: Array<{
+    id?: string;
+    name: string;
+    response: Record<string, unknown>;
+    multimodalParts?: Array<Record<string, unknown>>;
+  }>
+) {
+  const parts = functionCalls.map((call, index) => {
+    const matched =
+      resultsByCall.find(
+        (r) =>
+          (call.id && r.id === call.id && r.name === call.name) ||
+          (!call.id && r.name === call.name)
+      ) || resultsByCall[index];
+    const fnResp: Record<string, unknown> = {
+      name: call.name,
+      response: matched?.response ?? { ok: true },
+    };
+    if (call.id) {
+      fnResp.id = call.id;
+    }
+    if (matched?.multimodalParts && matched.multimodalParts.length > 0) {
+      fnResp.parts = matched.multimodalParts;
+    }
+    return { functionResponse: fnResp };
+  });
+  return { role: 'user', parts };
+}
+
+function sanitizeMultiTurnGeminiContents(
+  rawTurns: Array<{ role: string; content: string; tool_calls?: any }>,
+  activeModel: string
+) {
+  const sanitized: Array<{ role: 'user' | 'model'; parts: any[] }> = [];
+  for (const turn of rawTurns) {
+    const role: 'user' | 'model' = turn.role === 'assistant' || turn.role === 'model' ? 'model' : 'user';
+    const storedMeta = turn.tool_calls && typeof turn.tool_calls === 'object' ? turn.tool_calls : null;
+    const isSameModel = !storedMeta?.model || storedMeta.model === activeModel;
+
+    if (role === 'model' && isSameModel && Array.isArray(storedMeta?.model_parts) && storedMeta.model_parts.length > 0) {
+      sanitized.push({
+        role: 'model',
+        parts: storedMeta.model_parts,
+      });
+      if (Array.isArray(storedMeta?.function_response_parts) && storedMeta.function_response_parts.length > 0) {
+        sanitized.push({
+          role: 'user',
+          parts: storedMeta.function_response_parts,
+        });
+      }
+      continue;
+    }
+
+    const text = String(turn.content || '').trim().slice(0, 600);
+    if (text) {
+      sanitized.push({
+        role,
+        parts: [{ text }],
+      });
+    }
+  }
+  return sanitized;
+}
+
+async function invokeGeminiCompatRequest(params: {
+  apiKey: string;
+  targetModel?: string;
+  systemPrompt: string;
+  contents: Array<{ role: string; parts: any[] }>;
+  thinkingLevel?: 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
+  maxOutputTokens?: number;
+  tools?: any[];
+  responseMimeType?: string;
+  responseSchema?: Record<string, unknown>;
+  allowUpstreamFallback?: boolean;
+}) {
+  const configuredModel = params.targetModel || GEMINI_TARGET_MODEL;
+  const thinkingLevel = params.thinkingLevel || GEMINI_DEFAULT_THINKING_LEVEL;
+  const startedAt = Date.now();
+
+  const buildPayload = (includeThinkingLevel: boolean) => {
+    const payload: Record<string, unknown> = {
+      systemInstruction: { parts: [{ text: params.systemPrompt }] },
+      contents: params.contents,
+      generationConfig: buildSanitizedGeminiConfig({
+        thinkingLevel,
+        maxOutputTokens: params.maxOutputTokens ?? 350,
+        responseMimeType: params.responseMimeType,
+        responseSchema: params.responseSchema,
+        includeThinkingLevel,
+      }),
+    };
+    if (Array.isArray(params.tools) && params.tools.length > 0) {
+      payload.tools = params.tools;
+    }
+    return payload;
+  };
+
+  const callModel = async (modelId: string, includeThinkingLevel: boolean) => {
+    const reqBody = buildPayload(includeThinkingLevel);
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${params.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqBody),
+      }
+    );
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, json, modelId, reqBody };
+  };
+
+  let attempt = await callModel(configuredModel, true);
+  let redirectOrFallbackReason: string | null = null;
+
+  if (!attempt.ok && params.allowUpstreamFallback !== false) {
+    const errMsg = String(attempt.json?.error?.message || '');
+    if (attempt.status === 404 || /not found|not supported/i.test(errMsg)) {
+      redirectOrFallbackReason = `Upstream v1beta returned HTTP ${attempt.status} for ${configuredModel} prior to December 1, 2026 account redirect (${errMsg.slice(0, 140)})`;
+      // Try gemini-3-flash-preview (supports thinkingLevel: MEDIUM natively), then gemini-2.5-flash-lite / gemini-2.5-flash
+      const fallbackCandidates: Array<[string, boolean]> = [
+        ['gemini-3-flash-preview', true],
+        ['gemini-2.5-flash-lite', false],
+        ['gemini-2.5-flash', false],
+      ];
+      for (const [fbModel, useThinkingLevel] of fallbackCandidates) {
+        if (fbModel === configuredModel) continue;
+        const fbAttempt = await callModel(fbModel, useThinkingLevel);
+        if (fbAttempt.ok) {
+          attempt = fbAttempt;
+          break;
+        }
+      }
+    } else if (attempt.status === 400 && /thinkingLevel|thinking_level/i.test(errMsg)) {
+      redirectOrFallbackReason = `Model ${configuredModel} rejected thinkingLevel parameter on v1beta; retried with sanitized base generationConfig`;
+      attempt = await callModel(configuredModel, false);
+    }
+  }
+
+  const latencyMs = Date.now() - startedAt;
+  const candidateContent = attempt.json?.candidates?.[0]?.content || null;
+  const candidateParts: any[] = Array.isArray(candidateContent?.parts) ? candidateContent.parts : [];
+  const textParts = candidateParts
+    .filter((p: any) => typeof p?.text === 'string' && !p?.thought)
+    .map((p: any) => p.text.trim())
+    .filter(Boolean);
+  const functionCalls = candidateParts
+    .filter((p: any) => p?.functionCall)
+    .map((p: any) => p.functionCall);
+  const thoughtSignatures = extractGeminiThoughtSignatures(candidateContent);
+  const usage = attempt.json?.usageMetadata || {};
+
+  return {
+    ok: attempt.ok,
+    status: attempt.status,
+    configuredModel,
+    upstreamResolvedModel: attempt.modelId,
+    redirectOrFallbackReason,
+    thinkingLevel,
+    latencyMs,
+    text: textParts.join('\n').trim(),
+    functionCalls,
+    thoughtSignatures,
+    modelParts: candidateParts,
+    usageMetadata: {
+      promptTokenCount: Number(usage.promptTokenCount || 0),
+      candidatesTokenCount: Number(usage.candidatesTokenCount || 0),
+      thoughtsTokenCount: Number(usage.thoughtsTokenCount || 0),
+      totalTokenCount: Number(usage.totalTokenCount || 0),
+    },
+    rawError: attempt.ok ? null : attempt.json?.error || null,
+  };
+}
+
 function formatUsd(minor: number): string {
   return `$${(Number(minor || 0) / 100).toFixed(2)}`;
 }
@@ -208,6 +424,280 @@ Deno.serve(async (req: Request) => {
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+    }
+
+    if (body?.action === 'gemini-compatibility-benchmark') {
+      if (!geminiApiKey) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'GEMINI_API_KEY not configured on server.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const modelsListRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`
+      );
+      const modelsListJson = await modelsListRes.json().catch(() => ({}));
+      const availableFlashModels = Array.isArray(modelsListJson?.models)
+        ? modelsListJson.models
+            .map((m: any) => String(m?.name || '').replace(/^models\//, ''))
+            .filter((name: string) => /gemini-(?:2\.5|3)/i.test(name))
+        : [];
+
+      const directTargetProbe = await invokeGeminiCompatRequest({
+        apiKey: geminiApiKey,
+        targetModel: GEMINI_TARGET_MODEL,
+        thinkingLevel: 'MEDIUM',
+        systemPrompt: 'You are the PayPal AI Billing Kit Assistant. Reply concisely.',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Confirm readiness for PayPal AI Billing Kit administrative queries.' }],
+          },
+        ],
+        maxOutputTokens: 800,
+        allowUpstreamFallback: false,
+      });
+
+      const resolvedTargetProbe = await invokeGeminiCompatRequest({
+        apiKey: geminiApiKey,
+        targetModel: GEMINI_TARGET_MODEL,
+        thinkingLevel: 'MEDIUM',
+        systemPrompt:
+          'You are the PayPal AI Billing Kit Assistant. Strictly administrative billing only; $500 single-action and $2,500 daily guardrails.',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: 'Summarize why Invoice #PPB-INV-2026-1003 ($125.00 USD, Sample Demo Settlement) is distinct from a live PayPal Sandbox capture.',
+              },
+            ],
+          },
+        ],
+        maxOutputTokens: 800,
+        allowUpstreamFallback: true,
+      });
+
+      const started25 = Date.now();
+      const raw25Res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_PREVIOUS_MODEL}:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                {
+                  text: 'You are the PayPal AI Billing Kit Assistant. Strictly administrative billing only; $500 single-action and $2,500 daily guardrails.',
+                },
+              ],
+            },
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    text: 'Summarize why Invoice #PPB-INV-2026-1003 ($125.00 USD, Sample Demo Settlement) is distinct from a live PayPal Sandbox capture.',
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 800,
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          }),
+        }
+      );
+      const raw25Json = await raw25Res.json().catch(() => ({}));
+      const raw25Usage = raw25Json?.usageMetadata || {};
+      const baseline25FlashProbe = {
+        ok: raw25Res.ok,
+        status: raw25Res.status,
+        configuredModel: GEMINI_PREVIOUS_MODEL,
+        upstreamResolvedModel: GEMINI_PREVIOUS_MODEL,
+        latencyMs: Date.now() - started25,
+        usageMetadata: {
+          promptTokenCount: Number(raw25Usage.promptTokenCount || 0),
+          candidatesTokenCount: Number(raw25Usage.candidatesTokenCount || 0),
+          thoughtsTokenCount: Number(raw25Usage.thoughtsTokenCount || 0),
+          totalTokenCount: Number(raw25Usage.totalTokenCount || 0),
+        },
+        text:
+          raw25Json?.candidates?.[0]?.content?.parts
+            ?.map((p: any) => p?.text || '')
+            .join('\n')
+            .trim() || '',
+      };
+
+      // Multi-turn Function Calling + Thought Signature Preservation Test
+      const toolDecls = [
+        {
+          functionDeclarations: [
+            {
+              name: 'get_invoice_details',
+              description: 'Retrieve structured details for an invoice number.',
+              parameters: {
+                type: 'OBJECT',
+                properties: {
+                  invoice_number: { type: 'STRING', description: 'Invoice number such as PPB-INV-2026-1002' },
+                },
+                required: ['invoice_number'],
+              },
+            },
+          ],
+        },
+      ];
+
+      const toolTurn1 = await invokeGeminiCompatRequest({
+        apiKey: geminiApiKey,
+        targetModel: GEMINI_TARGET_MODEL,
+        thinkingLevel: 'MEDIUM',
+        systemPrompt:
+          'You are the PayPal AI Billing Kit Assistant. Call get_invoice_details when asked about a specific invoice.',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Look up invoice PPB-INV-2026-1002 and tell me its balance due.' }],
+          },
+        ],
+        tools: toolDecls,
+        maxOutputTokens: 600,
+        allowUpstreamFallback: true,
+      });
+
+      let toolTurn2: any = null;
+      if (toolTurn1.functionCalls.length > 0) {
+        const fnRespTurn = buildOrderedFunctionResponseTurn(
+          toolTurn1.functionCalls,
+          toolTurn1.functionCalls.map((fc: any) => ({
+            id: fc.id,
+            name: fc.name,
+            response: {
+              ok: true,
+              invoice_number: 'PPB-INV-2026-1002',
+              customer_name: 'Alex Rivera',
+              status: 'overdue',
+              balance_due_usd: '$50.00',
+              service_code: 'ADMIN-COPAY',
+            },
+          }))
+        );
+        toolTurn2 = await invokeGeminiCompatRequest({
+          apiKey: geminiApiKey,
+          targetModel: toolTurn1.upstreamResolvedModel,
+          thinkingLevel: 'MEDIUM',
+          systemPrompt:
+            'You are the PayPal AI Billing Kit Assistant. Summarize the tool result with exact invoice number and USD amount.',
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: 'Look up invoice PPB-INV-2026-1002 and tell me its balance due.' }],
+            },
+            {
+              role: 'model',
+              parts: toolTurn1.modelParts,
+            },
+            fnRespTurn,
+          ],
+          tools: toolDecls,
+          maxOutputTokens: 600,
+          allowUpstreamFallback: true,
+        });
+      }
+
+      // Structured JSON Schema Output Test
+      const structuredJsonProbe = await invokeGeminiCompatRequest({
+        apiKey: geminiApiKey,
+        targetModel: GEMINI_TARGET_MODEL,
+        thinkingLevel: 'MEDIUM',
+        systemPrompt: 'Classify the billing user instruction into JSON.',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Are you able to issue refunds for settled statements?' }],
+          },
+        ],
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            intent: { type: 'STRING' },
+            mutates_state: { type: 'BOOLEAN' },
+            target_operation: { type: 'STRING' },
+          },
+          required: ['intent', 'mutates_state', 'target_operation'],
+        },
+        maxOutputTokens: 800,
+        allowUpstreamFallback: true,
+      });
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          configuredTargetModel: GEMINI_TARGET_MODEL,
+          previousBaselineModel: GEMINI_PREVIOUS_MODEL,
+          thinkingLevel: GEMINI_DEFAULT_THINKING_LEVEL,
+          availableFlashModels,
+          directTargetProbe: {
+            ok: directTargetProbe.ok,
+            status: directTargetProbe.status,
+            configuredModel: directTargetProbe.configuredModel,
+            upstreamResolvedModel: directTargetProbe.upstreamResolvedModel,
+            latencyMs: directTargetProbe.latencyMs,
+            usageMetadata: directTargetProbe.usageMetadata,
+            error: directTargetProbe.rawError,
+          },
+          resolvedTargetProbe: {
+            ok: resolvedTargetProbe.ok,
+            status: resolvedTargetProbe.status,
+            configuredModel: resolvedTargetProbe.configuredModel,
+            upstreamResolvedModel: resolvedTargetProbe.upstreamResolvedModel,
+            redirectOrFallbackReason: resolvedTargetProbe.redirectOrFallbackReason,
+            thinkingLevel: resolvedTargetProbe.thinkingLevel,
+            latencyMs: resolvedTargetProbe.latencyMs,
+            usageMetadata: resolvedTargetProbe.usageMetadata,
+            thoughtSignaturesCount: resolvedTargetProbe.thoughtSignatures.length,
+            textPreview: resolvedTargetProbe.text.slice(0, 300),
+          },
+          baseline25FlashProbe: {
+            ok: baseline25FlashProbe.ok,
+            status: baseline25FlashProbe.status,
+            configuredModel: baseline25FlashProbe.configuredModel,
+            upstreamResolvedModel: baseline25FlashProbe.upstreamResolvedModel,
+            latencyMs: baseline25FlashProbe.latencyMs,
+            usageMetadata: baseline25FlashProbe.usageMetadata,
+            textPreview: baseline25FlashProbe.text.slice(0, 300),
+          },
+          multiTurnFunctionCallingTest: {
+            turn1Ok: toolTurn1.ok,
+            turn1UpstreamModel: toolTurn1.upstreamResolvedModel,
+            turn1FunctionCalls: toolTurn1.functionCalls,
+            turn1ThoughtSignaturesPreserved: toolTurn1.thoughtSignatures.length,
+            turn1LatencyMs: toolTurn1.latencyMs,
+            turn1Usage: toolTurn1.usageMetadata,
+            turn2Ok: Boolean(toolTurn2?.ok),
+            turn2Text: toolTurn2?.text || null,
+            turn2LatencyMs: toolTurn2?.latencyMs || 0,
+            turn2Usage: toolTurn2?.usageMetadata || null,
+          },
+          structuredJsonOutputTest: {
+            ok: structuredJsonProbe.ok,
+            upstreamModel: structuredJsonProbe.upstreamResolvedModel,
+            latencyMs: structuredJsonProbe.latencyMs,
+            usageMetadata: structuredJsonProbe.usageMetadata,
+            parsedJson: (() => {
+              try {
+                return JSON.parse(structuredJsonProbe.text);
+              } catch {
+                return null;
+              }
+            })(),
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const message = String(body?.message || '').trim().slice(0, 2000);
@@ -1463,23 +1953,20 @@ Deno.serve(async (req: Request) => {
     }
 
     let usedGemini = false;
+    let geminiCompatMeta: Record<string, any> | null = null;
+    const configuredGeminiModel =
+      String(Deno.env.get('GEMINI_MODEL') || GEMINI_TARGET_MODEL).trim() || GEMINI_TARGET_MODEL;
 
     if (!assistantReply && geminiApiKey) {
       const { data: recentChatRows } = await serviceClient
         .from('billing_ai_messages')
-        .select('role, content')
+        .select('role, content, tool_calls')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false })
         .limit(6);
 
-      const historyParts = Array.isArray(recentChatRows)
-        ? recentChatRows
-            .slice()
-            .reverse()
-            .map((m: any) => ({
-              role: m.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: String(m.content || '').slice(0, 600) }],
-            }))
+      const historyParts = Array.isArray(recentChatRows) && recentChatRows.length > 0
+        ? sanitizeMultiTurnGeminiContents(recentChatRows.slice().reverse(), configuredGeminiModel)
         : [{ role: 'user', parts: [{ text: message }] }];
 
       const systemPrompt = [
@@ -1502,31 +1989,29 @@ Deno.serve(async (req: Request) => {
         `BILLING CONTEXT JSON:\n${JSON.stringify(invoiceSummaries, null, 2)}`,
       ].join('\n');
 
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: historyParts.length > 0 ? historyParts : [{ role: 'user', parts: [{ text: message }] }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 350,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          }),
-        }
-      );
+      const geminiResult = await invokeGeminiCompatRequest({
+        apiKey: geminiApiKey,
+        targetModel: configuredGeminiModel,
+        thinkingLevel: GEMINI_DEFAULT_THINKING_LEVEL,
+        systemPrompt,
+        contents: historyParts.length > 0 ? historyParts : [{ role: 'user', parts: [{ text: message }] }],
+        maxOutputTokens: 1536,
+        allowUpstreamFallback: true,
+      });
 
-      if (geminiRes.ok) {
-        const geminiJson = await geminiRes.json();
-        const candidateText =
-          geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-        if (candidateText) {
-          assistantReply = candidateText;
-          usedGemini = true;
-        }
+      if (geminiResult.ok && geminiResult.text) {
+        assistantReply = geminiResult.text;
+        usedGemini = true;
+        geminiCompatMeta = {
+          model: geminiResult.configuredModel,
+          upstream_resolved_model: geminiResult.upstreamResolvedModel,
+          redirect_or_fallback_reason: geminiResult.redirectOrFallbackReason,
+          thinking_level: geminiResult.thinkingLevel,
+          thought_signatures: geminiResult.thoughtSignatures,
+          model_parts: geminiResult.modelParts,
+          latency_ms: geminiResult.latencyMs,
+          usage_metadata: geminiResult.usageMetadata,
+        };
       }
     }
 
@@ -1636,6 +2121,7 @@ Deno.serve(async (req: Request) => {
         role: 'assistant',
         content: assistantReply,
         proposal_id: proposalRow?.id ?? null,
+        tool_calls: geminiCompatMeta,
       })
       .select('*')
       .single();
@@ -1645,18 +2131,31 @@ Deno.serve(async (req: Request) => {
       .update({ last_activity_at: new Date().toISOString() })
       .eq('id', sessionId);
 
+    const activeAiEngineLabel = usedGemini
+      ? configuredGeminiModel
+      : 'deterministic-guardrail-router';
+
     return new Response(
       JSON.stringify({
         sessionId,
-        aiEngine: usedGemini ? 'gemini-2.5-flash' : 'deterministic-guardrail-router',
+        aiEngine: activeAiEngineLabel,
         geminiConfigured: Boolean(geminiApiKey),
+        geminiCompatibility: {
+          configuredModel: configuredGeminiModel,
+          previousModel: GEMINI_PREVIOUS_MODEL,
+          thinkingLevel: GEMINI_DEFAULT_THINKING_LEVEL,
+          upstreamResolvedModel: geminiCompatMeta?.upstream_resolved_model ?? null,
+          thoughtSignaturesPreserved: geminiCompatMeta?.thought_signatures?.length ?? 0,
+          latencyMs: geminiCompatMeta?.latency_ms ?? null,
+          usageMetadata: geminiCompatMeta?.usage_metadata ?? null,
+        },
         reply: {
           id: savedAssistantMsg?.id || crypto.randomUUID(),
           role: 'assistant',
           content: assistantReply,
           createdAt: savedAssistantMsg?.created_at || new Date().toISOString(),
           proposal: proposalRow,
-          aiEngine: usedGemini ? 'gemini-2.5-flash' : 'deterministic-guardrail-router',
+          aiEngine: activeAiEngineLabel,
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

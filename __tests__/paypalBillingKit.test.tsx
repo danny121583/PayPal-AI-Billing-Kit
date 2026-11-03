@@ -15,6 +15,17 @@ import {
   evaluateConversationalAuthorization,
   generateReceiptPdfString,
   generateReceiptPdfBytes,
+  DEFAULT_ELECTRONIC_RECEIPT_FOOTER,
+  resolveReceiptPresentationState,
+  resolveMerchantBranding,
+  GEMINI_PREVIOUS_MODEL,
+  GEMINI_TARGET_MODEL,
+  GEMINI_DEFAULT_THINKING_LEVEL,
+  buildSanitizedGenerationConfig,
+  extractThoughtSignatures,
+  sanitizeMultiTurnContents,
+  buildOrderedFunctionResponseTurn,
+  computeGeminiUsageMetrics,
   UNIFIED_MCP_TOOL_REGISTRY,
   UNIFIED_MCP_REGISTRY_SUMMARY,
 } from '../packages/paypal-billing-kit/src';
@@ -722,12 +733,20 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
       ],
     };
 
-    // Verify PDF 1.4 Receipt generation (Paid & Refunded)
+    // Verify Merchant-Branded PDF 1.4 Receipt generation (Paid, Refunded, Partial Refund, Demo Settlement, Unpaid Refusal)
     const pdfStr = generateReceiptPdfString(sampleReceiptPayload);
     expect(pdfStr.startsWith('%PDF-1.4')).toBe(true);
     expect(pdfStr).toContain('PPB-INV-2026-1057');
     expect(pdfStr).toContain('5HM71086SR568352C');
-    expect(pdfStr).toContain('PAYMENT RECEIPT');
+    expect(pdfStr).toContain('Jenkins Wellness & Telehealth Practice');
+    expect(pdfStr).toContain('Provider: Dr. Sarah Jenkins');
+    expect(pdfStr).toContain('Payment Receipt');
+    expect(pdfStr).toContain('Payment Receipt - Paid');
+    expect(pdfStr).toContain('PayPal Sandbox Test Transaction');
+    expect(pdfStr).toContain('Payment processed through PayPal');
+    expect(pdfStr).toContain(DEFAULT_ELECTRONIC_RECEIPT_FOOTER);
+    expect(pdfStr).not.toContain('Unified MCP Gateway');
+    expect(pdfStr).not.toContain('Zero PHI Administrative Ledger');
     expect(pdfStr.trim().endsWith('%%EOF')).toBe(true);
     expect(generateReceiptPdfBytes(sampleReceiptPayload).byteLength).toBeGreaterThan(1000);
 
@@ -739,8 +758,122 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
       refunded_at: '2026-11-02T22:28:18Z',
       paypal_refund_id: '2EM77813GU330222M',
     });
-    expect(refundedPdfStr).toContain('REFUNDED');
+    expect(refundedPdfStr).toContain('Payment & Refund Receipt - Refunded');
     expect(refundedPdfStr).toContain('2EM77813GU330222M');
+
+    const partialRefundPdfStr = generateReceiptPdfString({
+      ...sampleReceiptPayload,
+      status: 'partially_refunded',
+      amount_refunded_minor: 1500,
+      amount_refunded_usd: '$15.00',
+      net_paid_minor: 2000,
+      net_paid_usd: '$20.00',
+    });
+    expect(partialRefundPdfStr).toContain('Payment Receipt - Partially Refunded');
+    expect(partialRefundPdfStr).toContain('Net Payment Retained:');
+
+    const demoSettlementPdfStr = generateReceiptPdfString({
+      ...sampleReceiptPayload,
+      is_live_paypal_capture: false,
+      settlement_verification: 'sample_demo_settlement_not_live_paypal',
+      settlement_reference: 'SAMPLE-DEMO-SETTLEMENT-1003',
+      paypal_capture_id: null,
+    });
+    expect(demoSettlementPdfStr).toContain('Sample Demo Receipt - Not a Real PayPal Payment');
+    expect(demoSettlementPdfStr).not.toContain('Payment processed through PayPal');
+
+    expect(() =>
+      resolveReceiptPresentationState({
+        ...sampleReceiptPayload,
+        status: 'sent',
+        amount_paid_minor: 0,
+        amount_paid_usd: '$0.00',
+      })
+    ).toThrow(/RECEIPT_UNAVAILABLE_UNPAID_INVOICE/);
+
+    const resolvedDefaultBranding = resolveMerchantBranding(sampleReceiptPayload);
+    expect(resolvedDefaultBranding.businessName).toBe('Jenkins Wellness & Telehealth Practice');
+    expect(resolvedDefaultBranding.providerName).toBe('Dr. Sarah Jenkins');
+    expect(resolvedDefaultBranding.businessAddress).toBeNull();
+    expect(resolvedDefaultBranding.businessPhone).toBeNull();
+
+    // Verify Gemini 3.5 Flash-Lite Compatibility Layer
+    expect(GEMINI_PREVIOUS_MODEL).toBe('gemini-2.5-flash');
+    expect(GEMINI_TARGET_MODEL).toBe('gemini-3.5-flash-lite');
+    expect(GEMINI_DEFAULT_THINKING_LEVEL).toBe('MEDIUM');
+
+    const sanitizedGenConfig = buildSanitizedGenerationConfig({
+      model: GEMINI_TARGET_MODEL,
+      thinkingLevel: 'medium',
+      legacyConfigToSanitize: {
+        temperature: 0.1,
+        thinkingConfig: { thinkingBudget: 0 },
+        candidateCount: 2,
+      },
+    });
+    expect(sanitizedGenConfig.thinkingConfig).toEqual({ thinkingLevel: 'MEDIUM' });
+    expect((sanitizedGenConfig as any).temperature).toBeUndefined();
+    expect((sanitizedGenConfig as any).thinkingBudget).toBeUndefined();
+    expect((sanitizedGenConfig as any).candidateCount).toBeUndefined();
+
+    const sigs = extractThoughtSignatures({
+      role: 'model',
+      parts: [
+        { thought: true, text: 'Evaluating invoice', thoughtSignature: 'sig_abc_123' },
+        { functionCall: { id: 'call_1', name: 'get_invoice_details', args: { invoice_number: 'PPB-INV-2026-1002' } } },
+      ],
+    });
+    expect(sigs).toEqual(['sig_abc_123']);
+
+    const orderedFnResp = buildOrderedFunctionResponseTurn(
+      [
+        { id: 'call_1', name: 'get_invoice_details', args: { invoice_number: 'PPB-INV-2026-1002' } },
+        { id: 'call_2', name: 'get_business_metrics', args: {} },
+      ],
+      [
+        { id: 'call_2', name: 'get_business_metrics', response: { ok: true, count: 6 } },
+        {
+          id: 'call_1',
+          name: 'get_invoice_details',
+          response: { ok: true, balance_due_usd: '$50.00' },
+          multimodalParts: [{ inlineData: { mimeType: 'application/pdf', data: 'JVBERi0xLjQ=' } }],
+        },
+      ]
+    );
+    expect(orderedFnResp.parts.length).toBe(2);
+    expect(orderedFnResp.parts[0].functionResponse?.id).toBe('call_1');
+    expect(orderedFnResp.parts[0].functionResponse?.name).toBe('get_invoice_details');
+    expect(orderedFnResp.parts[0].functionResponse?.parts?.length).toBe(1);
+    expect(orderedFnResp.parts[1].functionResponse?.id).toBe('call_2');
+
+    const sanitizedTurns = sanitizeMultiTurnContents(
+      [
+        { role: 'user', parts: [{ text: 'Check invoice 1002' }] },
+        {
+          role: 'model',
+          sourceModel: 'gemini-2.5-flash',
+          parts: [{ text: 'Checking', thoughtSignature: 'legacy_25_sig' }],
+        },
+        {
+          role: 'model',
+          sourceModel: 'gemini-3.5-flash-lite',
+          parts: [{ text: 'Verified', thoughtSignature: 'current_35_sig' }],
+        },
+        { role: 'user', parts: [{ text: 'Proceed with details' }] },
+      ],
+      'gemini-3.5-flash-lite'
+    );
+    expect(sanitizedTurns[1].parts[0].thoughtSignature).toBeUndefined();
+    expect(sanitizedTurns[2].parts[0].thoughtSignature).toBe('current_35_sig');
+
+    const usageMetrics = computeGeminiUsageMetrics('gemini-3.5-flash-lite', {
+      promptTokenCount: 200,
+      candidatesTokenCount: 100,
+      thoughtsTokenCount: 150,
+      totalTokenCount: 450,
+    });
+    expect(usageMetrics.totalTokenCount).toBe(450);
+    expect(usageMetrics.estimatedCostUsd).toBeGreaterThan(0);
 
     // Render Unified MCP Modal and verify 30 tools + brand icon + PDF receipt endpoint
     const { getByTestId, getByText } = render(

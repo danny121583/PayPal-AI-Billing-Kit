@@ -1,6 +1,6 @@
-# PayPal AI Billing Kit (`v1.7.0`)
+# PayPal AI Billing Kit (`v1.8.0`)
 
-**AI-Powered Invoicing, Mistake-Recovery Workflows, Conversational Authorization, Automated Sandbox Card Checkout & Unified 30-Tool Model Context Protocol (MCP) Gateway for PayPal Sandbox.**
+**AI-Powered Invoicing, Mistake-Recovery Workflows, Conversational Authorization, Automated Sandbox Card Checkout, Merchant-Branded PDF Receipts & Unified 30-Tool Model Context Protocol (MCP) Gateway for PayPal Sandbox.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000000?logo=vercel)](https://paypal-ai-billing-kit.vercel.app)
@@ -24,7 +24,7 @@
 
 ## Overview
 
-**PayPal AI Billing Kit** is a standalone, open-source AI billing and payment application built for the **PayPal AI Hackathon 2026**. It pairs a multi-role Billing Dashboard (**Provider** & **Customer** perspectives) with an in-app **Gemini 2.5 Flash Billing AI Assistant** and a **Unified 30-Tool Model Context Protocol (MCP) Gateway** connected to **PayPal Sandbox REST v2 APIs** (`api-m.sandbox.paypal.com`) and **Official PayPal MCP Discovery** (`mcp.sandbox.paypal.com/sse`).
+**PayPal AI Billing Kit** is a standalone, open-source AI billing and payment application built for the **PayPal AI Hackathon 2026**. It pairs a multi-role Billing Dashboard (**Provider** & **Customer** perspectives) with an in-app **Gemini 3.5 Flash-Lite Billing AI Assistant** (`thinkingLevel: "MEDIUM"`) and a **Unified 30-Tool Model Context Protocol (MCP) Gateway** connected to **PayPal Sandbox REST v2 APIs** (`api-m.sandbox.paypal.com`) and **Official PayPal MCP Discovery** (`mcp.sandbox.paypal.com/sse`).
 
 ### Key Capabilities
 
@@ -42,8 +42,8 @@
    - **Explicit Conversational Authorization (`evaluateConversationalAuthorization`):** Direct user instructions (e.g., *"Create a $35 invoice for Alex Rivera for immunization"*, *"Pay Alex Rivera's $35 invoice"*, *"Refund $20 on invoice PPB-INV-2026-1003"*, *"Void unpaid invoice PPB-INV-2026-1001"*) execute immediately within `$500` single-action and `$2,500` daily guardrails, while capability questions (*"Can you refund invoices?"*) and hypothetical questions (*"What would happen if I paid?"*) never trigger writes.
 3. **Real End-to-End PayPal Sandbox Payments & Refunds:**
    - Creates real PayPal Sandbox Orders (`POST /v2/checkout/orders`), enforces genuine buyer approval on `sandbox.paypal.com`, captures payments (`POST /v2/checkout/orders/{id}/capture`), and executes partial or full refunds (`POST /v2/payments/captures/{id}/refund`).
-4. **Downloadable PDF 1.4 Receipts:**
-   - Generates downloadable PDF receipts (`GET /api/receipts/:invoice_number.pdf`) and base64-encoded PDFs inside `get_payment_receipt` with PayPal Order IDs, Capture IDs, Refund IDs, and line-item totals.
+4. **Professional Merchant-Branded PDF 1.4 Receipts:**
+   - Generates merchant-first downloadable PDF receipts (`GET /api/receipts/:invoice_number.pdf`) and base64-encoded PDFs inside `get_payment_receipt` and `generate_receipt_pdf` featuring **Jenkins Wellness & Telehealth Practice** (`Provider: Dr. Sarah Jenkins`), distinct state titles (`Payment Receipt — Paid`, `Payment & Refund Receipt — Refunded`, `Payment Receipt — Partially Refunded`, `Sample Demo Receipt — Not a Real PayPal Payment`), PayPal Order/Capture/Refund IDs, card brand & last 4 digits, `"Payment processed through PayPal"` attribution, and `"This receipt was generated electronically. Please retain it for your records."` footer.
 
 ---
 
