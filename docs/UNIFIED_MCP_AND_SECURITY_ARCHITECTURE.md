@@ -1,6 +1,6 @@
-# Unified PayPal MCP Gateway, Gemini 3.5 Flash-Lite AI, Automated Sandbox Card Checkout & Merchant-Branded PDF Receipt Architecture
+# Unified PayPal MCP Gateway (82 Tools), Gemini 3.5 Flash-Lite AI, Automated Sandbox Card Checkout & Merchant-Branded PDF Receipt Architecture
 
-**Project:** PayPal AI Billing Kit (`v1.8.0`)  
+**Project:** PayPal AI Billing Kit (`v1.9.0`)  
 **Unified MCP Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`  
 **Vercel MCP Mirror:** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
 **OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json`  
@@ -8,17 +8,17 @@
 
 ---
 
-## 1. Unified MCP Gateway Architecture (30 Tools)
+## 1. Unified MCP Gateway Architecture (82 Tools)
 
-External AI clients (ChatGPT MCP, Claude Desktop, MCP Inspector, or custom agents) connect to **one single MCP endpoint** (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`) and gain access to **30 unified tools** (26 baseline + 4 Sandbox card & PDF receipt tools) across three source categories and three permission tiers.
+External AI clients (ChatGPT MCP, Claude Desktop, MCP Inspector, or custom agents) connect to **one single MCP endpoint** (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`) and gain access to **82 unified tools** across three source categories (`21` Native Application, `47` Official PayPal MCP, `14` PayPal REST Adapters) and three permission tiers (`39` `read_only`, `3` `proposal_only`, `40` `confirmed_demo_write`).
 
 ### 1.1 Tool Breakdown by Source
 
 | Source Category | Count | Tools |
 | --- | --- | --- |
-| **Native Application (`native_app`)** | 21 | `discover_billing_capabilities`, `list_demo_customers`, `search_invoices`, `get_invoice_details`, `explain_outstanding_balances`, `get_transaction_history`, `get_payment_receipt`, `generate_receipt_pdf`, `get_financial_audit_history`, `get_paypal_sandbox_status`, `get_business_metrics`, `create_invoice_proposal`, `prepare_payment_proposal`, `prepare_refund_proposal`, `create_approved_invoice`, `create_paypal_checkout_order`, `capture_paypal_checkout_order`, `execute_approved_refund`, `void_unpaid_invoice`, `reset_demo_session`, `execute_conversational_instruction` |
-| **Official PayPal MCP (`official_paypal_mcp`)** | 1 | `paypal_discover_official_mcp` |
-| **PayPal REST Adapter (`paypal_rest_adapter`)** | 8 | `paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `paypal_check_card_eligibility`, `execute_sandbox_card_payment`, `run_sandbox_card_lifecycle_test` |
+| **Native Application (`native_application`)** | 21 | `discover_billing_capabilities`, `list_demo_customers`, `search_invoices`, `get_invoice_details`, `explain_outstanding_balances`, `get_transaction_history`, `get_payment_receipt`, `generate_receipt_pdf`, `get_financial_audit_history`, `get_paypal_sandbox_status`, `get_business_metrics`, `create_invoice_proposal`, `prepare_payment_proposal`, `prepare_refund_proposal`, `create_approved_invoice`, `create_paypal_checkout_order`, `capture_paypal_checkout_order`, `execute_approved_refund`, `void_unpaid_invoice`, `reset_demo_session`, `execute_conversational_instruction` |
+| **Official PayPal MCP (`official_paypal_mcp`)** | 47 | `paypal_discover_official_mcp` + all **46 official PayPal MCP tools** by their exact official names: `create_invoice`, `create_recurring_series`, `activate_recurring_series`, `get_recurring_series`, `cancel_recurring_series`, `delete_recurring_series`, `list_invoices`, `get_invoice`, `send_invoice`, `send_invoice_reminder`, `cancel_sent_invoice`, `delete_invoice`, `setup_invoice_auto_reminders`, `update_invoice_auto_reminder`, `search_invoicing`, `update_invoicing`, `cancel_invoice_auto_reminder`, `generate_invoice_qr_code`, `generate_invoice_number`, `record_payment_for_invoice`, `record_refund_for_invoice`, `create_conditional_rules_for_invoice`, `create_product`, `list_products`, `update_product`, `show_product_details`, `create_subscription_plan`, `list_subscription_plans`, `show_subscription_plan_details`, `create_subscription`, `show_subscription_details`, `cancel_subscription`, `update_subscription`, `create_shipment_tracking`, `get_shipment_tracking`, `update_shipment_tracking`, `create_order`, `get_order`, `pay_order`, `list_disputes`, `get_dispute`, `accept_dispute_claim`, `list_transactions`, `create_refund`, `get_refund`, `get_merchant_insights` |
+| **PayPal REST Adapter (`paypal_rest_adapter`)** | 14 | `paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `paypal_check_card_eligibility`, `execute_sandbox_card_payment`, `run_sandbox_card_lifecycle_test`, `update_plan`, `paypal_authorize_order`, `paypal_list_webhooks`, `paypal_list_webhook_event_types`, `paypal_list_invoice_templates`, `paypal_create_vault_setup_token` |
 
 ### 1.2 Official PayPal Sandbox MCP Server Diagnostic (`https://mcp.sandbox.paypal.com`)
 
@@ -27,11 +27,11 @@ During integration with PayPal's official remote MCP server (`https://mcp.sandbo
 1. **Endpoint Discovery:**
    - `https://mcp.sandbox.paypal.com/http` returns `HTTP 404 Not Found` (`Requested path /http not found`).
    - `https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server` returns `HTTP 200 OK` (OAuth 2.0 metadata with issuer `https://mcp.sandbox.paypal.com`).
-   - `GET https://mcp.sandbox.paypal.com/sse` with `Authorization: Bearer <PayPal_Sandbox_Access_Token>` returns `HTTP 200 OK` (`text/event-stream`), initializes `PayPal MCP Agent v1.0.0`, and lists **46 official PayPal tools** (`create_order`, `get_order`, `capture_order`, `create_refund`, `get_refund`, `list_invoices`, `generate_invoice_number`, `list_disputes`, etc.).
+   - `GET https://mcp.sandbox.paypal.com/sse` with `Authorization: Bearer <PayPal_Sandbox_Access_Token>` returns `HTTP 200 OK` (`text/event-stream`), initializes `PayPal MCP Agent v1.0.0`, and lists **46 official PayPal tools** (`create_invoice`, `create_order`, `get_order`, `pay_order`, `create_refund`, `get_refund`, `list_invoices`, `generate_invoice_number`, `list_disputes`, etc.).
 2. **Upstream Cloudflare Workers Runtime Issue in `@paypal/agent-toolkit`:**
    - When invoking `tools/call` on PayPal's hosted remote MCP server (`mcp.sandbox.paypal.com`), PayPal's internal Cloudflare Worker executes `@paypal/agent-toolkit` (`src/shared/functions.ts:2053`), which uses `axios` with `cache: "default"` in its `fetch` adapter. Cloudflare Workers' runtime `fetch` rejects `cache: "default"`, causing PayPal's hosted MCP server to return `PAYPAL_API_SETUP_ERROR: "Unsupported cache mode: default"`.
-3. **Unified Gateway Solution:**
-   - Our Unified MCP Gateway exposes `paypal_discover_official_mcp` (`source: "official_paypal_mcp"`) to inspect live connectivity and OAuth status against `mcp.sandbox.paypal.com/sse`, while executing the 5 official PayPal tool contracts (`paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `source: "paypal_rest_adapter"`) directly against `https://api-m.sandbox.paypal.com` using native `fetch` with zero `cache` runtime errors.
+3. **Unified 82-Tool Gateway Solution:**
+   - Our Unified MCP Gateway exposes `paypal_discover_official_mcp` plus all **46 official PayPal MCP tools** by their exact official names and **14 PayPal Sandbox REST-to-MCP adapter tools**, executing every supported PayPal Sandbox operation directly against `https://api-m.sandbox.paypal.com` using native `fetch` with zero `cache` runtime errors, full `$500`/`$2,500` guardrails, PHI firewall enforcement, and session-scoped audit logging.
 
 ---
 

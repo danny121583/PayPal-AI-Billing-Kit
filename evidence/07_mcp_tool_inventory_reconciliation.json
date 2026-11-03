@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-11-03T03:00:48.196Z",
+  "generated_at": "2026-11-03T04:36:37.189Z",
   "canonical_registry_path": "packages/paypal-billing-kit/src/mcpRegistry.ts",
   "summary": {
-    "total_tools": 30,
-    "baseline_v1_6_tools": 26,
+    "total_tools": 82,
+    "baseline_v1_6_tools": 30,
     "v1_7_sandbox_card_and_pdf_tools": 4,
     "by_source": {
       "native_app": 21,
-      "official_paypal_mcp": 1,
-      "paypal_rest_adapter": 8
+      "official_paypal_mcp": 47,
+      "paypal_rest_adapter": 14
     },
     "by_permission_tier": {
-      "read_only": 18,
+      "read_only": 39,
       "proposal_only": 3,
-      "confirmed_write": 9
+      "confirmed_write": 40
     },
     "verification_checks_passed": 38,
     "verification_checks_failed": 0
@@ -40,9 +40,9 @@
         "title": "PayPal AI Billing Kit MCP",
         "version": "2.0.0"
       },
-      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 30 billing tools (21 Native Application tools + 1 Official PayPal MCP Discovery tool + 8 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
-      "tools_count": 30,
-      "unique_tools_count": 30,
+      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 82 billing tools (21 Native Application tools + 47 Official PayPal MCP Discovery tool + 14 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
+      "tools_count": 82,
+      "unique_tools_count": 82,
       "duplicates": [],
       "missing_tools": [],
       "unexpected_tools": [],
@@ -59,9 +59,9 @@
         "title": "PayPal AI Billing Kit MCP",
         "version": "2.0.0"
       },
-      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 30 billing tools (21 Native Application tools + 1 Official PayPal MCP Discovery tool + 8 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
-      "tools_count": 30,
-      "unique_tools_count": 30,
+      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 82 billing tools (21 Native Application tools + 47 Official PayPal MCP Discovery tool + 14 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
+      "tools_count": 82,
+      "unique_tools_count": 82,
       "duplicates": [],
       "missing_tools": [],
       "unexpected_tools": [],
@@ -78,9 +78,9 @@
         "title": "PayPal AI Billing Kit MCP",
         "version": "2.0.0"
       },
-      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 30 billing tools (21 Native Application tools + 1 Official PayPal MCP Discovery tool + 8 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
-      "tools_count": 30,
-      "unique_tools_count": 30,
+      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 82 billing tools (21 Native Application tools + 47 Official PayPal MCP Discovery tool + 14 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
+      "tools_count": 82,
+      "unique_tools_count": 82,
       "duplicates": [],
       "missing_tools": [],
       "unexpected_tools": [],
@@ -746,6 +746,1427 @@
         "card_profile",
         "include_refund",
         "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 31,
+      "name": "create_invoice",
+      "title": "PayPal MCP: Create Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:currency_code,items,primary_recipients|props:actor_role:string[patient,provider],allow_partial_payment:boolean,allow_tip:boolean,currency_code:string,demo_session_id:string,enable_pay_by_bank:boolean,explicit_human_approval:boolean,invoice_date:string,invoice_number:string,invoicer_address_line_1:string,invoicer_address_line_2:string,invoicer_business_name:string,invoicer_city:string,invoicer_country_code:string,invoicer_email_address:string,invoicer_given_name:string,invoicer_postal_code:string,invoicer_state:string,invoicer_surname:string,invoicer_tax_id:string,items:array,minimum_partial_payment_amount:string,note:string,pay_by_bank_exclusive_above_threshold:boolean,primary_recipients:array,proposal_id:string,reference:string,shipping_cost:string,theme_color:string,user_instruction:string",
+      "required_params": [
+        "currency_code",
+        "primary_recipients",
+        "items"
+      ],
+      "parameter_names": [
+        "currency_code",
+        "invoice_number",
+        "invoice_date",
+        "reference",
+        "note",
+        "invoicer_business_name",
+        "invoicer_given_name",
+        "invoicer_surname",
+        "invoicer_email_address",
+        "invoicer_tax_id",
+        "invoicer_address_line_1",
+        "invoicer_address_line_2",
+        "invoicer_city",
+        "invoicer_state",
+        "invoicer_postal_code",
+        "invoicer_country_code",
+        "primary_recipients",
+        "items",
+        "allow_tip",
+        "theme_color",
+        "shipping_cost",
+        "enable_pay_by_bank",
+        "pay_by_bank_exclusive_above_threshold",
+        "allow_partial_payment",
+        "minimum_partial_payment_amount",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 32,
+      "name": "create_recurring_series",
+      "title": "PayPal MCP: Create Recurring Series",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:currency_code,interval_count,interval_unit,primary_recipients,start_series_date|props:actor_role:string[patient,provider],allow_partial_payment:boolean,allow_tip:boolean,currency_code:string,demo_session_id:string,explicit_human_approval:boolean,interval_count:integer,interval_unit:string[DAY,MONTH,WEEK,YEAR],invoicer_address_line_1:string,invoicer_address_line_2:string,invoicer_business_name:string,invoicer_city:string,invoicer_country_code:string,invoicer_email_address:string,invoicer_given_name:string,invoicer_postal_code:string,invoicer_state:string,invoicer_surname:string,invoicer_tax_id:string,items:array,minimum_partial_payment_amount:string,note:string,primary_recipients:array,proposal_id:string,reference:string,shipping_cost:string,start_series_date:string,total_cycles:integer,user_instruction:string",
+      "required_params": [
+        "interval_unit",
+        "interval_count",
+        "start_series_date",
+        "currency_code",
+        "primary_recipients"
+      ],
+      "parameter_names": [
+        "interval_unit",
+        "interval_count",
+        "start_series_date",
+        "total_cycles",
+        "reference",
+        "currency_code",
+        "note",
+        "invoicer_business_name",
+        "invoicer_given_name",
+        "invoicer_surname",
+        "invoicer_email_address",
+        "invoicer_tax_id",
+        "invoicer_address_line_1",
+        "invoicer_address_line_2",
+        "invoicer_city",
+        "invoicer_state",
+        "invoicer_postal_code",
+        "invoicer_country_code",
+        "primary_recipients",
+        "items",
+        "allow_tip",
+        "shipping_cost",
+        "allow_partial_payment",
+        "minimum_partial_payment_amount",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 33,
+      "name": "activate_recurring_series",
+      "title": "PayPal MCP: Activate Recurring Series",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:recurring_series_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,proposal_id:string,recurring_series_id:string,user_instruction:string",
+      "required_params": [
+        "recurring_series_id"
+      ],
+      "parameter_names": [
+        "recurring_series_id",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 34,
+      "name": "get_recurring_series",
+      "title": "PayPal MCP: Get Recurring Series",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:recurring_series_id|props:demo_session_id:string,recurring_series_id:string",
+      "required_params": [
+        "recurring_series_id"
+      ],
+      "parameter_names": [
+        "recurring_series_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 35,
+      "name": "cancel_recurring_series",
+      "title": "PayPal MCP: Cancel Recurring Series",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:recurring_series_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,proposal_id:string,recurring_series_id:string,user_instruction:string",
+      "required_params": [
+        "recurring_series_id"
+      ],
+      "parameter_names": [
+        "recurring_series_id",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 36,
+      "name": "delete_recurring_series",
+      "title": "PayPal MCP: Delete Recurring Series",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:recurring_series_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,proposal_id:string,recurring_series_id:string,user_instruction:string",
+      "required_params": [
+        "recurring_series_id"
+      ],
+      "parameter_names": [
+        "recurring_series_id",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 37,
+      "name": "list_invoices",
+      "title": "PayPal MCP: List Invoices",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,page:number,page_size:number,total_required:boolean",
+      "required_params": [],
+      "parameter_names": [
+        "page",
+        "page_size",
+        "total_required",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 38,
+      "name": "get_invoice",
+      "title": "PayPal MCP: Get Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:demo_session_id:string,invoice_id:string",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 39,
+      "name": "send_invoice",
+      "title": "PayPal MCP: Send Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:actor_role:string[patient,provider],additional_recipients:array,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,note:string,proposal_id:string,send_to_recipient:boolean,user_instruction:string",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "note",
+        "send_to_recipient",
+        "additional_recipients",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 40,
+      "name": "send_invoice_reminder",
+      "title": "PayPal MCP: Send Invoice Reminder",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:actor_role:string[patient,provider],additional_recipients:array,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,note:string,proposal_id:string,subject:string,user_instruction:string",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "subject",
+        "note",
+        "additional_recipients",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 41,
+      "name": "cancel_sent_invoice",
+      "title": "PayPal MCP: Cancel Sent Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:actor_role:string[patient,provider],additional_recipients:array,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,note:string,proposal_id:string,send_to_recipient:boolean,user_instruction:string",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "note",
+        "send_to_recipient",
+        "additional_recipients",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 42,
+      "name": "delete_invoice",
+      "title": "PayPal MCP: Delete Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,proposal_id:string,user_instruction:string",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 43,
+      "name": "setup_invoice_auto_reminders",
+      "title": "PayPal MCP: Setup Invoice Auto Reminders",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:actor_role:string[patient,provider],configurations:array,demo_session_id:string,explicit_human_approval:boolean,proposal_id:string,user_instruction:string",
+      "required_params": [],
+      "parameter_names": [
+        "configurations",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 44,
+      "name": "update_invoice_auto_reminder",
+      "title": "PayPal MCP: Update Invoice Auto Reminder",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:interval,reminder_configuration_id,repetition,type|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,interval:object,notification:object,proposal_id:string,reminder_configuration_id:string,repetition:integer,status:string[ACTIVE,INACTIVE,NONE],type:string[AFTER_DUE,BEFORE_DUE],user_instruction:string",
+      "required_params": [
+        "reminder_configuration_id",
+        "type",
+        "interval",
+        "repetition"
+      ],
+      "parameter_names": [
+        "reminder_configuration_id",
+        "type",
+        "status",
+        "interval",
+        "repetition",
+        "notification",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 45,
+      "name": "search_invoicing",
+      "title": "PayPal MCP: Search Invoicing",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:resource_type|props:demo_session_id:string,invoice_filters:object,page:integer,page_size:integer,recurring_series_filters:object,resource_type:string[invoice,recurring_series],total_required:boolean",
+      "required_params": [
+        "resource_type"
+      ],
+      "parameter_names": [
+        "resource_type",
+        "page",
+        "page_size",
+        "total_required",
+        "invoice_filters",
+        "recurring_series_filters",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 46,
+      "name": "update_invoicing",
+      "title": "PayPal MCP: Update Invoicing",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:resource_type|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,invoice_update:object,proposal_id:string,recurring_series_update:object,resource_type:string[invoice,recurring_series],user_instruction:string",
+      "required_params": [
+        "resource_type"
+      ],
+      "parameter_names": [
+        "resource_type",
+        "invoice_update",
+        "recurring_series_update",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 47,
+      "name": "cancel_invoice_auto_reminder",
+      "title": "PayPal MCP: Cancel Invoice Auto Reminder",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,proposal_id:string,user_instruction:string",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 48,
+      "name": "generate_invoice_qr_code",
+      "title": "PayPal MCP: Generate Invoice Qr Code",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id|props:demo_session_id:string,height:number,invoice_id:string,width:number",
+      "required_params": [
+        "invoice_id"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "width",
+        "height",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 49,
+      "name": "generate_invoice_number",
+      "title": "PayPal MCP: Generate Invoice Number",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 50,
+      "name": "record_payment_for_invoice",
+      "title": "PayPal MCP: Record Payment For Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id,method|props:actor_role:string[patient,provider],amount:object,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,method:string[BANK_TRANSFER,CASH,CHECK,CREDIT_CARD,DEBIT_CARD,OTHER,PAYPAL,WIRE_TRANSFER],note:string,payment_date:string,payment_date_time:string,payment_id:string,proposal_id:string,shipping_info:object,user_instruction:string",
+      "required_params": [
+        "invoice_id",
+        "method"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "payment_id",
+        "payment_date",
+        "payment_date_time",
+        "method",
+        "note",
+        "amount",
+        "shipping_info",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 51,
+      "name": "record_refund_for_invoice",
+      "title": "PayPal MCP: Record Refund For Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id,method|props:actor_role:string[patient,provider],amount:object,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,method:string[BANK_TRANSFER,CASH,CHECK,CREDIT_CARD,DEBIT_CARD,OTHER,PAYPAL,WIRE_TRANSFER],proposal_id:string,refund_date:string,user_instruction:string",
+      "required_params": [
+        "invoice_id",
+        "method"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "refund_date",
+        "amount",
+        "method",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 52,
+      "name": "create_conditional_rules_for_invoice",
+      "title": "PayPal MCP: Create Conditional Rules For Invoice",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_id,rules|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,proposal_id:string,rules:array,user_instruction:string",
+      "required_params": [
+        "invoice_id",
+        "rules"
+      ],
+      "parameter_names": [
+        "invoice_id",
+        "rules",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 53,
+      "name": "create_product",
+      "title": "PayPal MCP: Create Product",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:name,type|props:actor_role:string[patient,provider],category:string,demo_session_id:string,description:string,explicit_human_approval:boolean,home_url:string,image_url:string,name:string,proposal_id:string,type:string[DIGITAL,PHYSICAL,SERVICE],user_instruction:string",
+      "required_params": [
+        "name",
+        "type"
+      ],
+      "parameter_names": [
+        "name",
+        "type",
+        "description",
+        "category",
+        "image_url",
+        "home_url",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 54,
+      "name": "list_products",
+      "title": "PayPal MCP: List Products",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,page:number,page_size:number,total_required:boolean",
+      "required_params": [],
+      "parameter_names": [
+        "page",
+        "page_size",
+        "total_required",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 55,
+      "name": "update_product",
+      "title": "PayPal MCP: Update Product",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:operations,product_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,operations:array,product_id:string,proposal_id:string,user_instruction:string",
+      "required_params": [
+        "product_id",
+        "operations"
+      ],
+      "parameter_names": [
+        "product_id",
+        "operations",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 56,
+      "name": "show_product_details",
+      "title": "PayPal MCP: Show Product Details",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:product_id|props:demo_session_id:string,product_id:string",
+      "required_params": [
+        "product_id"
+      ],
+      "parameter_names": [
+        "product_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 57,
+      "name": "create_subscription_plan",
+      "title": "PayPal MCP: Create Subscription Plan",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:billing_cycles,name,product_id|props:actor_role:string[patient,provider],billing_cycles:array,demo_session_id:string,description:string,explicit_human_approval:boolean,name:string,payment_preferences:object,product_id:string,proposal_id:string,taxes:object,user_instruction:string",
+      "required_params": [
+        "product_id",
+        "name",
+        "billing_cycles"
+      ],
+      "parameter_names": [
+        "product_id",
+        "name",
+        "description",
+        "billing_cycles",
+        "payment_preferences",
+        "taxes",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 58,
+      "name": "list_subscription_plans",
+      "title": "PayPal MCP: List Subscription Plans",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,page:number,page_size:number,product_id:string,total_required:boolean",
+      "required_params": [],
+      "parameter_names": [
+        "product_id",
+        "page",
+        "page_size",
+        "total_required",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 59,
+      "name": "show_subscription_plan_details",
+      "title": "PayPal MCP: Show Subscription Plan Details",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:plan_id|props:demo_session_id:string,plan_id:string",
+      "required_params": [
+        "plan_id"
+      ],
+      "parameter_names": [
+        "plan_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 60,
+      "name": "create_subscription",
+      "title": "PayPal MCP: Create Subscription",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:plan_id|props:actor_role:string[patient,provider],application_context:object,demo_session_id:string,explicit_human_approval:boolean,plan_id:string,proposal_id:string,quantity:number,shipping_amount:object,subscriber:object,user_instruction:string",
+      "required_params": [
+        "plan_id"
+      ],
+      "parameter_names": [
+        "plan_id",
+        "quantity",
+        "shipping_amount",
+        "subscriber",
+        "application_context",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 61,
+      "name": "show_subscription_details",
+      "title": "PayPal MCP: Show Subscription Details",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:subscription_id|props:demo_session_id:string,get_additional_details:boolean,subscription_id:string",
+      "required_params": [
+        "subscription_id"
+      ],
+      "parameter_names": [
+        "subscription_id",
+        "get_additional_details",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 62,
+      "name": "cancel_subscription",
+      "title": "PayPal MCP: Cancel Subscription",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:payload,subscription_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,payload:object,proposal_id:string,subscription_id:string,user_instruction:string",
+      "required_params": [
+        "subscription_id",
+        "payload"
+      ],
+      "parameter_names": [
+        "subscription_id",
+        "payload",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 63,
+      "name": "update_subscription",
+      "title": "PayPal MCP: Update Subscription",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:subscription_id|props:actor_role:string[patient,provider],auto_bill_outstanding:boolean,currency_code:string[USD],custom_id:string,demo_session_id:string,explicit_human_approval:boolean,fixed_price:object,outstanding_balance:string,payment_failure_threshold:number,proposal_id:string,shipping_address:object,shipping_amount:string,subscription_id:string,taxes_inclusive:boolean,taxes_percentage:string,user_instruction:string",
+      "required_params": [
+        "subscription_id"
+      ],
+      "parameter_names": [
+        "subscription_id",
+        "currency_code",
+        "outstanding_balance",
+        "custom_id",
+        "fixed_price",
+        "payment_failure_threshold",
+        "auto_bill_outstanding",
+        "taxes_inclusive",
+        "taxes_percentage",
+        "shipping_amount",
+        "shipping_address",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 64,
+      "name": "create_shipment_tracking",
+      "title": "PayPal MCP: Create Shipment Tracking",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:tracking_number,transaction_id|props:actor_role:string[patient,provider],carrier:string,demo_session_id:string,explicit_human_approval:boolean,order_id:string,proposal_id:string,status:string,tracking_number:string,transaction_id:string,user_instruction:string",
+      "required_params": [
+        "tracking_number",
+        "transaction_id"
+      ],
+      "parameter_names": [
+        "order_id",
+        "tracking_number",
+        "transaction_id",
+        "status",
+        "carrier",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 65,
+      "name": "get_shipment_tracking",
+      "title": "PayPal MCP: Get Shipment Tracking",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,order_id:string,transaction_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "order_id",
+        "transaction_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 66,
+      "name": "update_shipment_tracking",
+      "title": "PayPal MCP: Update Shipment Tracking",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:status,tracking_number,transaction_id|props:actor_role:string[patient,provider],carrier:string,demo_session_id:string,explicit_human_approval:boolean,new_tracking_number:string,proposal_id:string,status:string,tracking_number:string,transaction_id:string,user_instruction:string",
+      "required_params": [
+        "transaction_id",
+        "tracking_number",
+        "status"
+      ],
+      "parameter_names": [
+        "transaction_id",
+        "tracking_number",
+        "new_tracking_number",
+        "status",
+        "carrier",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 67,
+      "name": "create_order",
+      "title": "PayPal MCP: Create Order",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:currencyCode,items|props:actor_role:string[patient,provider],cancelUrl:string,currencyCode:string[USD],demo_session_id:string,discount:number,explicit_human_approval:boolean,items:array,notes:object,proposal_id:string,returnUrl:string,shippingAddress:object,shippingCost:number,user_instruction:string",
+      "required_params": [
+        "currencyCode",
+        "items"
+      ],
+      "parameter_names": [
+        "currencyCode",
+        "items",
+        "discount",
+        "shippingCost",
+        "shippingAddress",
+        "notes",
+        "returnUrl",
+        "cancelUrl",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 68,
+      "name": "get_order",
+      "title": "PayPal MCP: Get Order",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:id|props:demo_session_id:string,id:string",
+      "required_params": [
+        "id"
+      ],
+      "parameter_names": [
+        "id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 69,
+      "name": "pay_order",
+      "title": "PayPal MCP: Pay Order",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,id:string,proposal_id:string,user_instruction:string",
+      "required_params": [
+        "id"
+      ],
+      "parameter_names": [
+        "id",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 70,
+      "name": "list_disputes",
+      "title": "PayPal MCP: List Disputes",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,dispute_state:string[APPEALABLE,OPEN_INQUIRIES,REQUIRED_ACTION,REQUIRED_OTHER_PARTY_ACTION,RESOLVED,UNDER_PAYPAL_REVIEW],disputed_transaction_id:object,page:number,page_size:number",
+      "required_params": [],
+      "parameter_names": [
+        "disputed_transaction_id",
+        "dispute_state",
+        "page_size",
+        "page",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 71,
+      "name": "get_dispute",
+      "title": "PayPal MCP: Get Dispute",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:dispute_id|props:demo_session_id:string,dispute_id:string",
+      "required_params": [
+        "dispute_id"
+      ],
+      "parameter_names": [
+        "dispute_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 72,
+      "name": "accept_dispute_claim",
+      "title": "PayPal MCP: Accept Dispute Claim",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:dispute_id,note|props:actor_role:string[patient,provider],demo_session_id:string,dispute_id:string,explicit_human_approval:boolean,note:string,proposal_id:string,user_instruction:string",
+      "required_params": [
+        "dispute_id",
+        "note"
+      ],
+      "parameter_names": [
+        "dispute_id",
+        "note",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 73,
+      "name": "list_transactions",
+      "title": "PayPal MCP: List Transactions",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,end_date:string,page:number,page_size:number,search_months:number,start_date:string,transaction_id:object,transaction_status:string[D,P,S,V]",
+      "required_params": [],
+      "parameter_names": [
+        "transaction_id",
+        "transaction_status",
+        "start_date",
+        "end_date",
+        "search_months",
+        "page_size",
+        "page",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 74,
+      "name": "create_refund",
+      "title": "PayPal MCP: Create Refund",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:capture_id|props:actor_role:string[patient,provider],amount:object,capture_id:string,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,note_to_payer:string,proposal_id:string,user_instruction:string",
+      "required_params": [
+        "capture_id"
+      ],
+      "parameter_names": [
+        "capture_id",
+        "amount",
+        "invoice_id",
+        "note_to_payer",
+        "explicit_human_approval",
+        "user_instruction",
+        "proposal_id",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 75,
+      "name": "get_refund",
+      "title": "PayPal MCP: Get Refund",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:refund_id|props:demo_session_id:string,refund_id:string",
+      "required_params": [
+        "refund_id"
+      ],
+      "parameter_names": [
+        "refund_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 76,
+      "name": "get_merchant_insights",
+      "title": "PayPal MCP: Get Merchant Insights",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:end_date,insight_type,start_date,time_interval|props:demo_session_id:string,end_date:string,insight_type:string,start_date:string,time_interval:string",
+      "required_params": [
+        "start_date",
+        "end_date",
+        "insight_type",
+        "time_interval"
+      ],
+      "parameter_names": [
+        "start_date",
+        "end_date",
+        "insight_type",
+        "time_interval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 77,
+      "name": "update_plan",
+      "title": "PayPal REST: Update Subscription Plan",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:plan_id|props:actor_role:string[patient,provider],auto_bill_outstanding:boolean,demo_session_id:string,description:string,explicit_human_approval:boolean,operations:array,payment_failure_threshold:integer,plan_id:string,user_instruction:string",
+      "required_params": [
+        "plan_id"
+      ],
+      "parameter_names": [
+        "plan_id",
+        "description",
+        "auto_bill_outstanding",
+        "payment_failure_threshold",
+        "operations",
+        "explicit_human_approval",
+        "user_instruction",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 78,
+      "name": "paypal_authorize_order",
+      "title": "PayPal REST: Authorize Checkout Order",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:order_id|props:actor_role:string[patient,provider],demo_session_id:string,explicit_human_approval:boolean,order_id:string,user_instruction:string",
+      "required_params": [
+        "order_id"
+      ],
+      "parameter_names": [
+        "order_id",
+        "explicit_human_approval",
+        "user_instruction",
+        "actor_role",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 79,
+      "name": "paypal_list_webhooks",
+      "title": "PayPal REST: List Webhooks",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:anchor_type:string[ACCOUNT,APPLICATION],demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "anchor_type",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 80,
+      "name": "paypal_list_webhook_event_types",
+      "title": "PayPal REST: List Webhook Event Types",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,domain_filter:string",
+      "required_params": [],
+      "parameter_names": [
+        "domain_filter",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 81,
+      "name": "paypal_list_invoice_templates",
+      "title": "PayPal REST: List Invoice Templates",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,fields:string,page:integer,page_size:integer",
+      "required_params": [],
+      "parameter_names": [
+        "fields",
+        "page",
+        "page_size",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 82,
+      "name": "paypal_create_vault_setup_token",
+      "title": "PayPal REST: Create Vault Setup Token",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:actor_role:string[patient,provider],cancel_url:string,customer_id:string,demo_session_id:string,explicit_human_approval:boolean,payment_source_type:string[card,paypal],return_url:string,user_instruction:string",
+      "required_params": [],
+      "parameter_names": [
+        "payment_source_type",
+        "customer_id",
+        "return_url",
+        "cancel_url",
+        "explicit_human_approval",
+        "user_instruction",
+        "actor_role",
         "demo_session_id"
       ],
       "availability": {

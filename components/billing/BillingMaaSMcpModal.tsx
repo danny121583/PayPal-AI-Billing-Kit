@@ -195,15 +195,19 @@ export default function BillingMaaSMcpModal({
           </View>
           <View style={[styles.sourcePill, styles.sourcePillOfficial]}>
             <Text style={styles.sourcePillOfficialText}>
-              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp} Official PayPal MCP`}
+              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp} Official PayPal MCP (46 Catalog + Discovery)`}
             </Text>
           </View>
           <View style={[styles.sourcePill, styles.sourcePillAdapter]}>
             <Text style={styles.sourcePillAdapterText}>
-              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter} PayPal REST Adapter`}
+              {`${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter} PayPal REST Adapters`}
             </Text>
           </View>
         </View>
+
+        <Text style={styles.label} testID="maas-capability-notes">
+          {`Read/Write Split: ${READ_ONLY_TOOLS.length} Read-Only • ${PROPOSAL_ONLY_TOOLS.length} Proposal-Only • ${CONFIRMED_WRITE_TOOLS.length} Confirmed-Write | Sandbox Scope Notes: 77 Live Executable, 4 OAuth Scope Gated (Shipping Trackers v1 & Transaction Search v1), 1 Sandbox Unsupported (get_merchant_insights).`}
+        </Text>
 
         <Text style={styles.tierLabel}>
           {`1. Read-Only Discovery, Receipts & PayPal Sandbox Inspection (${READ_ONLY_TOOLS.length} Tools)`}

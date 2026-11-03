@@ -409,7 +409,7 @@
     ]
   },
   "proof_version": "1.8.0",
-  "verified_at": "2026-11-03T01:51:41.772Z",
+  "verified_at": "2026-11-03T04:37:19.974Z",
   "unified_mcp_endpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
   "official_paypal_mcp_diagnostic": {
     "ok": true,
@@ -828,17 +828,17 @@
     }
   },
   "automated_sandbox_direct_card_lifecycle_proof": {
-    "demo_session_id": "full-sbx-mw0170h4",
-    "invoice_number": "PPB-INV-2026-1094",
+    "demo_session_id": "full-sbx-mw074cjy",
+    "invoice_number": "PPB-INV-2026-1109",
     "amount_usd": "$35.00",
     "payment_source_type": "paypal_card",
     "card_profile": "visa_sandbox",
     "card_brand": "VISA",
     "card_last_digits": "1881",
     "processor_response_code": "0000",
-    "paypal_order_id": "60B1503079765005U",
-    "paypal_capture_id": "30999255PD588002G",
-    "paypal_refund_id": "8J349403LK9427529",
+    "paypal_order_id": "0PF858302K023054U",
+    "paypal_capture_id": "81T43159TK973290M",
+    "paypal_refund_id": "0W06180450656673Y",
     "negative_decline_test": {
       "card_profile": "decline_refused",
       "attempt_classification": "payment_declined",
@@ -861,7 +861,7 @@
       "stage": 1,
       "name": "Standalone repo & Supabase isolation check",
       "status": "PASS",
-      "evidence": "cwd=/Users/danny/Desktop/PayPal-AI-Billing-Kit, branch=main, version=1.8.0, supabase=dvzfesfvefggnunkjhom"
+      "evidence": "cwd=/Users/danny/Desktop/PayPal-AI-Billing-Kit, branch=feature/full-paypal-mcp-integration, version=1.9.0, supabase=dvzfesfvefggnunkjhom"
     },
     {
       "stage": 2,
@@ -885,7 +885,7 @@
       "stage": 5,
       "name": "Unified MCP discovery & schema check",
       "status": "PASS",
-      "evidence": "tools_count=30, baseline_preserved=26"
+      "evidence": "tools_count=82, baseline_preserved=30"
     },
     {
       "stage": 6,
@@ -939,13 +939,13 @@
       "stage": 14,
       "name": "Invoice creation in isolated demo session",
       "status": "PASS",
-      "evidence": "invoice_number=#PPB-INV-2026-1094, amount=$35.00, session=full-sbx-mw0170h4"
+      "evidence": "invoice_number=#PPB-INV-2026-1109, amount=$35.00, session=full-sbx-mw074cjy"
     },
     {
       "stage": 15,
       "name": "PayPal wallet order creation & awaiting_buyer_approval state check",
       "status": "PASS",
-      "evidence": "order_id=1E8038529R5762607, classification=awaiting_buyer_approval"
+      "evidence": "order_id=77S9610787059192J, classification=awaiting_buyer_approval"
     },
     {
       "stage": 16,
@@ -957,19 +957,19 @@
       "stage": 17,
       "name": "Automated Sandbox card payment execution",
       "status": "PASS",
-      "evidence": "raw_pan_blocked=RAW_CARD_CREDENTIALS_FORBIDDEN, decline=payment_declined (0500), captured_order=60B1503079765005U, capture=30999255PD588002G"
+      "evidence": "raw_pan_blocked=RAW_CARD_CREDENTIALS_FORBIDDEN, decline=payment_declined (0500), captured_order=0PF858302K023054U, capture=81T43159TK973290M"
     },
     {
       "stage": 18,
       "name": "Direct PayPal order & capture verification",
       "status": "PASS",
-      "evidence": "card_order=60B1503079765005U (COMPLETED), capture=30999255PD588002G (COMPLETED), historical=7FA47897KM5938009"
+      "evidence": "card_order=0PF858302K023054U (COMPLETED), capture=81T43159TK973290M (COMPLETED), historical=7FA47897KM5938009"
     },
     {
       "stage": 19,
       "name": "Invoice & ledger reconciliation verification",
       "status": "PASS",
-      "evidence": "invoice=#PPB-INV-2026-1094, status=paid, paid=$35.00, balance=$0.00, ref=30999255PD588002G"
+      "evidence": "invoice=#PPB-INV-2026-1109, status=paid, paid=$35.00, balance=$0.00, ref=81T43159TK973290M"
     },
     {
       "stage": 20,
@@ -981,13 +981,13 @@
       "stage": 21,
       "name": "Refund execution",
       "status": "PASS",
-      "evidence": "refund_id=8J349403LK9427529, is_live_paypal_refund=true, amount=$35.00"
+      "evidence": "refund_id=0W06180450656673Y, is_live_paypal_refund=true, amount=$35.00"
     },
     {
       "stage": 22,
       "name": "Direct PayPal refund verification",
       "status": "PASS",
-      "evidence": "new_refund=8J349403LK9427529 (COMPLETED), historical_refund=2EM77813GU330222M (COMPLETED)"
+      "evidence": "new_refund=0W06180450656673Y (COMPLETED), historical_refund=2EM77813GU330222M (COMPLETED)"
     },
     {
       "stage": 23,
@@ -1005,7 +1005,7 @@
       "stage": 25,
       "name": "Demo session reset verification",
       "status": "PASS",
-      "evidence": "session=reset-sbx-mw0181ik, post_reset_invoices_count=6"
+      "evidence": "session=reset-sbx-mw0752oe, post_reset_invoices_count=6"
     }
   ]
 }

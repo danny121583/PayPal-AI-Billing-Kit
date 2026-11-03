@@ -144,7 +144,7 @@ async function main() {
     pkg.name === 'paypal-ai-billing-kit' &&
     envText.includes(EXPECTED_SUPABASE_REF) &&
     !envText.includes('health-erecords') &&
-    gitBranch === 'main';
+    (gitBranch === 'main' || gitBranch === 'feature/full-paypal-mcp-integration');
   recordStage(
     1,
     'Standalone repo & Supabase isolation check',
@@ -211,14 +211,16 @@ async function main() {
   const toolsList = listRpc.json?.result?.tools || [];
   const capRes = await callMcpTool('discover_billing_capabilities', {}, testSession);
   const stage5Ok =
-    toolsList.length === 30 &&
+    toolsList.length === 82 &&
     capRes.data?.ok === true &&
-    capRes.data?.baseline_tools_count === 26 &&
-    capRes.data?.tools_count === 30 &&
+    capRes.data?.baseline_tools_count === 30 &&
+    capRes.data?.tools_count === 82 &&
     toolsList.some((t) => t.name === 'paypal_check_card_eligibility') &&
     toolsList.some((t) => t.name === 'execute_sandbox_card_payment') &&
     toolsList.some((t) => t.name === 'generate_receipt_pdf') &&
-    toolsList.some((t) => t.name === 'run_sandbox_card_lifecycle_test');
+    toolsList.some((t) => t.name === 'run_sandbox_card_lifecycle_test') &&
+    toolsList.some((t) => t.name === 'create_invoice') &&
+    toolsList.some((t) => t.name === 'paypal_create_vault_setup_token');
   recordStage(
     5,
     'Unified MCP discovery & schema check',

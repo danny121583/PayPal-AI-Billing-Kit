@@ -176,13 +176,13 @@ async function main() {
       getRes.status === 200 &&
         initRes.status === 200 &&
         listRes.status === 200 &&
-        liveTools.length === 30 &&
+        liveTools.length === 82 &&
         duplicates.length === 0 &&
         missingTools.length === 0 &&
         unexpectedTools.length === 0 &&
         schemaMismatches.length === 0 &&
-        String(initJson?.result?.instructions || '').includes('30 billing tools'),
-      `Live Endpoint Discovery [${key.toUpperCase()}] (${url}): HTTP 200, 30 tools, 0 duplicates, 0 missing, 0 legacy, 100% schema fingerprint parity`
+        String(initJson?.result?.instructions || '').includes('82 billing tools'),
+      `Live Endpoint Discovery [${key.toUpperCase()}] (${url}): HTTP 200, 82 tools, 0 duplicates, 0 missing, 0 legacy, 100% schema fingerprint parity`
     );
   }
 
@@ -243,11 +243,11 @@ async function main() {
     '_meta',
   ]);
   const strictSchemaValid =
-    tools.length === 30 &&
+    tools.length === 82 &&
     tools.every((t) => Object.keys(t).every((k) => allowedTopKeys.has(k)) && t._meta?.permissionTier);
   assert(
     strictSchemaValid,
-    `MCP \`tools/list\` exposes all 30 Unified MCP tools (26 baseline + 4 Sandbox Card/PDF tools) with strict MCP schema compliance (count=${tools.length})`
+    `MCP \`tools/list\` exposes all 82 Unified MCP tools (21 Native + 47 Official PayPal MCP + 14 PayPal REST Adapters) with strict MCP schema compliance (count=${tools.length})`
   );
 
   // 7. Tool 1: discover_billing_capabilities
