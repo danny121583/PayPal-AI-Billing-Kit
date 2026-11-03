@@ -7,17 +7,26 @@ import {
   formatBillingDate,
   formatUsdCents,
   getSyntheticInvoicesForRole,
+  resolveBillingDeepLinkInvoice,
 } from '../data/syntheticBillingFixtures';
 import {
+  authorizeAndFilterNotificationsForAccount,
   createBillingInvoice,
   DEFAULT_SERVICE_CATALOG,
   DEMO_USER_IDS,
   fetchBillingDashboardData,
   getActiveDemoUserId,
+  getDefaultNotificationsByUserId,
   getOrCreateDemoSessionId,
   getOrCreateDemoSessionIdSync,
+  getPreloadedBillingSnapshot,
+  markAllBillingNotificationsRead,
+  markBillingNotificationRead,
+  resetBillingDemoSession,
+  resolveNotificationLinkedInvoice,
   sendBillingPaymentReminder,
   simulateBillingDemoRefund,
+  simulateBillingDemoSettlement,
   voidBillingInvoice,
 } from './billingService';
 
@@ -1825,10 +1834,26 @@ async function evaluateBillingAITurn(params: {
     if (pendingProposal.kind === 'payment_checkout') {
       const invId = String(pendingProposal.payload?.invoice_id || '');
       const invNum = String(pendingProposal.payload?.invoice_number || '');
+      const invoiceIds = Array.isArray(pendingProposal.payload?.invoice_ids)
+        ? (pendingProposal.payload?.invoice_ids as string[]).map(String)
+        : invId
+          ? [invId]
+          : [];
       const amountMinor = Number(pendingProposal.amountMinor || 0);
       const targetInv =
         invoices.find((i) => i.id === invId || i.invoiceNumber === invNum) ||
         focusedInvoice;
+
+      if (invoiceIds.length > 1) {
+        // Settle secondary invoices in the combined batch so all included statements are settled together
+        for (const extraId of invoiceIds.slice(1)) {
+          try {
+            await simulateBillingDemoSettlement(extraId);
+          } catch {
+            // ignore
+          }
+        }
+      }
 
       decidedProposalCache.set(pendingProposal.id, {
         status: 'approved',
@@ -1836,9 +1861,9 @@ async function evaluateBillingAITurn(params: {
       });
       return {
         content: [
-          `Payment Proposal Confirmed for Statement #${invNum} (${formatUsdCents(
-            amountMinor
-          )} USD).`,
+          `Payment Proposal Confirmed for ${
+            invoiceIds.length > 1 ? `Statements #${invNum}` : `Statement #${invNum}`
+          } (${formatUsdCents(amountMinor)} USD).`,
           ``,
           `Current Status: Awaiting PayPal Sandbox Authorization`,
           `✓ Step 1: Proposal Prepared (Done)`,
@@ -2282,10 +2307,19 @@ async function evaluateBillingAITurn(params: {
 
   // 5. Customer Explicit Payment Checkout Proposal Directive
   if (params.roleScope === 'patient' && !isHypotheticalQuestion) {
-    const isQuestionAboutPaying =
-      /\b(?:can\s+i|how\s+do\s+i|how\s+can\s+i|why\s+did|when\s+was|was\s+it|is\s+it|what\s+if)\b/i.test(
+    const wantsMultipleOrBoth =
+      /\b(?:both|all(?:\s+of\s+them|\s+open|\s+unpaid|\s+my|\s+statements?|\s+invoices?)?|two\s+(?:statements?|invoices?)|at\s+the\s+same\s+time|together|combined)\b/i.test(
         lower
-      ) && !/\b(?:prepare|please\s+pay|pay\s+my|pay\s+#|pay\s+invoice|pay\s+statement|pay\s+now)\b/i.test(lower);
+      ) || matchedAuthorizedInvoices.length >= 2;
+
+    const isQuestionAboutPaying =
+      !wantsMultipleOrBoth &&
+      /\b(?:can\s+i|can\s+you|how\s+do\s+i|how\s+can\s+i|why\s+did|when\s+was|was\s+it|is\s+it|what\s+if)\b/i.test(
+        lower
+      ) &&
+      !/\b(?:prepare|please\s+pay|pay\s+my|pay\s+#|pay\s+invoice|pay\s+statement|pay\s+now|pay\s+both|pay\s+all)\b/i.test(
+        lower
+      );
 
     // Also allow bare invoice number reply (e.g. "#PPB-INV-2026-1002") when switching target invoice after a payment prompt
     const isBareInvoiceSelection =
@@ -2306,6 +2340,94 @@ async function evaluateBillingAITurn(params: {
       const unpaid = invoices.filter(
         (i) => i.balanceDueCents > 0 && i.status !== 'void' && i.status !== 'refunded'
       );
+
+      // Multi-statement ("pay both", "can you pay both at the same time?", "pay all open statements")
+      if (wantsMultipleOrBoth && unpaid.length >= 2) {
+        const matchedUnpaid = matchedAuthorizedInvoices.filter(
+          (i) => i.balanceDueCents > 0 && i.status !== 'void' && i.status !== 'refunded'
+        );
+        const batchTargets = matchedUnpaid.length >= 2 ? matchedUnpaid : unpaid;
+        const combinedAmountMinor = batchTargets.reduce(
+          (acc, i) => acc + i.balanceDueCents,
+          0
+        );
+        const singleLimit = dash.settings.maxSingleActionMinor;
+        if (combinedAmountMinor > singleLimit) {
+          return {
+            content: `Guardrail Blocked: A combined payment of ${formatUsdCents(
+              combinedAmountMinor
+            )} USD across ${batchTargets.length} statements exceeds your Maximum Single AI-Assisted Action limit of ${formatUsdCents(
+              singleLimit
+            )} USD. Please pay each statement individually.`,
+            proposal: null,
+            focusedInvoice: batchTargets[0],
+            responseSource: 'guardrail_immediate',
+            model: 'guardrail-monetary-limit',
+          };
+        }
+
+        const joinedNums = batchTargets
+          .map((i) => `#${i.invoiceNumber}`)
+          .join(' + ');
+        const rawNums = batchTargets.map((i) => i.invoiceNumber).join(', ');
+        const breakdownLines = batchTargets.map(
+          (i) =>
+            `• **#${i.invoiceNumber}** (${i.administrativeSummary}): **${formatUsdCents(
+              i.balanceDueCents
+            )} USD** — Due ${formatBillingDate(i.dueDate)} [**${i.status.toUpperCase()}**]`
+        );
+
+        return {
+          content: [
+            `Yes — you can settle all **${batchTargets.length}** open statements together in a single combined PayPal Sandbox checkout for **${formatUsdCents(
+              combinedAmountMinor
+            )} USD**:`,
+            ...breakdownLines,
+            ``,
+            `I have prepared a combined payment proposal below covering ${joinedNums} (**${formatUsdCents(
+              combinedAmountMinor
+            )} USD** total).`,
+            ``,
+            `Payment Workflow Stages:`,
+            `1. Preparation: Combined proposal prepared by Billing AI (${joinedNums})`,
+            `2. Requesting Approval: Tap Approve below or reply "Yes" to proceed`,
+            `3. PayPal Sandbox Checkout: Authorize ${formatUsdCents(
+              combinedAmountMinor
+            )} USD in PayPal Sandbox`,
+            `4. Awaiting Confirmation: PayPal Sandbox capture verification`,
+            `5. Completed: All ${batchTargets.length} statements marked paid and receipts issued`,
+            ``,
+            `Financial Boundary: Billing AI is an administrative assistant and cannot autonomously withdraw funds without your authorization in PayPal Sandbox.`,
+          ].join('\n'),
+          proposal: {
+            id: `local-prop-pay-batch-${batchTargets[0].id}-${Date.now()}`,
+            kind: 'payment_checkout',
+            title: `Pay ${joinedNums} (${formatUsdCents(combinedAmountMinor)})`,
+            summary: `Authorize combined ${formatUsdCents(
+              combinedAmountMinor
+            )} USD via PayPal Sandbox for ${batchTargets
+              .map(
+                (i) => `#${i.invoiceNumber} (${formatUsdCents(i.balanceDueCents)})`
+              )
+              .join(' + ')}`,
+            amountMinor: combinedAmountMinor,
+            currency: 'USD',
+            status: 'pending',
+            payload: {
+              action: 'payment_checkout',
+              invoice_id: batchTargets[0].id,
+              invoice_ids: batchTargets.map((i) => i.id),
+              invoice_number: rawNums,
+              invoice_numbers: batchTargets.map((i) => i.invoiceNumber),
+              amount_minor: combinedAmountMinor,
+            },
+          },
+          focusedInvoice: batchTargets[0],
+          responseSource: 'deterministic_rls',
+          model: 'deterministic-rls-responder',
+        };
+      }
+
       const payTarget =
         matchedAuthorizedInvoices[0] ||
         focusedInvoice ||
@@ -2604,6 +2726,18 @@ export async function decideBillingAIProposal(
       return { status: 'rejected', summary: 'Declined by user' };
     }
     if (proposalPayload?.action === 'payment_checkout') {
+      const invoiceIds = Array.isArray(proposalPayload?.invoice_ids)
+        ? (proposalPayload.invoice_ids as string[]).map(String)
+        : [];
+      if (invoiceIds.length > 1) {
+        for (const extraId of invoiceIds.slice(1)) {
+          try {
+            await simulateBillingDemoSettlement(extraId);
+          } catch {
+            // ignore
+          }
+        }
+      }
       await updateCachedProposalStatus(
         'approved',
         'Confirmed — Ready for PayPal Sandbox'
@@ -2813,5 +2947,13 @@ if (typeof window !== 'undefined') {
     buildBillingAIConversationScopeKey,
     DEMO_USER_IDS,
     getSyntheticInvoicesForRole,
+    resolveBillingDeepLinkInvoice,
+    authorizeAndFilterNotificationsForAccount,
+    getDefaultNotificationsByUserId,
+    getPreloadedBillingSnapshot,
+    markBillingNotificationRead,
+    markAllBillingNotificationsRead,
+    resetBillingDemoSession,
+    resolveNotificationLinkedInvoice,
   };
 }

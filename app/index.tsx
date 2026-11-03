@@ -54,11 +54,13 @@ import {
 import {
   DEFAULT_BILLABLE_PATIENTS,
   DEFAULT_SERVICE_CATALOG,
+  authorizeAndFilterNotificationsForAccount,
   fetchBillingDashboardData,
   getDefaultBillingAISettings,
   getOrCreateDemoSessionId,
   getOrCreateDemoSessionIdSync,
   getPreloadedBillingSnapshot,
+  markAllBillingNotificationsRead,
   markBillingNotificationRead,
   resetBillingDemoSession,
   resolveNotificationLinkedInvoice,
@@ -182,6 +184,7 @@ export default function BillingScreen() {
     () => initialSnap.notifications
   );
   const [refreshing, setRefreshing] = useState(false);
+  const accountRequestVersionRef = useRef(0);
 
   const dismissResetToast = useCallback(() => {
     if (resetToastTimerRef.current) {
@@ -204,6 +207,7 @@ export default function BillingScreen() {
       if (key === activePreset.key) return;
       const targetPreset = DEMO_ACCOUNT_PRESETS[key];
       if (!targetPreset) return;
+      accountRequestVersionRef.current += 1;
       // Synchronously apply preloaded persona state before render to prevent any flicker
       const snap = getPreloadedBillingSnapshot(
         targetPreset.roleScope,
@@ -243,14 +247,19 @@ export default function BillingScreen() {
 
   const refreshBillingData = useCallback(
     async (forceRefresh = true) => {
+      const requestVersion = ++accountRequestVersionRef.current;
+      const requestedUserId = activePreset.id;
+      const requestedRoleScope = roleScope;
       try {
         const sid = await getOrCreateDemoSessionId();
+        if (accountRequestVersionRef.current !== requestVersion) return;
         setDemoSessionId(sid);
         const dash = await fetchBillingDashboardData(
-          roleScope,
-          activePreset.id,
+          requestedRoleScope,
+          requestedUserId,
           { forceRefresh }
         );
+        if (accountRequestVersionRef.current !== requestVersion) return;
         setLiveInvoices(dash.invoices);
         setCatalog(dash.catalog);
         setBillablePatients(dash.billablePatients);
@@ -261,7 +270,9 @@ export default function BillingScreen() {
       } catch (err) {
         console.error('refreshBillingData error:', err);
       } finally {
-        setHasLoadedLiveOnce(true);
+        if (accountRequestVersionRef.current === requestVersion) {
+          setHasLoadedLiveOnce(true);
+        }
       }
     },
     [activePreset.id, roleScope]
@@ -277,9 +288,13 @@ export default function BillingScreen() {
       clearBillingAIClientCacheForTests();
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
+      setNotificationErrorText(null);
+      const snap = getPreloadedBillingSnapshot(roleScope, activePreset.id);
+      setLiveInvoices(snap.invoices);
+      setNotifications(snap.notifications);
       await refreshBillingData(true);
       setResetToastText(
-        'Demo session reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).'
+        'Demo session reset: all 6 canonical statements (#PPB-INV-2026-1001 to #PPB-INV-2026-1006), AI chats, and notifications restored.'
       );
       resetToastTimerRef.current = setTimeout(() => {
         setResetToastText(null);
@@ -292,7 +307,7 @@ export default function BillingScreen() {
     } finally {
       setIsResettingDemo(false);
     }
-  }, [dismissResetToast, isResettingDemo, refreshBillingData]);
+  }, [activePreset.id, dismissResetToast, isResettingDemo, refreshBillingData, roleScope]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -392,11 +407,12 @@ export default function BillingScreen() {
       resolveBillingDeepLinkInvoice({
         isAuthenticated: true,
         role: roleScope,
+        activeUserId: activePreset.id,
         invoiceId: rawInvoiceId,
         notificationId: rawNotificationId,
         additionalInvoices: liveInvoices ?? undefined,
       }),
-    [liveInvoices, rawInvoiceId, rawNotificationId, roleScope]
+    [activePreset.id, liveInvoices, rawInvoiceId, rawNotificationId, roleScope]
   );
 
   useEffect(() => {
@@ -498,9 +514,27 @@ export default function BillingScreen() {
     roleInvoices,
   ]);
 
+  const visibleNotifications = useMemo(
+    () =>
+      authorizeAndFilterNotificationsForAccount({
+        notifications,
+        roleScope,
+        activeUserId: activePreset.id,
+        invoices:
+          liveInvoices && liveInvoices.length > 0 ? liveInvoices : roleInvoices,
+      }),
+    [
+      activePreset.id,
+      liveInvoices,
+      notifications,
+      roleInvoices,
+      roleScope,
+    ]
+  );
+
   const unreadNotificationsCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications]
+    () => visibleNotifications.filter((n) => !n.isRead).length,
+    [visibleNotifications]
   );
 
   const handleOpenBillingAI = (
@@ -511,11 +545,22 @@ export default function BillingScreen() {
   };
 
   const handleMarkAllNotificationsRead = useCallback(async () => {
-    const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+    const unreadIds = visibleNotifications
+      .filter((n) => !n.isRead)
+      .map((n) => n.id);
     if (unreadIds.length === 0) return;
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    await Promise.all(unreadIds.map((id) => markBillingNotificationRead(id)));
-  }, [notifications]);
+    setNotifications((prev) =>
+      prev.map((n) =>
+        unreadIds.includes(n.id) && n.recipientUserId === activePreset.id
+          ? { ...n, isRead: true }
+          : n
+      )
+    );
+    await markAllBillingNotificationsRead({
+      activeUserId: activePreset.id,
+      roleScope,
+    });
+  }, [activePreset.id, roleScope, visibleNotifications]);
 
   const handleSelectNotification = async (
     notif: BillingNotificationItem
@@ -536,10 +581,15 @@ export default function BillingScreen() {
       return { ok: false, errorMessage: resolution.message };
     }
 
-    await markBillingNotificationRead(notif.id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
-    );
+    const markedRead = await markBillingNotificationRead(notif.id, {
+      activeUserId: activePreset.id,
+      roleScope,
+    });
+    if (markedRead) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+      );
+    }
     setShowNotificationsModal(false);
     setOpenedFromNotifications(true);
     setSelectedInvoice(resolution.invoice);
@@ -1003,7 +1053,7 @@ export default function BillingScreen() {
       {showNotificationsModal ? (
         <BillingNotificationsModal
           visible={showNotificationsModal}
-          notifications={notifications}
+          notifications={visibleNotifications}
           onClose={() => {
             setShowNotificationsModal(false);
             setNotificationErrorText(null);

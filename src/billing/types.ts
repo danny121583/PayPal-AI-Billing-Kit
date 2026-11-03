@@ -52,7 +52,9 @@ export interface SyntheticBillingInvoice {
   invoiceNumber: string;
   organizationId: string;
   organizationName: string;
+  issuerUserId?: string;
   issuerDoctorName: string;
+  recipientUserId?: string;
   patientDisplayName: string;
   allowedRoleScopes: BillingRoleScope[];
   authorizedDoctorScope: 'org_primary_demo' | 'other_org_restricted';
@@ -82,7 +84,9 @@ export interface SyntheticBillingInvoice {
 export interface BillingNotificationItem {
   id: string;
   recipientUserId: string;
+  organizationId?: string | null;
   invoiceId: string | null;
+  invoiceNumber?: string | null;
   type: string;
   title: string;
   body: string;

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  SquarePen,
   CheckCircle2,
   XCircle,
 } from 'lucide-react-native';
@@ -657,6 +659,28 @@ export default function BillingAIAssistantModal({
       testID="billing-ai-assistant-modal"
       closeTestID="billing-ai-close-btn"
       closeAccessibilityLabel="Close Billing AI"
+      headerLeftAction={
+        <Pressable
+          style={({ pressed, hovered }: any) => [
+            styles.headerNewChatButton,
+            hovered && styles.headerNewChatButtonHovered,
+            pressed && styles.headerNewChatButtonPressed,
+          ]}
+          onPress={() => void handleResetCurrentConversation()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="New Chat"
+          accessibilityHint="Start a fresh conversation for this billing context"
+          testID="billing-ai-new-chat-btn"
+          {...(Platform.OS === 'web'
+            ? ({
+                title: 'New Chat — Start a fresh conversation',
+              } as any)
+            : {})}
+        >
+          <SquarePen size={17} color="#374151" strokeWidth={2.2} />
+        </Pressable>
+      }
       footer={
         <ChatComposer
           value={composerValue}
@@ -681,8 +705,8 @@ export default function BillingAIAssistantModal({
           </Text>
         </View>
 
-        <View style={styles.contextChipsRow}>
-          {activeInvoice ? (
+        {activeInvoice ? (
+          <View style={styles.contextChipsRow}>
             <Pressable
               style={styles.focusChip}
               onPress={() => onOpenInvoice?.(activeInvoice)}
@@ -697,21 +721,8 @@ export default function BillingAIAssistantModal({
                 <ArrowUpRight size={12} color="#3730A3" />
               ) : null}
             </Pressable>
-          ) : null}
-
-          {messages.length > 0 ? (
-            <Pressable
-              style={styles.newChatChip}
-              onPress={() => void handleResetCurrentConversation()}
-              accessibilityRole="button"
-              accessibilityLabel="Start new chat for this statement"
-              testID="billing-ai-new-chat-btn"
-            >
-              <RotateCcw size={11} color="#475569" />
-              <Text style={styles.newChatChipText}>New Chat</Text>
-            </Pressable>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
 
       <ScrollView
@@ -926,25 +937,23 @@ const styles = StyleSheet.create({
   contextChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     flexWrap: 'wrap',
     gap: 8,
   },
-  newChatChip: {
-    flexDirection: 'row',
+  headerNewChatButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    justifyContent: 'center',
   },
-  newChatChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
+  headerNewChatButtonHovered: {
+    backgroundColor: '#E5E7EB',
+  },
+  headerNewChatButtonPressed: {
+    backgroundColor: '#D1D5DB',
   },
   messages: {
     flex: 1,

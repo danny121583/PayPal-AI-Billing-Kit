@@ -233,35 +233,25 @@ async function main() {
       const askAiBtn = document.querySelector(
         '[data-testid="billing-detail-ask-ai-btn"]'
       );
-      const rCard = cardBtn?.getBoundingClientRect();
-      const rSim = simBtn?.getBoundingClientRect();
       const rPp = ppBtn?.getBoundingClientRect();
       const rCancel = cancelBtn?.getBoundingClientRect();
       const rAskAi = askAiBtn?.getBoundingClientRect();
       return {
-        cardLabel: cardBtn?.textContent?.trim() || '',
-        simLabel: simBtn?.textContent?.trim() || '',
+        noCompetingSandboxCardBtn: !cardBtn && !simBtn,
         ppLabel: ppBtn?.textContent?.trim() || '',
         allFooterSingleRowOnDesktop:
           Boolean(rCancel && rAskAi && rPp) &&
           Math.abs((rCancel?.top || 0) - (rAskAi?.top || 0)) < 6 &&
           Math.abs((rAskAi?.top || 0) - (rPp?.top || 0)) < 6,
-        settlementRowAligned:
-          Boolean(rCard && rSim) &&
-          Math.abs((rCard?.top || 0) - (rSim?.top || 0)) < 6,
-        cardHeight: Math.round(rCard?.height || 0),
-        simHeight: Math.round(rSim?.height || 0),
         ppHeight: Math.round(rPp?.height || 0),
       };
     });
 
     recordCheck(
-      'Issue #7: Simplified payment button labels and balanced single-row desktop layout',
-      desktopModalMetrics.cardLabel === 'Pay with Sandbox Card' &&
-        desktopModalMetrics.simLabel === 'Simulate Settlement' &&
+      'Issue #7: Unified single Pay with PayPal button label and balanced single-row desktop layout',
+      desktopModalMetrics.noCompetingSandboxCardBtn &&
         desktopModalMetrics.ppLabel === 'Pay with PayPal' &&
-        desktopModalMetrics.allFooterSingleRowOnDesktop &&
-        desktopModalMetrics.settlementRowAligned,
+        desktopModalMetrics.allFooterSingleRowOnDesktop,
       desktopModalMetrics
     );
 
@@ -372,6 +362,43 @@ async function main() {
 
     const shot05 = await page.screenshot({ fullPage: false });
     saveScreenshotBoth(shot05, '05-billing-ai-composer-alignment.png');
+
+    // Issue #14: Verify New Chat button is in the upper-left corner of the modal header opposite the X close button
+    const headerNewChatMetrics = await page.evaluate(() => {
+      const newChatBtn = document.querySelector(
+        '[data-testid="billing-ai-new-chat-btn"]'
+      );
+      const closeBtn = document.querySelector(
+        '[data-testid="billing-ai-close-btn"]'
+      );
+      const modal = document.querySelector(
+        '[data-testid="billing-ai-assistant-modal"]'
+      );
+      const rNewChat = newChatBtn?.getBoundingClientRect();
+      const rClose = closeBtn?.getBoundingClientRect();
+      const rModal = modal?.getBoundingClientRect();
+      return {
+        exists: Boolean(newChatBtn),
+        width: Math.round(rNewChat?.width || 0),
+        height: Math.round(rNewChat?.height || 0),
+        topDeltaToCloseBtn:
+          rNewChat && rClose ? Math.abs(rNewChat.top - rClose.top) : 999,
+        isUpperLeft:
+          rNewChat && rModal ? rNewChat.left - rModal.left < 40 : false,
+        ariaLabel: newChatBtn?.getAttribute('aria-label') || '',
+      };
+    });
+
+    recordCheck(
+      'Issue #14: New Chat button is in the upper-left corner of the Billing AI modal header opposite the Close button (36x36px, top-aligned)',
+      headerNewChatMetrics.exists &&
+        headerNewChatMetrics.width === 36 &&
+        headerNewChatMetrics.height === 36 &&
+        headerNewChatMetrics.topDeltaToCloseBtn <= 2 &&
+        headerNewChatMetrics.isUpperLeft &&
+        /new chat/i.test(headerNewChatMetrics.ariaLabel),
+      headerNewChatMetrics
+    );
 
     const waitForAiReplyReady = async () => {
       await page.waitForTimeout(300);

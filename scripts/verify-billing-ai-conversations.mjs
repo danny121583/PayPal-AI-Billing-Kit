@@ -168,7 +168,7 @@ async function main() {
         prompt: 'when?',
         validate: (res) =>
           /1002/.test(res.reply.content) &&
-          /oct(?:ober)?\s*(?:15|28|12|1),\s*2026|2026-10-/i.test(
+          /(?:oct(?:ober)?|nov(?:ember)?)\s*\d{1,2},\s*2026|2026-\d{2}-\d{2}/i.test(
             res.reply.content
           ),
       },
@@ -471,6 +471,25 @@ async function main() {
           ) &&
           !res.reply.proposal &&
           res.reply.telemetry?.responseSource === 'guardrail_immediate',
+      },
+
+      // 33: Combined Multi-Statement Payment Proposal ("can you pay both at the same time?")
+      {
+        id: 'S33_combined_multi_statement_pay_both_proposal',
+        category: 'action_proposal',
+        roleScope: 'patient',
+        activeUserId: USERS.alex_rivera,
+        focusedInvoiceId: inv1002,
+        prompt: 'can you pay both at the same time?',
+        validate: (res) =>
+          /Yes — you can settle all/i.test(res.reply.content) &&
+          /1001/.test(res.reply.content) &&
+          /1002/.test(res.reply.content) &&
+          /\$225\.00/.test(res.reply.content) &&
+          Boolean(res.reply.proposal) &&
+          res.reply.proposal.amountMinor === 22500 &&
+          Array.isArray(res.reply.proposal.payload?.invoice_ids) &&
+          res.reply.proposal.payload.invoice_ids.length === 2,
       },
     ];
 

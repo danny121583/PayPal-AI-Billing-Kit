@@ -21,6 +21,7 @@ export interface BillingModalShellProps {
   onClose: () => void;
   title: string;
   subtitle?: string | null;
+  headerLeftAction?: React.ReactNode;
   headerAccessory?: React.ReactNode;
   footer?: React.ReactNode;
   children?: React.ReactNode;
@@ -84,6 +85,7 @@ export function BillingModalShell({
   onClose,
   title,
   subtitle,
+  headerLeftAction,
   headerAccessory,
   footer,
   children,
@@ -134,27 +136,42 @@ export function BillingModalShell({
         >
           <View style={[styles.header, isCompactMobile && styles.headerMobile]}>
             <View style={styles.headerTitleContainer}>
+              {headerLeftAction ? (
+                <View style={styles.headerLeftSlot} testID="billing-modal-header-left-slot">
+                  {headerLeftAction}
+                </View>
+              ) : null}
               <Text
                 style={[styles.headerTitle, isCompactMobile && styles.headerTitleMobile]}
                 accessibilityRole="header"
-                numberOfLines={2}
+                numberOfLines={1}
               >
                 {title}
               </Text>
               {subtitle ? (
                 <Text
                   style={[styles.headerSubtitle, isCompactMobile && styles.headerSubtitleMobile]}
+                  numberOfLines={2}
                 >
                   {subtitle}
                 </Text>
               ) : null}
               <Pressable
                 testID={closeTestID}
-                style={styles.closeIconButton}
+                style={({ pressed }) => [
+                  styles.closeIconButton,
+                  pressed && styles.closeIconButtonPressed,
+                ]}
                 onPress={onClose}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel={closeAccessibilityLabel || `Close ${title}`}
+                {...(Platform.OS === 'web'
+                  ? ({ title: closeAccessibilityLabel || `Close ${title}` } as Record<
+                      string,
+                      unknown
+                    >)
+                  : {})}
               >
                 <X size={18} color="#475569" />
               </Pressable>
@@ -255,9 +272,16 @@ const styles = StyleSheet.create({
   },
   headerTitleContainer: {
     position: 'relative',
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 36,
+    paddingHorizontal: 44,
+  },
+  headerLeftSlot: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    zIndex: 2,
   },
   headerTitle: {
     fontSize: 20,
@@ -275,7 +299,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 18,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   headerSubtitleMobile: {
     fontSize: 11,
@@ -285,12 +309,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
+  },
+  closeIconButtonPressed: {
+    backgroundColor: '#E2E8F0',
   },
   headerAccessory: {
     marginTop: 8,

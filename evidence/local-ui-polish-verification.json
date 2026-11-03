@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-11-03T09:17:36.934Z",
+  "timestamp": "2026-11-03T10:27:33.387Z",
   "targetUrl": "http://localhost:8081",
-  "passed": 19,
+  "passed": 20,
   "failed": 0,
-  "total": 19,
+  "total": 20,
   "screenshotsSaved": [
     "docs/screenshots/local-polish/01-collapsed-paypal-merchant-card.png",
     "docs/screenshots/local-polish/02-expanded-paypal-merchant-card.png",
@@ -47,16 +47,12 @@
       }
     },
     {
-      "name": "Issue #7: Simplified payment button labels and balanced single-row desktop layout",
+      "name": "Issue #7: Unified single Pay with PayPal button label and balanced single-row desktop layout",
       "ok": true,
       "details": {
-        "cardLabel": "Pay with Sandbox Card",
-        "simLabel": "Simulate Settlement",
+        "noCompetingSandboxCardBtn": true,
         "ppLabel": "Pay with PayPal",
         "allFooterSingleRowOnDesktop": true,
-        "settlementRowAligned": true,
-        "cardHeight": 46,
-        "simHeight": 46,
         "ppHeight": 46
       }
     },
@@ -83,17 +79,29 @@
       }
     },
     {
+      "name": "Issue #14: New Chat button is in the upper-left corner of the Billing AI modal header opposite the Close button (36x36px, top-aligned)",
+      "ok": true,
+      "details": {
+        "exists": true,
+        "width": 36,
+        "height": 36,
+        "topDeltaToCloseBtn": 0,
+        "isUpperLeft": true,
+        "ariaLabel": "New Chat"
+      }
+    },
+    {
       "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter",
       "ok": true,
       "details": {
-        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 New Chat hello Hello Alex! Welcome. I see we have your account p"
+        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex! I see your account is currently focused on sta"
       }
     },
     {
       "name": "Issue #9: Asking \"why did it fail?\" on OVERDUE #PPB-INV-2026-1002 explains 0 failed payment attempts exist on #1002",
       "ok": true,
       "details": {
-        "investigationPreview": "ment fee) is marked OVERDUE because its payment due date (Oct 28, 2026) has passed without settlement — not because a payment failed. • Recorded Payment Attempts: 0 attempts (no failure reason exists on #PPB-INV-2026-1002). • Remaining Balance Due: $75.00 USD."
+        "investigationPreview": "ment fee) is marked OVERDUE because its payment due date (Oct 29, 2026) has passed without settlement — not because a payment failed. • Recorded Payment Attempts: 0 attempts (no failure reason exists on #PPB-INV-2026-1002). • Remaining Balance Due: $75.00 USD."
       }
     },
     {
@@ -101,14 +109,14 @@
       "ok": true,
       "details": {
         "leaked1002Into1003": false,
-        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 New Chat Was this statement paid? Yes, statement #PPB-INV-2026-1"
+        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 Was this statement paid? Yes, statement #PPB-INV-2026-1003 was p"
       }
     },
     {
       "name": "Issue #12: Reset Demo displays floating toast immediately and auto-dismisses after ~3 seconds",
       "ok": true,
       "details": {
-        "toastText": "Demo session reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).",
+        "toastText": "Demo session reset: all 6 canonical statements (#PPB-INV-2026-1001 to #PPB-INV-2026-1006), AI chats, and notifications restored.",
         "toastVisibleImmediately": true,
         "toastVisibleAfter3s": false
       }

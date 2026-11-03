@@ -51,8 +51,13 @@ import {
   DEFAULT_BILLABLE_PATIENTS,
   DEFAULT_SERVICE_CATALOG,
   DEMO_USER_IDS,
+  authorizeAndFilterNotificationsForAccount,
   getDefaultBillingAISettings,
   getDefaultNotificationsByUserId,
+  getPreloadedBillingSnapshot,
+  markAllBillingNotificationsRead,
+  markBillingNotificationRead,
+  resetBillingDemoSession,
   resolveNotificationLinkedInvoice,
   searchAuthorizedBillingRecords,
   type BillingAuditEventItem,
@@ -1302,8 +1307,8 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     const inv1003 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1003')!;
     const inv1004 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1004')!;
 
-    // 1. Issue #7: Simplified button labels on Statement Details modal
-    const { getByText: getDetailText } = render(
+    // 1. Issue #7 & Consistent Payment Button: Single unified Pay with PayPal button (no competing Pay with Sandbox Card button)
+    const { getByText: getDetailText, queryByText: queryDetailText } = render(
       <BillingInvoiceDetailModal
         visible={true}
         invoice={inv1002}
@@ -1313,9 +1318,9 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
         onAskAI={jest.fn()}
       />
     );
-    expect(getDetailText('Pay with Sandbox Card')).toBeTruthy();
-    expect(getDetailText('Simulate Settlement')).toBeTruthy();
     expect(getDetailText('Pay with PayPal')).toBeTruthy();
+    expect(queryDetailText('Pay with Sandbox Card')).toBeNull();
+    expect(queryDetailText('Simulate Settlement')).toBeNull();
 
     // 2. Issue #9: Greeting on focused overdue invoice #PPB-INV-2026-1002 responds conversationally (not an unprompted summary dump)
     const helloTurn = await sendBillingAIMessage({
@@ -1460,5 +1465,139 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     });
     expect(keyA).not.toBe(keyB);
     expect(keyA).not.toBe(keyC);
+  });
+
+  it('Issues #14 & #15 + Combined Multi-Statement Proposal: Header New Chat Button, Cross-Customer Notification Isolation, Demo Reset Notification Restoration, and "Pay Both" AI Proposal', async () => {
+    setBillingAIMinProcessingMsForTests(0);
+    clearBillingAIClientCacheForTests();
+    await resetBillingDemoSession();
+
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+    const inv1002 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1002')!;
+    const inv1004 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1004')!;
+
+    // 1. Issue #14: Header New Chat button in upper-left corner of Billing AI modal
+    const { getByTestId: getAiByTestId } = render(
+      <BillingAIAssistantModal
+        visible={true}
+        roleScope="patient"
+        activeUserId={DEMO_USER_IDS.jordan_taylor}
+        focusedInvoice={inv1004}
+        invoices={allInvoices.filter((i) => i.recipientUserId === DEMO_USER_IDS.jordan_taylor)}
+        onClose={jest.fn()}
+        onDataChanged={jest.fn()}
+      />
+    );
+    const newChatBtn = getAiByTestId('billing-ai-new-chat-btn');
+    expect(newChatBtn).toBeTruthy();
+    expect(newChatBtn.props.accessibilityLabel).toBe('New Chat');
+
+    // 2. Issue #15: Reconciled Canonical Notification Ownership & Dual-Ownership Isolation
+    const defaultsByUser = getDefaultNotificationsByUserId();
+    const jordanNotifs = authorizeAndFilterNotificationsForAccount({
+      notifications: defaultsByUser[DEMO_USER_IDS.jordan_taylor],
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      invoices: allInvoices,
+    });
+    const alexNotifs = authorizeAndFilterNotificationsForAccount({
+      notifications: defaultsByUser[DEMO_USER_IDS.alex_rivera],
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      invoices: allInvoices,
+    });
+    const sarahNotifs = authorizeAndFilterNotificationsForAccount({
+      notifications: defaultsByUser[DEMO_USER_IDS.sarah_jenkins],
+      roleScope: 'doctor',
+      activeUserId: DEMO_USER_IDS.sarah_jenkins,
+      invoices: allInvoices,
+    });
+
+    // Jordan Taylor sees ONLY PPB-INV-2026-1004 (1 unread) and NEVER sees Alex Rivera's 1003 or 1006
+    expect(jordanNotifs).toHaveLength(1);
+    expect(jordanNotifs[0].invoiceNumber).toBe('PPB-INV-2026-1004');
+    expect(jordanNotifs.some((n) => n.invoiceNumber === 'PPB-INV-2026-1003')).toBe(false);
+    expect(jordanNotifs.some((n) => n.invoiceNumber === 'PPB-INV-2026-1006')).toBe(false);
+
+    // Alex Rivera sees 1002, 1001, 1003, 1006 (3 unread) and NEVER sees Jordan Taylor's 1004
+    expect(alexNotifs.map((n) => n.invoiceNumber)).toEqual([
+      'PPB-INV-2026-1002',
+      'PPB-INV-2026-1001',
+      'PPB-INV-2026-1003',
+      'PPB-INV-2026-1006',
+    ]);
+    expect(alexNotifs.filter((n) => !n.isRead)).toHaveLength(3);
+    expect(alexNotifs.some((n) => n.invoiceNumber === 'PPB-INV-2026-1004')).toBe(false);
+
+    // Dr. Sarah Jenkins sees provider notifications for 1003, 1002, 1004
+    expect(sarahNotifs.map((n) => n.invoiceNumber)).toEqual([
+      'PPB-INV-2026-1003',
+      'PPB-INV-2026-1002',
+      'PPB-INV-2026-1004',
+    ]);
+
+    // 3. Cross-customer mark-as-read is rejected; valid owner mark-as-read succeeds and is restored on Reset Demo
+    const crossMarkResult = await markBillingNotificationRead('notif-seed-alex-1002', {
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      roleScope: 'patient',
+    });
+    expect(crossMarkResult).toBe(false);
+
+    const validMarkResult = await markBillingNotificationRead('notif-seed-jordan-1004', {
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      roleScope: 'patient',
+    });
+    expect(validMarkResult).toBe(true);
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.jordan_taylor).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(0);
+
+    await markAllBillingNotificationsRead({
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      roleScope: 'patient',
+    });
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.alex_rivera).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(0);
+
+    // Reset Demo restores all notifications and unread badge counts for all accounts
+    await resetBillingDemoSession();
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.jordan_taylor).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(1);
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.alex_rivera).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(3);
+    expect(
+      getPreloadedBillingSnapshot('doctor', DEMO_USER_IDS.sarah_jenkins).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(3);
+
+    // 4. Combined Multi-Statement Payment Proposal ("can you pay both at the same time?")
+    const payBothTurn = await sendBillingAIMessage({
+      message: 'can you pay both at the same time?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(payBothTurn.reply.content).toMatch(/Yes — you can settle all \*\*2\*\* open statements together/i);
+    expect(payBothTurn.reply.content).toContain('#PPB-INV-2026-1002');
+    expect(payBothTurn.reply.content).toContain('#PPB-INV-2026-1001');
+    expect(payBothTurn.reply.content).toContain('$225.00 USD');
+    expect(payBothTurn.reply.proposal).toBeTruthy();
+    expect(payBothTurn.reply.proposal?.amountMinor).toBe(22500);
+    expect(payBothTurn.reply.proposal?.title).toContain('#PPB-INV-2026-1001');
+    expect(payBothTurn.reply.proposal?.title).toContain('#PPB-INV-2026-1002');
+    expect(Array.isArray(payBothTurn.reply.proposal?.payload?.invoice_ids)).toBe(true);
+    expect((payBothTurn.reply.proposal?.payload?.invoice_ids as string[])).toHaveLength(2);
   });
 });
