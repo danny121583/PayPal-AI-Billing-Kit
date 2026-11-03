@@ -241,6 +241,11 @@ async function run() {
         (jordanRetryModalText.includes('PayPal Sandbox Order') ||
           jordanRetryModalText.includes('PPB-INV-2026-1004'))
     );
+    await page
+      .locator('[data-testid="billing-detail-sandbox-card-btn"]')
+      .scrollIntoViewIfNeeded()
+      .catch(() => {});
+    await page.waitForTimeout(400);
     await page.screenshot({
       path: path.join(
         SCREENSHOTS_DIR,
@@ -266,6 +271,7 @@ async function run() {
     await page.waitForSelector('[data-testid="billing-create-invoice-modal"]', {
       timeout: 10000,
     });
+    await page.waitForTimeout(500);
     await page.locator('[data-testid="create-invoice-service-ADMIN-FORMS"]').click();
     await page.waitForTimeout(300);
     await page.screenshot({
@@ -281,6 +287,10 @@ async function run() {
       { timeout: 15000 }
     ).catch(() => {});
     await page.waitForTimeout(1000);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '05-paypal-sandbox-connected.png'),
+      fullPage: false,
+    });
 
     const afterCreateText = await page.locator('body').innerText();
     const hasForms = afterCreateText.includes('Forms Completion');
@@ -410,6 +420,11 @@ async function run() {
       'Step 7: Customer Billing AI prepares a payment checkout proposal requiring human approval',
       has1002 && has75 && hasApprove
     );
+    await page.waitForTimeout(400);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '08b-billing-ai-payment-proposal.png'),
+      fullPage: false,
+    });
     await page.locator('[data-testid="billing-ai-close-btn"]').click();
     await page.waitForTimeout(500);
 
@@ -467,6 +482,7 @@ async function run() {
     await page.waitForSelector('[data-testid="billing-ai-settings-modal"]', {
       timeout: 10000,
     });
+    await page.waitForTimeout(700);
     const settingsText =
       (await page
         .locator('[data-testid="billing-ai-settings-modal"]')
@@ -483,6 +499,15 @@ async function run() {
       path: path.join(SCREENSHOTS_DIR, '10-guardrails-and-audit-trail.png'),
       fullPage: false,
     });
+    await page
+      .locator('[data-testid="billing-settings-audit-section"]')
+      .scrollIntoViewIfNeeded()
+      .catch(() => {});
+    await page.waitForTimeout(400);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '10b-immutable-audit-trail.png'),
+      fullPage: false,
+    });
     await page.locator('[data-testid="billing-settings-done-btn"]').click();
     await page.waitForTimeout(400);
 
@@ -492,6 +517,7 @@ async function run() {
     await page.waitForSelector('[data-testid="billing-maas-mcp-modal"]', {
       timeout: 10000,
     });
+    await page.waitForTimeout(700);
     const modalText = await page.locator('[data-testid="billing-maas-mcp-modal"]').innerText();
     check(
       'Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 82 tools, source badges, PDF receipt endpoint, and zero MaaS branding',
@@ -525,6 +551,15 @@ async function run() {
     });
     await page.screenshot({
       path: path.join(SCREENSHOTS_DIR, '09-mcp-agent-interface-modal.png'),
+      fullPage: false,
+    });
+    await page
+      .locator('[data-testid="maas-tool-count-title"]')
+      .scrollIntoViewIfNeeded()
+      .catch(() => {});
+    await page.waitForTimeout(400);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '09b-mcp-82-tools-catalog.png'),
       fullPage: false,
     });
 
@@ -587,11 +622,36 @@ async function run() {
 
     // Mobile viewport screenshot check
     await page.setViewportSize({ width: 430, height: 932 });
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      document.querySelectorAll('*').forEach((el) => {
+        if (el.scrollTop > 0) el.scrollTop = 0;
+      });
+    });
     await page.waitForTimeout(600);
     await page.screenshot({
       path: path.join(ARTIFACT_DIR, `${PREFIX}_mobile_provider_dashboard.png`),
       fullPage: false,
     });
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '15-mobile-provider-dashboard.png'),
+      fullPage: false,
+    });
+    await page.locator('[data-testid="demo-account-chip-alex_rivera"]').click();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      document.querySelectorAll('*').forEach((el) => {
+        if (el.scrollTop > 0) el.scrollTop = 0;
+      });
+    });
+    await page.waitForTimeout(400);
+    await page.screenshot({
+      path: path.join(SCREENSHOTS_DIR, '16-mobile-customer-dashboard.png'),
+      fullPage: false,
+    });
+    await page.locator('[data-testid="demo-account-chip-sarah_jenkins"]').click();
+    await page.waitForTimeout(400);
 
     // Step 12: Zero console errors & zero page errors
     check(
