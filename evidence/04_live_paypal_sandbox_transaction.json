@@ -408,13 +408,13 @@
       }
     ]
   },
-  "proof_version": "1.8.0",
-  "verified_at": "2026-11-03T04:37:19.974Z",
+  "proof_version": "1.6.0",
+  "verified_at": "2026-11-03T12:10:28.526Z",
   "unified_mcp_endpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
   "official_paypal_mcp_diagnostic": {
     "ok": true,
     "source": "official_paypal_mcp",
-    "demo_session_id": "live-sbx-v16-1793667870300",
+    "demo_session_id": "live-sbx-v16-1793707817967",
     "official_paypal_mcp": {
       "server_info": {
         "name": "PayPal MCP Agent",
@@ -426,7 +426,7 @@
         "http_note": "https://mcp.sandbox.paypal.com/http returns HTTP 404; PayPal hosts its official MCP server on /sse and /mcp (OAuth 2.0 protected).",
         "sse_endpoint": "https://mcp.sandbox.paypal.com/sse",
         "sse_authenticated_reachable": true,
-        "sse_session_endpoint_sample": "/sse/message?sessionId=080b885e4b023e66b7e0c4e21526a4285f7d9490ded6b672ce7cafcee3ef8df2",
+        "sse_session_endpoint_sample": "/sse/message?sessionId=4904d4088770b76ba8a80dd80128589e4cd3ec42b798f0f169c1d10d8c81295a",
         "oauth_metadata_endpoint": "https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server",
         "oauth_issuer": "https://mcp.sandbox.paypal.com"
       },
@@ -435,44 +435,54 @@
         "upstream_tools_count": 46,
         "upstream_tools_sample": [
           "create_invoice",
+          "create_recurring_series",
+          "activate_recurring_series",
+          "get_recurring_series",
+          "cancel_recurring_series",
+          "delete_recurring_series",
           "list_invoices",
           "get_invoice",
           "send_invoice",
           "send_invoice_reminder",
           "cancel_sent_invoice",
+          "delete_invoice",
+          "setup_invoice_auto_reminders",
+          "update_invoice_auto_reminder",
+          "search_invoicing",
+          "update_invoicing",
+          "cancel_invoice_auto_reminder",
           "generate_invoice_qr_code",
+          "generate_invoice_number",
+          "record_payment_for_invoice",
+          "record_refund_for_invoice",
+          "create_conditional_rules_for_invoice",
           "create_product",
           "list_products",
-          "show_product_details",
           "update_product",
+          "show_product_details",
           "create_subscription_plan",
           "list_subscription_plans",
           "show_subscription_plan_details",
           "create_subscription",
           "show_subscription_details",
-          "update_subscription",
           "cancel_subscription",
+          "update_subscription",
           "create_shipment_tracking",
           "get_shipment_tracking",
           "update_shipment_tracking",
           "create_order",
           "get_order",
-          "capture_order",
+          "pay_order",
           "list_disputes",
           "get_dispute",
           "accept_dispute_claim",
           "list_transactions",
-          "pay_invoice",
-          "create_And_Send_Invoice",
-          "generate_invoice_number",
-          "create_webhook",
-          "Starting_ page_for_PayPal_integration",
-          "get_merchant_insights",
           "create_refund",
-          "get_refund"
+          "get_refund",
+          "get_merchant_insights"
         ],
         "upstream_tools_call_issue": "Calling tools/call on mcp.sandbox.paypal.com triggers PAYPAL_API_SETUP_ERROR: \"Unsupported cache mode: default\" inside @paypal/agent-toolkit (src/shared/functions.ts:2053) because axios passes cache:\"default\" to Cloudflare Workers fetch.",
-        "unified_gateway_resolution": "Our Unified PayPal MCP Gateway connects to mcp.sandbox.paypal.com for official schema & capability discovery and executes the official PayPal tool contracts (paypal_get_order, paypal_get_refund, paypal_list_invoices, paypal_generate_invoice_number, paypal_list_disputes) directly against api-m.sandbox.paypal.com using the same merchant Sandbox OAuth 2.0 token."
+        "unified_gateway_resolution": "Our Unified PayPal MCP Gateway exposes all 46 official PayPal MCP tools by their exact official names plus 14 PayPal Sandbox REST-to-MCP adapter tools and 21 Native Application tools (82 total callable tools), executing all PayPal Sandbox operations server-side via native fetch against https://api-m.sandbox.paypal.com without triggering the axios cache:\"default\" Cloudflare Worker bug."
       },
       "paypal_sandbox_oauth": {
         "authenticated": true,
@@ -481,10 +491,10 @@
     }
   },
   "conversational_execution_proof": {
-    "demo_session_id": "live-sbx-v16-1793667870300",
+    "demo_session_id": "live-sbx-v16-1793707817967",
     "created_invoice": {
-      "id": "6676c7b5-71fd-45cd-9e10-222159eca978",
-      "invoice_number": "PPB-INV-2026-1084",
+      "id": "f4a8b8f1-31c6-4632-9cef-6f98cf7b6c20",
+      "invoice_number": "PPB-INV-2026-1129",
       "status": "sent",
       "customer_name": "Alex Rivera",
       "service_code": "ADMIN-FORMS",
@@ -494,20 +504,20 @@
     },
     "created_paypal_order": {
       "ok": true,
-      "demo_session_id": "live-sbx-v16-1793667870300",
+      "demo_session_id": "live-sbx-v16-1793707817967",
       "checkout_mode": "paypal_sandbox_live",
-      "invoice_id": "6676c7b5-71fd-45cd-9e10-222159eca978",
-      "invoice_number": "PPB-INV-2026-1084",
+      "invoice_id": "f4a8b8f1-31c6-4632-9cef-6f98cf7b6c20",
+      "invoice_number": "PPB-INV-2026-1129",
       "customer_name": "Alex Rivera",
       "amount_minor": 3500,
       "amount_usd": "$35.00",
-      "order_id": "6FX02632ST422445S",
+      "order_id": "79G47226GP4197509",
       "order_status": "PAYER_ACTION_REQUIRED",
-      "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=6FX02632ST422445S",
-      "message": "PayPal Sandbox Order 6FX02632ST422445S created for Statement #PPB-INV-2026-1084 ($35.00 USD). Open the approval_url to authorize as the Sandbox buyer, then call `capture_paypal_checkout_order`."
+      "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=79G47226GP4197509&appSwitchEligible=false",
+      "message": "PayPal Sandbox Order 79G47226GP4197509 created for Statement #PPB-INV-2026-1129 ($35.00 USD). Open the approval_url to authorize as the Sandbox buyer, then call `capture_paypal_checkout_order`."
     },
     "paypal_get_order_verification": {
-      "id": "6FX02632ST422445S",
+      "id": "79G47226GP4197509",
       "intent": "CAPTURE",
       "status": "PAYER_ACTION_REQUIRED",
       "payment_source": {
@@ -515,7 +525,7 @@
       },
       "purchase_units": [
         {
-          "reference_id": "6676c7b5-71fd-45cd-9e10-222159eca978",
+          "reference_id": "f4a8b8f1-31c6-4632-9cef-6f98cf7b6c20",
           "amount": {
             "currency_code": "USD",
             "value": "35.00",
@@ -528,26 +538,26 @@
               "brand_name": "PayPal AI Billing Kit Sandbox"
             }
           },
-          "description": "Administrative Statement PPB-INV-2026-1084",
-          "custom_id": "6676c7b5-71fd-45cd-9e10-222159eca978",
-          "invoice_id": "PPB-INV-2026-1084-4955"
+          "description": "Administrative Statement PPB-INV-2026-1129",
+          "custom_id": "f4a8b8f1-31c6-4632-9cef-6f98cf7b6c20",
+          "invoice_id": "PPB-INV-2026-1129-2935"
         }
       ],
-      "create_time": "2026-11-03T01:04:35Z",
+      "create_time": "2026-11-03T12:10:23Z",
       "links": [
         {
-          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/6FX02632ST422445S",
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/79G47226GP4197509",
           "rel": "self",
           "method": "GET"
         },
         {
-          "href": "https://www.sandbox.paypal.com/checkoutnow?token=6FX02632ST422445S",
+          "href": "https://www.sandbox.paypal.com/checkoutnow?token=79G47226GP4197509",
           "rel": "payer-action",
           "method": "GET"
         }
       ]
     },
-    "paypal_generated_invoice_number": "0001"
+    "paypal_generated_invoice_number": "0009"
   },
   "live_paypal_sandbox_end_to_end_proof": {
     "demo_session_id": "live-sbx-1793655303922",
@@ -561,46 +571,24 @@
       "intent": "CAPTURE",
       "status": "COMPLETED",
       "payment_source": {
-        "card": {
-          "name": "Alex Rivera",
-          "last_digits": "6953",
-          "expiry": "2029-12",
-          "brand": "VISA",
-          "available_networks": [
-            "VISA"
-          ],
-          "type": "CREDIT",
-          "bin_details": {
-            "bin": "403203",
-            "issuing_bank": "Baxter Credit Union",
-            "bin_country_code": "US"
-          }
-        }
+        "paypal": {}
       },
       "purchase_units": [
         {
           "reference_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
           "amount": {
             "currency_code": "USD",
-            "value": "35.00",
-            "breakdown": {}
+            "value": "35.00"
           },
           "payee": {
             "email_address": "sb-ixtp453680658@business.example.com",
-            "merchant_id": "L9KAFVR7N9HLY",
-            "display_data": {
-              "brand_name": "PayPal AI Billing Kit Sandbox"
-            }
+            "merchant_id": "L9KAFVR7N9HLY"
           },
           "description": "Administrative Statement PPB-INV-2026-1057",
           "custom_id": "562b3029-9a2c-452b-8ee8-d04939e336bf",
           "invoice_id": "PPB-INV-2026-1057-7209",
           "soft_descriptor": "TEST STORE",
-          "supplementary_data": {
-            "risk": {
-              "risk_level_indicator": "HIGH_RISK"
-            }
-          },
+          "supplementary_data": {},
           "payments": {
             "captures": [
               {
@@ -649,10 +637,6 @@
                 ],
                 "create_time": "2026-11-02T21:52:12Z",
                 "update_time": "2026-11-02T21:53:06Z",
-                "network_transaction_reference": {
-                  "id": "043595502366789",
-                  "network": "VISA"
-                },
                 "processor_response": {
                   "avs_code": "A",
                   "cvv_code": "M",
@@ -716,8 +700,8 @@
           }
         }
       ],
-      "create_time": "2026-11-02T21:52:12Z",
-      "update_time": "2026-11-02T21:53:06Z",
+      "create_time": "2026-11-02T21:52:14Z",
+      "update_time": "2026-11-02T21:52:14Z",
       "links": [
         {
           "href": "https://api.sandbox.paypal.com/v2/checkout/orders/7FA47897KM5938009",
@@ -783,12 +767,16 @@
       "customer_name": "Alex Rivera",
       "customer_email_masked": "a***@demo.paypal-billing-kit.local",
       "currency": "USD",
+      "subtotal_minor": 3500,
+      "subtotal_usd": "$35.00",
       "total_minor": 3500,
       "total_usd": "$35.00",
       "amount_paid_minor": 3500,
       "amount_paid_usd": "$35.00",
       "amount_refunded_minor": 3500,
       "amount_refunded_usd": "$35.00",
+      "net_paid_minor": 0,
+      "net_paid_usd": "$0.00",
       "balance_due_minor": 0,
       "balance_due_usd": "$0.00",
       "service_date": "2026-11-02",
@@ -799,10 +787,28 @@
       "paypal_capture_id": "5HM71086SR568352C",
       "paypal_refund_id": "2EM77813GU330222M",
       "payment_source_type": "paypal_wallet",
-      "payment_source_label": "PayPal Sandbox Wallet Checkout (Orders v2)",
+      "payment_source_label": "PayPal Wallet Checkout",
+      "card_brand": null,
+      "card_last_digits": null,
       "settlement_verification": "paypal_sandbox_verified",
       "is_live_paypal_capture": true,
       "verification_badge": "Verified PayPal Sandbox Capture",
+      "merchant_branding": {
+        "businessName": "Jenkins Wellness & Telehealth Practice",
+        "providerName": "Dr. Sarah Jenkins",
+        "hasLogo": false,
+        "logoMonogram": "JW",
+        "businessAddress": null,
+        "supportEmail": "sarah.jenkins@demo.paypal-billing-kit.local",
+        "businessPhone": null,
+        "businessWebsite": null,
+        "receiptFooterMessage": "This receipt was generated electronically. Please retain it for your records.",
+        "brandAccentRgb": [
+          0.07,
+          0.23,
+          0.43
+        ]
+      },
       "line_items": [
         {
           "service_code": "ADMIN-FORMS",
@@ -814,16 +820,21 @@
           "line_total_usd": "$35.00"
         }
       ],
+      "document_title": "Payment & Refund Receipt",
+      "receipt_presentation_state": "Payment & Refund Receipt — Refunded",
+      "paypal_attribution": "Payment processed through PayPal",
+      "sandbox_transaction_label": "PayPal Sandbox Test Transaction",
+      "receipt_footer_text": "This receipt was generated electronically. Please retain it for your records.",
       "pdf_download_url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?session=live-sbx-1793655303922",
-      "pdf_base64": "[BASE64_PDF_OMITTED_3673_BYTES]",
-      "pdf_byte_length": 3673,
+      "pdf_base64": "[BASE64_PDF_OMITTED_5426_BYTES]",
+      "pdf_byte_length": 5426,
       "pdf_mime_type": "application/pdf"
     },
     "pdf_download_verification": {
       "url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?demo_session_id=live-sbx-1793655303922",
       "http_status": 200,
       "content_type": "application/pdf",
-      "byte_length": 3673,
+      "byte_length": 5426,
       "pdf_header": "%PDF-1.4"
     }
   },

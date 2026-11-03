@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import {
   UserCheck,
   RotateCcw,
   Cpu,
+  CheckCircle2,
+  X,
 } from 'lucide-react-native';
 import { supabase } from '../src/lib/supabase';
 import {
@@ -52,11 +54,13 @@ import {
 import {
   DEFAULT_BILLABLE_PATIENTS,
   DEFAULT_SERVICE_CATALOG,
+  authorizeAndFilterNotificationsForAccount,
   fetchBillingDashboardData,
   getDefaultBillingAISettings,
   getOrCreateDemoSessionId,
   getOrCreateDemoSessionIdSync,
   getPreloadedBillingSnapshot,
+  markAllBillingNotificationsRead,
   markBillingNotificationRead,
   resetBillingDemoSession,
   resolveNotificationLinkedInvoice,
@@ -143,7 +147,9 @@ export default function BillingScreen() {
     getOrCreateDemoSessionIdSync()
   );
   const [isResettingDemo, setIsResettingDemo] = useState(false);
-  const [resetBannerText, setResetBannerText] = useState<string | null>(null);
+  const [resetToastText, setResetToastText] = useState<string | null>(null);
+  const [resetErrorText, setResetErrorText] = useState<string | null>(null);
+  const resetToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openedFromNotifications, setOpenedFromNotifications] = useState(false);
   const [notificationErrorText, setNotificationErrorText] = useState<
     string | null
@@ -178,20 +184,39 @@ export default function BillingScreen() {
     () => initialSnap.notifications
   );
   const [refreshing, setRefreshing] = useState(false);
+  const accountRequestVersionRef = useRef(0);
+
+  const dismissResetToast = useCallback(() => {
+    if (resetToastTimerRef.current) {
+      clearTimeout(resetToastTimerRef.current);
+      resetToastTimerRef.current = null;
+    }
+    setResetToastText(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resetToastTimerRef.current) {
+        clearTimeout(resetToastTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSelectDemoAccount = useCallback(
     (key: DemoAccountKey) => {
       if (key === activePreset.key) return;
       const targetPreset = DEMO_ACCOUNT_PRESETS[key];
       if (!targetPreset) return;
+      accountRequestVersionRef.current += 1;
       // Synchronously apply preloaded persona state before render to prevent any flicker
       const snap = getPreloadedBillingSnapshot(
         targetPreset.roleScope,
         targetPreset.id
       );
+      dismissResetToast();
+      setResetErrorText(null);
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
-      setResetBannerText(null);
       setNotificationErrorText(null);
       setOpenedFromNotifications(false);
       setCheckoutReturnState(null);
@@ -206,7 +231,7 @@ export default function BillingScreen() {
       setNotifications(snap.notifications);
       void switchDemoAccount(key);
     },
-    [activePreset.key, switchDemoAccount]
+    [activePreset.key, dismissResetToast, switchDemoAccount]
   );
 
   useEffect(() => {
@@ -222,14 +247,19 @@ export default function BillingScreen() {
 
   const refreshBillingData = useCallback(
     async (forceRefresh = true) => {
+      const requestVersion = ++accountRequestVersionRef.current;
+      const requestedUserId = activePreset.id;
+      const requestedRoleScope = roleScope;
       try {
         const sid = await getOrCreateDemoSessionId();
+        if (accountRequestVersionRef.current !== requestVersion) return;
         setDemoSessionId(sid);
         const dash = await fetchBillingDashboardData(
-          roleScope,
-          activePreset.id,
+          requestedRoleScope,
+          requestedUserId,
           { forceRefresh }
         );
+        if (accountRequestVersionRef.current !== requestVersion) return;
         setLiveInvoices(dash.invoices);
         setCatalog(dash.catalog);
         setBillablePatients(dash.billablePatients);
@@ -240,7 +270,9 @@ export default function BillingScreen() {
       } catch (err) {
         console.error('refreshBillingData error:', err);
       } finally {
-        setHasLoadedLiveOnce(true);
+        if (accountRequestVersionRef.current === requestVersion) {
+          setHasLoadedLiveOnce(true);
+        }
       }
     },
     [activePreset.id, roleScope]
@@ -249,24 +281,33 @@ export default function BillingScreen() {
   const handleResetDemoSession = useCallback(async () => {
     if (isResettingDemo) return;
     setIsResettingDemo(true);
-    setResetBannerText(null);
+    dismissResetToast();
+    setResetErrorText(null);
     try {
       await resetBillingDemoSession();
       clearBillingAIClientCacheForTests();
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
+      setNotificationErrorText(null);
+      const snap = getPreloadedBillingSnapshot(roleScope, activePreset.id);
+      setLiveInvoices(snap.invoices);
+      setNotifications(snap.notifications);
       await refreshBillingData(true);
-      setResetBannerText(
-        'Demo session reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).'
+      setResetToastText(
+        'Demo session reset: all 6 canonical statements (#PPB-INV-2026-1001 to #PPB-INV-2026-1006), AI chats, and notifications restored.'
       );
+      resetToastTimerRef.current = setTimeout(() => {
+        setResetToastText(null);
+        resetToastTimerRef.current = null;
+      }, 3000);
     } catch (err: any) {
-      setResetBannerText(
+      setResetErrorText(
         err?.message || 'Could not reset demo session.'
       );
     } finally {
       setIsResettingDemo(false);
     }
-  }, [isResettingDemo, refreshBillingData]);
+  }, [activePreset.id, dismissResetToast, isResettingDemo, refreshBillingData, roleScope]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -366,11 +407,12 @@ export default function BillingScreen() {
       resolveBillingDeepLinkInvoice({
         isAuthenticated: true,
         role: roleScope,
+        activeUserId: activePreset.id,
         invoiceId: rawInvoiceId,
         notificationId: rawNotificationId,
         additionalInvoices: liveInvoices ?? undefined,
       }),
-    [liveInvoices, rawInvoiceId, rawNotificationId, roleScope]
+    [activePreset.id, liveInvoices, rawInvoiceId, rawNotificationId, roleScope]
   );
 
   useEffect(() => {
@@ -472,9 +514,27 @@ export default function BillingScreen() {
     roleInvoices,
   ]);
 
+  const visibleNotifications = useMemo(
+    () =>
+      authorizeAndFilterNotificationsForAccount({
+        notifications,
+        roleScope,
+        activeUserId: activePreset.id,
+        invoices:
+          liveInvoices && liveInvoices.length > 0 ? liveInvoices : roleInvoices,
+      }),
+    [
+      activePreset.id,
+      liveInvoices,
+      notifications,
+      roleInvoices,
+      roleScope,
+    ]
+  );
+
   const unreadNotificationsCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications]
+    () => visibleNotifications.filter((n) => !n.isRead).length,
+    [visibleNotifications]
   );
 
   const handleOpenBillingAI = (
@@ -485,11 +545,22 @@ export default function BillingScreen() {
   };
 
   const handleMarkAllNotificationsRead = useCallback(async () => {
-    const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+    const unreadIds = visibleNotifications
+      .filter((n) => !n.isRead)
+      .map((n) => n.id);
     if (unreadIds.length === 0) return;
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    await Promise.all(unreadIds.map((id) => markBillingNotificationRead(id)));
-  }, [notifications]);
+    setNotifications((prev) =>
+      prev.map((n) =>
+        unreadIds.includes(n.id) && n.recipientUserId === activePreset.id
+          ? { ...n, isRead: true }
+          : n
+      )
+    );
+    await markAllBillingNotificationsRead({
+      activeUserId: activePreset.id,
+      roleScope,
+    });
+  }, [activePreset.id, roleScope, visibleNotifications]);
 
   const handleSelectNotification = async (
     notif: BillingNotificationItem
@@ -510,10 +581,15 @@ export default function BillingScreen() {
       return { ok: false, errorMessage: resolution.message };
     }
 
-    await markBillingNotificationRead(notif.id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
-    );
+    const markedRead = await markBillingNotificationRead(notif.id, {
+      activeUserId: activePreset.id,
+      roleScope,
+    });
+    if (markedRead) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+      );
+    }
     setShowNotificationsModal(false);
     setOpenedFromNotifications(true);
     setSelectedInvoice(resolution.invoice);
@@ -775,13 +851,17 @@ export default function BillingScreen() {
           </View>
         ) : null}
 
-        {/* Deep-Link Error / Unauthorized Banner */}
-        {resetBannerText ? (
+        {/* Demo Reset Error Banner (errors remain visible until dismissed or retried) */}
+        {resetErrorText ? (
           <View
-            style={styles.deepLinkResolvedBanner}
-            testID="billing-demo-reset-banner"
+            style={styles.deepLinkErrorBanner}
+            testID="billing-demo-reset-error-banner"
           >
-            <Text style={styles.deepLinkResolvedText}>{resetBannerText}</Text>
+            <ShieldAlert size={18} color="#B91C1C" />
+            <View style={styles.deepLinkErrorCol}>
+              <Text style={styles.deepLinkErrorTitle}>Demo Reset Failed</Text>
+              <Text style={styles.deepLinkErrorBody}>{resetErrorText}</Text>
+            </View>
           </View>
         ) : null}
         {(deepLinkResolution.status === 'not_found' &&
@@ -905,6 +985,7 @@ export default function BillingScreen() {
         <BillingAIAssistantModal
           visible={showAiModal}
           roleScope={roleScope}
+          activeUserId={activePreset.id}
           focusedInvoice={focusedAiInvoice}
           invoices={roleInvoices}
           onClose={() => setShowAiModal(false)}
@@ -917,6 +998,33 @@ export default function BillingScreen() {
             }
           }}
         />
+      ) : null}
+
+      {/* Floating Auto-Dismissing Demo Reset Toast (Non-Layout-Shifting) */}
+      {resetToastText ? (
+        <View
+          style={[
+            styles.resetFloatingToast,
+            isMobile && styles.resetFloatingToastMobile,
+          ]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          testID="billing-demo-reset-toast"
+        >
+          <CheckCircle2 size={16} color="#047857" />
+          <Text style={styles.resetFloatingToastText} numberOfLines={2}>
+            {resetToastText}
+          </Text>
+          <Pressable
+            style={styles.resetFloatingToastCloseBtn}
+            onPress={dismissResetToast}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss reset notification"
+            testID="billing-demo-reset-toast-dismiss"
+          >
+            <X size={14} color="#065F46" />
+          </Pressable>
+        </View>
       ) : null}
 
       {showSettingsModal ? (
@@ -945,7 +1053,7 @@ export default function BillingScreen() {
       {showNotificationsModal ? (
         <BillingNotificationsModal
           visible={showNotificationsModal}
-          notifications={notifications}
+          notifications={visibleNotifications}
           onClose={() => {
             setShowNotificationsModal(false);
             setNotificationErrorText(null);
@@ -1199,5 +1307,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#3730A3',
+  },
+  resetFloatingToast: {
+    position: 'absolute',
+    top: 108,
+    alignSelf: 'center',
+    maxWidth: 560,
+    width: '92%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#6EE7B7',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    zIndex: 60,
+  },
+  resetFloatingToastMobile: {
+    top: 68,
+    width: '94%',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  resetFloatingToastText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
+    lineHeight: 17,
+  },
+  resetFloatingToastCloseBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

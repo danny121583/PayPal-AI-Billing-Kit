@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  SquarePen,
   CheckCircle2,
   XCircle,
 } from 'lucide-react-native';
@@ -27,9 +29,13 @@ import {
   loadBillingAIHistory,
   decideBillingAIProposal,
   getBillingAIMinProcessingMs,
+  clearBillingAIConversation,
+  getBillingAIConversationScopeKey,
+  getBillingAIConversationSnapshotSync,
   type BillingAIChatMessage,
   type BillingAIProposal,
 } from '../../src/billing/api/billingAIClient';
+import { getActiveDemoUserId } from '../../src/billing/api/billingService';
 
 const DOCTOR_PROMPTS = [
   'Show me all overdue invoices.',
@@ -48,6 +54,7 @@ const PATIENT_PROMPTS = [
 export interface BillingAIAssistantModalProps {
   visible: boolean;
   roleScope: BillingRoleScope;
+  activeUserId?: string;
   focusedInvoice?: SyntheticBillingInvoice | null;
   invoices?: SyntheticBillingInvoice[];
   onClose: () => void;
@@ -278,6 +285,7 @@ function FormattedAssistantMessage({
 export default function BillingAIAssistantModal({
   visible,
   roleScope,
+  activeUserId: propActiveUserId,
   focusedInvoice,
   invoices,
   onClose,
@@ -285,9 +293,33 @@ export default function BillingAIAssistantModal({
   onOpenInvoice,
   minProcessingDurationMs,
 }: BillingAIAssistantModalProps) {
+  const effectiveUserId = (
+    propActiveUserId || getActiveDemoUserId(roleScope)
+  ).trim();
+  const focusedInvoiceId = focusedInvoice?.id ?? null;
+  const conversationScopeKey = getBillingAIConversationScopeKey({
+    roleScope,
+    activeUserId: effectiveUserId,
+    focusedInvoiceId,
+  });
+
   const [composerValue, setComposerValue] = useState('');
-  const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<UiMessage[]>(() => {
+    const snap = getBillingAIConversationSnapshotSync({
+      roleScope,
+      activeUserId: effectiveUserId,
+      focusedInvoiceId,
+    });
+    return snap.messages;
+  });
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    const snap = getBillingAIConversationSnapshotSync({
+      roleScope,
+      activeUserId: effectiveUserId,
+      focusedInvoiceId,
+    });
+    return snap.sessionId;
+  });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFailedPrompt, setLastFailedPrompt] = useState<string | null>(null);
@@ -298,12 +330,14 @@ export default function BillingAIAssistantModal({
   const scrollRef = useRef<ScrollView>(null);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  const conversationVersionRef = useRef(0);
   const isDoctor = roleScope === 'doctor';
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      conversationVersionRef.current += 1;
       if (pendingTimerRef.current) {
         clearTimeout(pendingTimerRef.current);
         pendingTimerRef.current = null;
@@ -312,27 +346,58 @@ export default function BillingAIAssistantModal({
   }, []);
 
   useEffect(() => {
-    if (!visible && pendingTimerRef.current) {
-      clearTimeout(pendingTimerRef.current);
-      pendingTimerRef.current = null;
+    if (!visible) {
+      conversationVersionRef.current += 1;
+      if (pendingTimerRef.current) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+      }
       setSending(false);
     }
   }, [visible]);
 
+  // Isolate conversation state whenever visible, roleScope, activeUserId, or focusedInvoice changes
   useEffect(() => {
-    if (focusedInvoice) {
-      setActiveInvoice(focusedInvoice);
-    }
-  }, [focusedInvoice]);
+    conversationVersionRef.current += 1;
+    const loadVersion = conversationVersionRef.current;
 
-  useEffect(() => {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setSending(false);
+    setError(null);
+    setLastFailedPrompt(null);
+    setComposerValue('');
+    setActiveInvoice(focusedInvoice ?? null);
+
+    const syncSnap = getBillingAIConversationSnapshotSync({
+      roleScope,
+      activeUserId: effectiveUserId,
+      focusedInvoiceId,
+    });
+    setSessionId(syncSnap.sessionId);
+    setMessages(syncSnap.messages);
+
     if (!visible) return;
+
     let cancelled = false;
-    loadBillingAIHistory(roleScope)
+    loadBillingAIHistory({
+      roleScope,
+      activeUserId: effectiveUserId,
+      focusedInvoiceId,
+    })
       .then((res) => {
-        if (cancelled || !res) return;
+        if (
+          cancelled ||
+          !isMountedRef.current ||
+          conversationVersionRef.current !== loadVersion ||
+          !res
+        ) {
+          return;
+        }
         setSessionId(res.sessionId);
-        setMessages((prev) => (prev.length === 0 ? res.messages : prev));
+        setMessages(res.messages);
       })
       .catch(() => {
         /* history is best-effort */
@@ -340,7 +405,33 @@ export default function BillingAIAssistantModal({
     return () => {
       cancelled = true;
     };
-  }, [visible, roleScope]);
+  }, [
+    conversationScopeKey,
+    effectiveUserId,
+    focusedInvoice,
+    focusedInvoiceId,
+    roleScope,
+    visible,
+  ]);
+
+  const handleResetCurrentConversation = useCallback(async () => {
+    conversationVersionRef.current += 1;
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setSending(false);
+    setError(null);
+    setLastFailedPrompt(null);
+    setComposerValue('');
+    setMessages([]);
+    setActiveInvoice(focusedInvoice ?? null);
+    await clearBillingAIConversation({
+      roleScope,
+      activeUserId: effectiveUserId,
+      focusedInvoiceId,
+    });
+  }, [effectiveUserId, focusedInvoice, focusedInvoiceId, roleScope]);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
@@ -350,6 +441,11 @@ export default function BillingAIAssistantModal({
     async (raw: string) => {
       const text = raw.trim();
       if (!text || sending) return;
+      const sendVersion = conversationVersionRef.current;
+      const lockedFocusedInvoiceId = focusedInvoiceId ?? activeInvoice?.id ?? null;
+      const lockedFocusedInvoiceNumber =
+        focusedInvoice?.invoiceNumber ?? activeInvoice?.invoiceNumber ?? null;
+
       setError(null);
       setLastFailedPrompt(null);
       setComposerValue('');
@@ -378,11 +474,19 @@ export default function BillingAIAssistantModal({
           message: text,
           sessionId,
           roleScope,
-          focusedInvoiceId: activeInvoice?.id ?? focusedInvoice?.id ?? null,
-          focusedInvoiceNumber:
-            activeInvoice?.invoiceNumber ?? focusedInvoice?.invoiceNumber ?? null,
+          activeUserId: effectiveUserId,
+          focusedInvoiceId: lockedFocusedInvoiceId,
+          focusedInvoiceNumber: lockedFocusedInvoiceNumber,
           recentMessages: messages,
         });
+
+        // If user switched invoices, switched accounts, closed modal, or reset chat while awaiting:
+        if (
+          !isMountedRef.current ||
+          conversationVersionRef.current !== sendVersion
+        ) {
+          return;
+        }
 
         const elapsedMs = Math.max(0, Date.now() - startedAtMs);
         const shouldHold =
@@ -399,7 +503,12 @@ export default function BillingAIAssistantModal({
           });
         }
 
-        if (!isMountedRef.current) return;
+        if (
+          !isMountedRef.current ||
+          conversationVersionRef.current !== sendVersion
+        ) {
+          return;
+        }
 
         const enrichedReply: BillingAIChatMessage = {
           ...res.reply,
@@ -412,7 +521,7 @@ export default function BillingAIAssistantModal({
         };
 
         setSessionId(res.sessionId);
-        if (res.focusedInvoice) {
+        if (res.focusedInvoice && !focusedInvoiceId) {
           setActiveInvoice(res.focusedInvoice);
         }
         setMessages((prev) => [
@@ -426,7 +535,12 @@ export default function BillingAIAssistantModal({
           onDataChanged?.();
         }
       } catch (e) {
-        if (!isMountedRef.current) return;
+        if (
+          !isMountedRef.current ||
+          conversationVersionRef.current !== sendVersion
+        ) {
+          return;
+        }
         const msg = e instanceof Error ? e.message : String(e);
         setMessages((prev) =>
           prev.map((m) => (m.id === localId ? { ...m, status: 'failed' } : m))
@@ -434,7 +548,10 @@ export default function BillingAIAssistantModal({
         setError(msg || 'Billing AI could not respond.');
         setLastFailedPrompt(text);
       } finally {
-        if (isMountedRef.current) {
+        if (
+          isMountedRef.current &&
+          conversationVersionRef.current === sendVersion
+        ) {
           setSending(false);
           scrollToEnd();
         }
@@ -443,8 +560,9 @@ export default function BillingAIAssistantModal({
     [
       activeInvoice?.id,
       activeInvoice?.invoiceNumber,
-      focusedInvoice?.id,
+      effectiveUserId,
       focusedInvoice?.invoiceNumber,
+      focusedInvoiceId,
       messages,
       minProcessingDurationMs,
       onDataChanged,
@@ -541,6 +659,28 @@ export default function BillingAIAssistantModal({
       testID="billing-ai-assistant-modal"
       closeTestID="billing-ai-close-btn"
       closeAccessibilityLabel="Close Billing AI"
+      headerLeftAction={
+        <Pressable
+          style={({ pressed, hovered }: any) => [
+            styles.headerNewChatButton,
+            hovered && styles.headerNewChatButtonHovered,
+            pressed && styles.headerNewChatButtonPressed,
+          ]}
+          onPress={() => void handleResetCurrentConversation()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="New Chat"
+          accessibilityHint="Start a fresh conversation for this billing context"
+          testID="billing-ai-new-chat-btn"
+          {...(Platform.OS === 'web'
+            ? ({
+                title: 'New Chat — Start a fresh conversation',
+              } as any)
+            : {})}
+        >
+          <SquarePen size={17} color="#374151" strokeWidth={2.2} />
+        </Pressable>
+      }
       footer={
         <ChatComposer
           value={composerValue}
@@ -566,20 +706,22 @@ export default function BillingAIAssistantModal({
         </View>
 
         {activeInvoice ? (
-          <Pressable
-            style={styles.focusChip}
-            onPress={() => onOpenInvoice?.(activeInvoice)}
-            accessibilityRole="button"
-            accessibilityLabel={`Open focused statement ${activeInvoice.invoiceNumber}`}
-            testID="billing-ai-focused-invoice-chip"
-          >
-            <Text style={styles.focusChipText} numberOfLines={1}>
-              Invoice #{activeInvoice.invoiceNumber}
-            </Text>
-            {onOpenInvoice ? (
-              <ArrowUpRight size={12} color="#3730A3" />
-            ) : null}
-          </Pressable>
+          <View style={styles.contextChipsRow}>
+            <Pressable
+              style={styles.focusChip}
+              onPress={() => onOpenInvoice?.(activeInvoice)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open focused statement ${activeInvoice.invoiceNumber}`}
+              testID="billing-ai-focused-invoice-chip"
+            >
+              <Text style={styles.focusChipText} numberOfLines={1}>
+                Invoice #{activeInvoice.invoiceNumber}
+              </Text>
+              {onOpenInvoice ? (
+                <ArrowUpRight size={12} color="#3730A3" />
+              ) : null}
+            </Pressable>
+          </View>
         ) : null}
       </View>
 
@@ -631,21 +773,6 @@ export default function BillingAIAssistantModal({
               ) : (
                 <FormattedAssistantMessage content={m.content} />
               )}
-
-              {m.role === 'assistant' && m.telemetry ? (
-                <View
-                  style={styles.telemetryFooter}
-                  testID={`billing-ai-telemetry-${m.telemetry.responseSource}`}
-                >
-                  <Text style={styles.telemetryText}>
-                    {m.telemetry.responseSource === 'gemini_live'
-                      ? 'Verified via Gemini 3.5 Flash-Lite'
-                      : m.telemetry.responseSource === 'guardrail_immediate'
-                        ? 'Security & Guardrail Verification'
-                        : 'Verified Billing Ledger Record'}
-                  </Text>
-                </View>
-              ) : null}
 
               {m.status === 'failed' ? (
                 <Text style={styles.failedTag}>Not sent</Text>
@@ -806,6 +933,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#3730A3',
+  },
+  contextChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  headerNewChatButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerNewChatButtonHovered: {
+    backgroundColor: '#E5E7EB',
+  },
+  headerNewChatButtonPressed: {
+    backgroundColor: '#D1D5DB',
   },
   messages: {
     flex: 1,

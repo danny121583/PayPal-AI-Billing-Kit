@@ -104,7 +104,7 @@ function sanitizeMultiTurnGeminiContents(
       continue;
     }
 
-    const text = String(turn.content || '').trim().slice(0, 600);
+    const text = String(turn.content || '').trim().slice(0, 2400);
     if (text) {
       sanitized.push({
         role,
@@ -1937,18 +1937,17 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Specific Invoice Question Handling (when focusedInvoiceId/Number is active or an invoice number is mentioned)
-    const isAskingAboutInvoice =
-      Boolean(explicitInvMatch) ||
-      (Boolean(focusedOrMatchedSummary) &&
-        /\b(?:what|when|why|who|how\s+much|which|explain|detail|service|provided|for|this\s+invoice|this\s+statement|line\s+item|date|issued|sent|paid|due|status|balance|amount|fee|charge|receipt)\b/i.test(
-          message
-        ) &&
-        !/\b(?:all\s+invoices|all\s+statements|practice\s+summary|summarize\s+my\s+outstanding)\b/i.test(
-          message
-        ));
+    // Specific Invoice Line-Item Breakdown Handling (only when explicitly asking for a full breakdown, never overriding specific why/when/how-much questions before Gemini)
+    const isAskingForFullInvoiceBreakdown =
+      Boolean(focusedOrMatchedSummary) &&
+      /\b(?:what\s+is\s+this\s+(?:invoice|statement)\s+for|explain\s+the\s+line\s+items|full\s+statement\s+breakdown)\b/i.test(
+        message
+      ) &&
+      !/\b(?:why\s+did|fail|declin|try\s+again|retry|hello|hi\b|compare)\b/i.test(
+        message
+      );
 
-    if (!assistantReply && isAskingAboutInvoice && focusedOrMatchedSummary) {
+    if (!assistantReply && isAskingForFullInvoiceBreakdown && focusedOrMatchedSummary) {
       assistantReply = buildDetailedInvoiceExplanation(focusedOrMatchedSummary);
     }
 

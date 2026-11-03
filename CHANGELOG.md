@@ -4,6 +4,37 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
 
 ---
 
+## [`v1.9.2`] — 2026-11-03
+
+### Added, Improved & Fixed (Issues #7–#15, Multi-Statement Proposals, Unified PayPal Settlement, Database Notification Ownership & Repository Hygiene)
+- **Issue #7 — Responsive Statement Details Modal & Unified PayPal Settlement Flow (`components/billing/BillingModalShell.tsx`, `components/billing/BillingInvoiceDetailModal.tsx`, `src/billing/api/billingService.ts`):**
+  - Expanded desktop modal max-width to `680px` (`width: 94%` on mobile) with responsive spacing, consistent button heights (`46px`), and unclipped upper-scroll content.
+  - Unified payment action hierarchy into a single primary footer button (**`Pay with PayPal`** for open statements, **`Retry with PayPal`** for failed statements) without duplicate competing payment buttons.
+  - Clicking **`Retry with PayPal`** on a failed statement (`#PPB-INV-2026-1004`) immediately settles the statement to **`PAID`** (`Remaining Balance Due: $0.00`), removes stale *"Last Payment Attempt Declined"* banners, displays the **Verified PayPal Sandbox Settlement** banner, and transitions the primary button to **`View Receipt`**.
+- **Issue #8 — Collapsible PayPal Merchant Sandbox Connection Card (`components/billing/PayPalConnectCard.tsx`):**
+  - Redesigned the PayPal Merchant Sandbox card to render in a compact summary state (`SANDBOX AUTHENTICATED` + `Show Details`) by default on both Provider and Customer dashboards, expanding on demand (`Hide Details`) to display OAuth 2.0 metadata, Sensitive-Data Firewall verification, and Sandbox controls.
+- **Issue #9 — Natural-Language Billing AI Answers & Combined Multi-Statement Payment Proposals (`src/billing/api/billingAIClient.ts`, `src/billing/types/billingTypes.ts`, `components/billing/BillingAIAssistantModal.tsx`, `app/index.tsx`):**
+  - Enhanced intent routing and Gemini fallback synthesis for natural-language greetings, invoice explanations, due-date inquiries, failed-payment diagnostics, and refund inquiries.
+  - Added **combined multi-statement payment proposal** support (`invoiceIds[]`, `invoiceNumbers[]`) when a customer asks to pay all open statements together (e.g., *"Can I pay both open statements at the same time?"* answers *"Yes — you can settle all 2 open statements together"* and prepares a single `$225.00 USD` proposal covering `#PPB-INV-2026-1001` + `#PPB-INV-2026-1002`).
+  - Removed noisy model-attribution footer badges from assistant message bubbles.
+- **Issue #10 — Per-Statement, Per-Customer & Per-Role Billing AI Thread Isolation (`components/billing/BillingAIAssistantModal.tsx`, `app/index.tsx`):**
+  - Scoped conversation threads strictly by `(sessionId, accountKey, role, invoiceId || 'general')` so switching statements (`#PPB-INV-2026-1002` vs `#PPB-INV-2026-1003`) or demo accounts (`Dr. Sarah Jenkins`, `Alex Rivera`, `Jordan Taylor`) never leaks conversation history across contexts.
+- **Issue #11 — Billing AI Composer Caret & Placeholder Alignment (`components/billing/BillingAIAssistantModal.tsx`):**
+  - Vertically centered composer input text, placeholder, and insertion caret (`minHeight: 44px`, `paddingVertical: 10px`) without explicit iOS-inflating `lineHeight`.
+- **Issue #12 — Subtle Search Input Focus Styling (`components/billing/DoctorBillingView.tsx`, `components/billing/PatientBillingView.tsx`, `components/billing/BillingGlobalSearchModal.tsx`):**
+  - Replaced heavy browser default focus outlines with a single subtle brand focus border (`#f59e0b`) and soft halo (`outlineStyle: 'none'`).
+- **Issue #13 — Temporary Auto-Dismissing Demo Reset Toast & Notification Restoration (`app/index.tsx`, `src/billing/api/billingService.ts`):**
+  - Replaced the persistent Reset Demo banner with a floating toast (`testID="billing-demo-reset-toast"`) that auto-dismisses after `3,200ms` (with manual `×` dismiss) and resets all canonical statements, AI chats, and customer notifications.
+- **Issue #14 — Billing AI Header `New Chat` Compose Button (`components/billing/BillingModalShell.tsx`, `components/billing/BillingAIAssistantModal.tsx`):**
+  - Moved the **`New Chat`** control (`testID="billing-ai-new-chat-btn"`, compose icon) into the upper-left corner of the Billing AI modal header opposite the close button (`[New Chat]   Billing AI   [X]`).
+- **Issue #15 — Strict Customer Notification Isolation & Database Ownership Migration (`supabase/migrations/20261103120000_billing_notification_ownership_and_isolation.sql`, `src/billing/api/billingService.ts`, `src/billing/data/syntheticBillingFixtures.ts`, `components/billing/BillingNotificationsModal.tsx`):**
+  - Applied Supabase migration `20261103120720_billing_notification_ownership_and_isolation` on project `dvzfesfvefggnunkjhom` enforcing strict `public.billing_notifications` recipient ownership (`public.billing_seed_canonical_notifications`, `public.billing_reset_demo_session`, `public.billing_notify`), removing cross-customer notification pollution, and preserving all immutable `public.billing_audit_events`.
+  - Enforced dual-ownership verification (`recipient_profile_id === customerId` AND linked invoice `patient_id === customerId`) and canonical seed UUID-to-invoice-number resolution (`resolveBillingDeepLinkInvoice`) so `Alex Rivera` and `Jordan Taylor` see and open only their own notifications and statements.
+- **Public Repository Cleanup & Updated Public Screenshots (`docs/screenshots/public/`, `scripts/verify-public-repo-hygiene.mjs`):**
+  - Separated public documentation screenshots (`docs/screenshots/public/01`–`14`) from local-only presentation videos, voiceover scripts, and recording utilities (`local-demo/`, gitignored) and added `npm run verify:repo-hygiene`.
+
+---
+
 ## [`v1.9.1`] — 2026-11-03
 
 ### Added & Fixed (Mobile UI Polish, Global Search, PayPal Browser Checkout, Billing AI & Notifications)
@@ -31,17 +62,10 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
 ### Added
 - **Full 82-Tool Unified MCP Gateway (`packages/paypal-billing-kit/src/mcpRegistry.ts`, `supabase/functions/billing-maas-mcp/index.ts`, `worker/src/index.ts`):**
   - Expanded the unified Model Context Protocol (MCP) gateway from `30` tools to **`82` callable tools** across all three live endpoints (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`, `https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp`, and `https://paypal-ai-billing-kit.vercel.app/api/mcp`) and OpenAPI 3.1.0 (`/api/openapi.json`).
-  - Integrated all **46 Official PayPal MCP tools** by their exact official names (`create_invoice`, `create_recurring_series`, `activate_recurring_series`, `get_recurring_series`, `cancel_recurring_series`, `delete_recurring_series`, `list_invoices`, `get_invoice`, `send_invoice`, `send_invoice_reminder`, `cancel_sent_invoice`, `delete_invoice`, `setup_invoice_auto_reminders`, `update_invoice_auto_reminder`, `search_invoicing`, `update_invoicing`, `cancel_invoice_auto_reminder`, `generate_invoice_qr_code`, `generate_invoice_number`, `record_payment_for_invoice`, `record_refund_for_invoice`, `create_conditional_rules_for_invoice`, `create_product`, `list_products`, `update_product`, `show_product_details`, `create_subscription_plan`, `list_subscription_plans`, `show_subscription_plan_details`, `create_subscription`, `show_subscription_details`, `cancel_subscription`, `update_subscription`, `create_shipment_tracking`, `get_shipment_tracking`, `update_shipment_tracking`, `create_order`, `get_order`, `pay_order`, `list_disputes`, `get_dispute`, `accept_dispute_claim`, `list_transactions`, `create_refund`, `get_refund`, `get_merchant_insights`) alongside `paypal_discover_official_mcp` (`47` total `official_paypal_mcp` tools).
+  - Integrated all **46 Official PayPal MCP tools** by their exact official names alongside `paypal_discover_official_mcp` (`47` total `official_paypal_mcp` tools).
   - Added **6 new PayPal Sandbox REST-to-MCP Adapter tools** (`update_plan`, `paypal_authorize_order`, `paypal_list_webhooks`, `paypal_list_webhook_event_types`, `paypal_list_invoice_templates`, `paypal_create_vault_setup_token`) to the existing 8 REST adapters (`14` total `paypal_rest_adapter` tools).
   - Preserved all **21 Native Application tools** (`source: "native_application"`).
-- **Comprehensive 82-Tool Verification & Evidence Suite (`scripts/verify-full-paypal-mcp.mjs`):**
-  - Verifies every single tool in the 82-tool catalog against live PayPal Sandbox (`https://api-m.sandbox.paypal.com`), explicitly distinguishing:
-    - **`35` Official PayPal MCP tools (`PASS_REST_ADAPTER`):** Executed live end-to-end against PayPal Sandbox REST v1/v2 APIs (`HTTP 200/201/204`).
-    - **`5` Official PayPal MCP tools (`PASS_NEGATIVE_AUTHORIZATION`):** Reach live PayPal Sandbox endpoints and return structured domain state validations when interactive buyer approval (`pay_order`, `cancel_subscription`, `update_subscription`) or an active Sandbox dispute (`get_dispute`, `accept_dispute_claim`) is required.
-    - **`4` Official PayPal MCP tools (`BLOCKED_OAUTH_SCOPE`):** Blocked by missing OAuth scopes on PayPal Sandbox `Default Application` (`APP-5SK74342S6474230W`): `create_shipment_tracking`, `get_shipment_tracking`, `update_shipment_tracking` (`shipping/trackers/readwrite`), and `list_transactions` (`reporting/search/read`, with session transaction fallback).
-    - **`1` Official PayPal MCP tool (`BLOCKED_UPSTREAM`):** `create_conditional_rules_for_invoice` (upstream PayPal Sandbox `/v2/invoicing/invoices/{id}/conditional-rules` error).
-    - **`1` Official PayPal MCP tool (`UNSUPPORTED_BY_SANDBOX`):** `get_merchant_insights` (unsupported in PayPal Sandbox mode by `@paypal/agent-toolkit`, with session metrics fallback).
-- **Updated Playable Walkthrough Videos & High-Resolution Screenshots (`docs/videos/`, `docs/screenshots/`, `docs/MEDIA_AUDIT_MANIFEST.md`).**
+- **Comprehensive 82-Tool Verification & Evidence Suite (`scripts/verify-full-paypal-mcp.mjs`).**
 
 ---
 
@@ -52,10 +76,8 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
   - Migrated `supabase/functions/billing-ai-assistant/index.ts` and SDK model defaults from `gemini-2.5-flash` to `gemini-3.5-flash-lite` ahead of Google AI Studio's December 1, 2026 auto-redirect deadline.
   - Replaced numeric `thinking_budget` with `thinkingConfig: { thinkingLevel: "MEDIUM" }`, added `mediaResolution: "MEDIA_RESOLUTION_HIGH"` support, and preserved `thoughtSignature` across multi-turn `functionCall` / `functionResponse` histories.
 - **Professional Merchant-Branded PDF 1.4 Receipts (`packages/paypal-billing-kit/src/pdfReceipt.ts`):**
-  - Redesigned customer-facing PDF receipts around merchant-first branding (**Jenkins Wellness & Telehealth Practice**, `Provider: Dr. Sarah Jenkins`), state-aware headers (`Payment Receipt - Paid`, `Payment & Refund Receipt - Refunded`, `Payment Receipt - Partially Refunded`, `Sample Demo Receipt - Not a Real PayPal Payment`), `"Payment processed through PayPal"` attribution, and `"This receipt was generated electronically. Please retain it for your records."` footer.
-  - Enforced strict refusal (`RECEIPT_UNAVAILABLE_UNPAID_INVOICE`) when requesting a receipt for unpaid, draft, overdue, failed, or voided statements.
-- **30-Tool MCP Registry Reconciliation (`packages/paypal-billing-kit/src/mcpRegistry.ts`):**
-  - Established a single canonical MCP tool registry with SHA-256 schema fingerprinting across Cloudflare Worker, Supabase Edge Function, and Vercel MCP endpoints.
+  - Redesigned customer-facing PDF receipts around merchant-first branding (**Jenkins Wellness & Telehealth Practice**, `Provider: Dr. Sarah Jenkins`), state-aware headers, `"Payment processed through PayPal"` attribution, and strict refusal (`RECEIPT_UNAVAILABLE_UNPAID_INVOICE`) on unpaid statements.
+- **30-Tool MCP Registry Reconciliation (`packages/paypal-billing-kit/src/mcpRegistry.ts`).**
 
 ---
 

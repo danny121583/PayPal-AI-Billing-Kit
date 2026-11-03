@@ -21,6 +21,12 @@ export const DEMO_USER_IDS = {
   jordan_taylor: '11111111-1111-4111-8111-111111111103',
 } as const;
 
+export function getActiveDemoUserId(roleScope: BillingRoleScope): string {
+  return roleScope === 'doctor'
+    ? DEMO_USER_IDS.sarah_jenkins
+    : DEMO_USER_IDS.alex_rivera;
+}
+
 const ALL_DEMO_USER_IDS = [
   DEMO_USER_IDS.sarah_jenkins,
   DEMO_USER_IDS.alex_rivera,
@@ -286,104 +292,439 @@ interface PreloadedSessionCache {
 }
 
 const localReadNotificationIds = new Set<string>();
+const localSessionInvoiceOverridesBySession = new Map<
+  string,
+  Map<string, Record<string, any>>
+>();
 
+const CANONICAL_ORG_ID = '22222222-2222-4222-8222-222222222201';
+
+const CANONICAL_SEED_INVOICE_BASELINE: Record<
+  string,
+  {
+    invoice_number: string;
+    issuer_user_id: string;
+    recipient_user_id: string;
+    status: string;
+    total_minor: number;
+    amount_paid_minor: number;
+    amount_refunded_minor: number;
+    balance_due_minor: number;
+    days_offset_due: number;
+  }
+> = {
+  '33333333-3333-4333-8333-333333333301': {
+    invoice_number: 'PPB-INV-2026-1001',
+    issuer_user_id: DEMO_USER_IDS.sarah_jenkins,
+    recipient_user_id: DEMO_USER_IDS.alex_rivera,
+    status: 'sent',
+    total_minor: 15000,
+    amount_paid_minor: 0,
+    amount_refunded_minor: 0,
+    balance_due_minor: 15000,
+    days_offset_due: 10,
+  },
+  '33333333-3333-4333-8333-333333333302': {
+    invoice_number: 'PPB-INV-2026-1002',
+    issuer_user_id: DEMO_USER_IDS.sarah_jenkins,
+    recipient_user_id: DEMO_USER_IDS.alex_rivera,
+    status: 'sent',
+    total_minor: 7500,
+    amount_paid_minor: 0,
+    amount_refunded_minor: 0,
+    balance_due_minor: 7500,
+    days_offset_due: -5,
+  },
+  '33333333-3333-4333-8333-333333333303': {
+    invoice_number: 'PPB-INV-2026-1003',
+    issuer_user_id: DEMO_USER_IDS.sarah_jenkins,
+    recipient_user_id: DEMO_USER_IDS.alex_rivera,
+    status: 'paid',
+    total_minor: 12500,
+    amount_paid_minor: 12500,
+    amount_refunded_minor: 0,
+    balance_due_minor: 0,
+    days_offset_due: 3,
+  },
+  '33333333-3333-4333-8333-333333333304': {
+    invoice_number: 'PPB-INV-2026-1004',
+    issuer_user_id: DEMO_USER_IDS.sarah_jenkins,
+    recipient_user_id: DEMO_USER_IDS.jordan_taylor,
+    status: 'sent',
+    total_minor: 5000,
+    amount_paid_minor: 0,
+    amount_refunded_minor: 0,
+    balance_due_minor: 5000,
+    days_offset_due: 7,
+  },
+  '33333333-3333-4333-8333-333333333305': {
+    invoice_number: 'PPB-INV-2026-1005',
+    issuer_user_id: DEMO_USER_IDS.sarah_jenkins,
+    recipient_user_id: DEMO_USER_IDS.jordan_taylor,
+    status: 'void',
+    total_minor: 3500,
+    amount_paid_minor: 0,
+    amount_refunded_minor: 0,
+    balance_due_minor: 0,
+    days_offset_due: 5,
+  },
+  '33333333-3333-4333-8333-333333333306': {
+    invoice_number: 'PPB-INV-2026-1006',
+    issuer_user_id: DEMO_USER_IDS.sarah_jenkins,
+    recipient_user_id: DEMO_USER_IDS.alex_rivera,
+    status: 'refunded',
+    total_minor: 4500,
+    amount_paid_minor: 4500,
+    amount_refunded_minor: 4500,
+    balance_due_minor: 0,
+    days_offset_due: -3,
+  },
+};
+
+function isNotificationMarkedReadLocally(userId: string, notifId: string): boolean {
+  return (
+    localReadNotificationIds.has(`${userId}:${notifId}`) ||
+    localReadNotificationIds.has(notifId)
+  );
+}
+
+/**
+ * Canonical seed notification baseline strictly reconciled with authoritative
+ * invoice ownership in billing_invoices and syntheticBillingFixtures:
+ *  - Alex Rivera (1111...1102): PPB-INV-2026-1001, 1002, 1003, 1006
+ *  - Jordan Taylor (1111...1103): PPB-INV-2026-1004 (and 1005 voided)
+ *  - Dr. Sarah Jenkins (1111...1101): Merchant practice notifications (1003, 1002, 1004)
+ */
 export function getDefaultNotificationsByUserId(): Record<string, BillingNotificationItem[]> {
   return {
     [DEMO_USER_IDS.sarah_jenkins]: [
       {
         id: 'notif-seed-doc-1003',
         recipientUserId: DEMO_USER_IDS.sarah_jenkins,
+        organizationId: CANONICAL_ORG_ID,
         invoiceId: '33333333-3333-4333-8333-333333333303',
+        invoiceNumber: 'PPB-INV-2026-1003',
         type: 'payment_confirmed',
         title: 'Payment received',
-        body: 'A customer payment ($125.00 USD) was received for invoice PPB-INV-2026-1003 (Jordan Taylor).',
+        body: 'A customer payment ($125.00 USD) was received for invoice PPB-INV-2026-1003 (Alex Rivera).',
         deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333303',
-        isRead: localReadNotificationIds.has('notif-seed-doc-1003'),
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.sarah_jenkins,
+          'notif-seed-doc-1003'
+        ),
         createdAt: '2026-11-03T04:35:00.000Z',
       },
       {
-        id: 'notif-seed-doc-1001',
+        id: 'notif-seed-doc-1002',
         recipientUserId: DEMO_USER_IDS.sarah_jenkins,
-        invoiceId: '33333333-3333-4333-8333-333333333301',
+        organizationId: CANONICAL_ORG_ID,
+        invoiceId: '33333333-3333-4333-8333-333333333302',
+        invoiceNumber: 'PPB-INV-2026-1002',
         type: 'invoice_overdue',
         title: 'Overdue statement alert',
-        body: 'Statement PPB-INV-2026-1001 ($150.00 USD for Alex Rivera) is past due.',
-        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333301',
-        isRead: localReadNotificationIds.has('notif-seed-doc-1001'),
+        body: 'Statement PPB-INV-2026-1002 ($75.00 USD for Alex Rivera) is past due.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333302',
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.sarah_jenkins,
+          'notif-seed-doc-1002'
+        ),
         createdAt: '2026-11-03T03:00:00.000Z',
       },
       {
         id: 'notif-seed-doc-1004',
         recipientUserId: DEMO_USER_IDS.sarah_jenkins,
+        organizationId: CANONICAL_ORG_ID,
         invoiceId: '33333333-3333-4333-8333-333333333304',
+        invoiceNumber: 'PPB-INV-2026-1004',
         type: 'payment_failed',
         title: 'Payment attempt declined',
-        body: 'A card payment attempt on statement PPB-INV-2026-1004 ($50.00 USD for Alex Rivera) was declined.',
+        body: 'A card payment attempt on statement PPB-INV-2026-1004 ($50.00 USD for Jordan Taylor) was declined.',
         deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333304',
-        isRead: localReadNotificationIds.has('notif-seed-doc-1004'),
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.sarah_jenkins,
+          'notif-seed-doc-1004'
+        ),
         createdAt: '2026-11-03T01:15:00.000Z',
       },
     ],
     [DEMO_USER_IDS.alex_rivera]: [
       {
-        id: 'notif-seed-alex-1001',
+        id: 'notif-seed-alex-1002',
         recipientUserId: DEMO_USER_IDS.alex_rivera,
-        invoiceId: '33333333-3333-4333-8333-333333333301',
+        organizationId: CANONICAL_ORG_ID,
+        invoiceId: '33333333-3333-4333-8333-333333333302',
+        invoiceNumber: 'PPB-INV-2026-1002',
         type: 'invoice_overdue',
         title: 'Overdue statement reminder',
-        body: 'Statement PPB-INV-2026-1001 ($150.00 USD) from Dr. Sarah Jenkins is overdue.',
-        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333301',
-        isRead: localReadNotificationIds.has('notif-seed-alex-1001'),
+        body: 'Statement PPB-INV-2026-1002 ($75.00 USD) from Dr. Sarah Jenkins is overdue.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333302',
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.alex_rivera,
+          'notif-seed-alex-1002'
+        ),
         createdAt: '2026-11-03T04:00:00.000Z',
       },
       {
-        id: 'notif-seed-alex-1002',
+        id: 'notif-seed-alex-1001',
         recipientUserId: DEMO_USER_IDS.alex_rivera,
-        invoiceId: '33333333-3333-4333-8333-333333333302',
+        organizationId: CANONICAL_ORG_ID,
+        invoiceId: '33333333-3333-4333-8333-333333333301',
+        invoiceNumber: 'PPB-INV-2026-1001',
         type: 'invoice_sent',
         title: 'New invoice',
-        body: 'You have received a new invoice (PPB-INV-2026-1002 • $75.00 USD) from Dr. Sarah Jenkins.',
-        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333302',
-        isRead: localReadNotificationIds.has('notif-seed-alex-1002'),
+        body: 'You have received a new invoice (PPB-INV-2026-1001 • $150.00 USD) from Dr. Sarah Jenkins.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333301',
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.alex_rivera,
+          'notif-seed-alex-1001'
+        ),
         createdAt: '2026-11-03T02:30:00.000Z',
       },
       {
-        id: 'notif-seed-alex-1004',
+        id: 'notif-seed-alex-1003',
         recipientUserId: DEMO_USER_IDS.alex_rivera,
-        invoiceId: '33333333-3333-4333-8333-333333333304',
-        type: 'payment_failed',
-        title: 'Payment not completed',
-        body: 'Your payment attempt on statement PPB-INV-2026-1004 ($50.00 USD) was declined. Tap to retry.',
-        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333304',
-        isRead: localReadNotificationIds.has('notif-seed-alex-1004'),
-        createdAt: '2026-11-03T01:00:00.000Z',
-      },
-    ],
-    [DEMO_USER_IDS.jordan_taylor]: [
-      {
-        id: 'notif-seed-jordan-1003',
-        recipientUserId: DEMO_USER_IDS.jordan_taylor,
+        organizationId: CANONICAL_ORG_ID,
         invoiceId: '33333333-3333-4333-8333-333333333303',
+        invoiceNumber: 'PPB-INV-2026-1003',
         type: 'payment_confirmed',
         title: 'Payment confirmed',
         body: 'Your payment ($125.00 USD) for invoice PPB-INV-2026-1003 has been confirmed.',
         deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333303',
-        isRead: localReadNotificationIds.has('notif-seed-jordan-1003'),
-        createdAt: '2026-11-03T04:30:00.000Z',
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.alex_rivera,
+          'notif-seed-alex-1003'
+        ),
+        createdAt: '2026-11-03T01:30:00.000Z',
       },
       {
-        id: 'notif-seed-jordan-1006',
-        recipientUserId: DEMO_USER_IDS.jordan_taylor,
+        id: 'notif-seed-alex-1006',
+        recipientUserId: DEMO_USER_IDS.alex_rivera,
+        organizationId: CANONICAL_ORG_ID,
         invoiceId: '33333333-3333-4333-8333-333333333306',
+        invoiceNumber: 'PPB-INV-2026-1006',
         type: 'refund_completed',
         title: 'Refund completed',
         body: 'Your $45.00 USD refund for invoice PPB-INV-2026-1006 has been completed.',
         deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333306',
-        isRead: localReadNotificationIds.has('notif-seed-jordan-1006'),
+        isRead: true,
         createdAt: '2026-11-02T22:00:00.000Z',
       },
     ],
+    [DEMO_USER_IDS.jordan_taylor]: [
+      {
+        id: 'notif-seed-jordan-1004',
+        recipientUserId: DEMO_USER_IDS.jordan_taylor,
+        organizationId: CANONICAL_ORG_ID,
+        invoiceId: '33333333-3333-4333-8333-333333333304',
+        invoiceNumber: 'PPB-INV-2026-1004',
+        type: 'payment_failed',
+        title: 'Payment not completed',
+        body: 'Your payment attempt on statement PPB-INV-2026-1004 ($50.00 USD) was declined. Tap to retry.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333304',
+        isRead: isNotificationMarkedReadLocally(
+          DEMO_USER_IDS.jordan_taylor,
+          'notif-seed-jordan-1004'
+        ),
+        createdAt: '2026-11-03T04:15:00.000Z',
+      },
+    ],
   };
+}
+
+/**
+ * Authorizes and filters notifications for the active account using dual-ownership
+ * verification (notification recipient + linked invoice owner/merchant scope).
+ * Fails closed (`[]`) if user context or role scope is missing, invalid, or mismatched.
+ */
+export function authorizeAndFilterNotificationsForAccount(params: {
+  notifications: BillingNotificationItem[];
+  roleScope: BillingRoleScope | null | undefined;
+  activeUserId: string | null | undefined;
+  invoices: SyntheticBillingInvoice[];
+  authorizedOrganizationIds?: string[];
+}): BillingNotificationItem[] {
+  const {
+    notifications,
+    roleScope,
+    activeUserId,
+    invoices,
+    authorizedOrganizationIds = [CANONICAL_ORG_ID],
+  } = params;
+
+  if (
+    (roleScope !== 'doctor' && roleScope !== 'patient') ||
+    typeof activeUserId !== 'string' ||
+    !activeUserId.trim() ||
+    !Array.isArray(notifications)
+  ) {
+    return [];
+  }
+
+  const normalizedUid = activeUserId.trim().toLowerCase();
+  const isDoctorId = normalizedUid === DEMO_USER_IDS.sarah_jenkins.toLowerCase();
+  const isAlexId = normalizedUid === DEMO_USER_IDS.alex_rivera.toLowerCase();
+  const isJordanId = normalizedUid === DEMO_USER_IDS.jordan_taylor.toLowerCase();
+
+  // Fail closed on unknown user IDs or role/account mismatch
+  if (roleScope === 'doctor' && !isDoctorId) {
+    return [];
+  }
+  if (roleScope === 'patient' && isDoctorId) {
+    return [];
+  }
+  if (roleScope === 'patient' && !isAlexId && !isJordanId) {
+    // Allow custom test customer UUIDs only if they own at least one invoice in `invoices`
+    const ownsAnyInvoice = (invoices || []).some(
+      (inv) =>
+        inv.recipientUserId &&
+        inv.recipientUserId.trim().toLowerCase() === normalizedUid
+    );
+    if (!ownsAnyInvoice) {
+      return [];
+    }
+  }
+
+  const allowedOrgSet = new Set(
+    authorizedOrganizationIds.map((o) => String(o).toLowerCase())
+  );
+
+  const expectedCustomerName = isAlexId
+    ? 'alex rivera'
+    : isJordanId
+      ? 'jordan taylor'
+      : null;
+  const forbiddenOtherCustomerName = isAlexId
+    ? 'jordan taylor'
+    : isJordanId
+      ? 'alex rivera'
+      : null;
+
+  const authorized: BillingNotificationItem[] = [];
+  const seenIds = new Set<string>();
+
+  for (const n of notifications) {
+    if (!n || typeof n !== 'object') continue;
+    const notifId = String(n.id || '').trim();
+    if (!notifId || seenIds.has(notifId)) continue;
+
+    const notifRecipient = String(n.recipientUserId || '').trim().toLowerCase();
+    if (!notifRecipient || notifRecipient !== normalizedUid) {
+      continue;
+    }
+
+    if (
+      n.organizationId &&
+      !allowedOrgSet.has(String(n.organizationId).trim().toLowerCase())
+    ) {
+      continue;
+    }
+
+    // Extract invoice references from invoiceId, deepLink, invoiceNumber, and text
+    const rawInvId = n.invoiceId ? String(n.invoiceId).trim() : null;
+    let dlInvId: string | null = null;
+    if (n.deepLink) {
+      const dlMatch = String(n.deepLink).match(/[?&]invoiceId=([^&#]+)/i);
+      if (dlMatch) {
+        try {
+          dlInvId = decodeURIComponent(dlMatch[1]).trim();
+        } catch {
+          dlInvId = dlMatch[1].trim();
+        }
+      }
+    }
+    const textCombined = `${n.title || ''} ${n.body || ''}`;
+    const textInvMatch = textCombined.match(/\b((?:PPB|HER)-INV-\d{4}-\d+)\b/i);
+    const extractedInvNum = (
+      n.invoiceNumber || (textInvMatch ? textInvMatch[1] : '')
+    )
+      .trim()
+      .toUpperCase();
+
+    const candidateId = rawInvId || dlInvId;
+    if (!candidateId && !extractedInvNum) {
+      // Orphan notification with no linked statement is excluded
+      continue;
+    }
+
+    // Find linked invoice in current session invoices
+    const byId = candidateId
+      ? (invoices || []).find(
+          (inv) =>
+            inv.id.toLowerCase() === candidateId.toLowerCase() ||
+            inv.invoiceNumber.toLowerCase() === candidateId.toLowerCase()
+        )
+      : undefined;
+    const byNum = extractedInvNum
+      ? (invoices || []).find(
+          (inv) => inv.invoiceNumber.toUpperCase() === extractedInvNum
+        )
+      : undefined;
+
+    // If both ID and invoiceNumber are present, they MUST resolve to the exact same invoice
+    if (byId && byNum && byId.id !== byNum.id) {
+      continue;
+    }
+
+    const matchedInvoice = byId || byNum;
+    if (!matchedInvoice) {
+      // Linked invoice does not exist (deleted or belongs to another session/org)
+      continue;
+    }
+
+    if (
+      matchedInvoice.organizationId &&
+      !allowedOrgSet.has(matchedInvoice.organizationId.toLowerCase())
+    ) {
+      continue;
+    }
+
+    if (roleScope === 'patient') {
+      if (matchedInvoice.status === 'draft') {
+        continue;
+      }
+      if (
+        matchedInvoice.recipientUserId &&
+        matchedInvoice.recipientUserId.trim().toLowerCase() !== normalizedUid
+      ) {
+        continue;
+      }
+      if (
+        expectedCustomerName &&
+        matchedInvoice.patientDisplayName.trim().toLowerCase() !==
+          expectedCustomerName
+      ) {
+        continue;
+      }
+      if (
+        forbiddenOtherCustomerName &&
+        textCombined.toLowerCase().includes(forbiddenOtherCustomerName)
+      ) {
+        continue;
+      }
+    } else {
+      // Doctor / provider scope: must belong to provider's authorized organization and issuer
+      if (matchedInvoice.authorizedDoctorScope !== 'org_primary_demo') {
+        continue;
+      }
+      if (
+        matchedInvoice.issuerUserId &&
+        matchedInvoice.issuerUserId.trim().toLowerCase() !== normalizedUid
+      ) {
+        continue;
+      }
+    }
+
+    seenIds.add(notifId);
+    authorized.push({
+      ...n,
+      invoiceId: matchedInvoice.id,
+      invoiceNumber: matchedInvoice.invoiceNumber,
+      organizationId: matchedInvoice.organizationId,
+      deepLink: `/billing?invoiceId=${encodeURIComponent(matchedInvoice.id)}`,
+    });
+  }
+
+  return authorized;
 }
 
 const preloadedCache: PreloadedSessionCache = {
@@ -413,14 +754,33 @@ export function getPreloadedBillingSnapshot(
   roleScope: BillingRoleScope,
   targetUserId?: string
 ): BillingDashboardData {
-  const userId =
-    targetUserId ||
-    (roleScope === 'doctor' ? DEMO_USER_IDS.sarah_jenkins : DEMO_USER_IDS.alex_rivera);
+  const hasExplicitEmptyOrInvalid =
+    targetUserId !== undefined &&
+    (typeof targetUserId !== 'string' || !targetUserId.trim());
+  const userId = hasExplicitEmptyOrInvalid
+    ? ''
+    : targetUserId ||
+      (roleScope === 'doctor'
+        ? DEMO_USER_IDS.sarah_jenkins
+        : DEMO_USER_IDS.alex_rivera);
 
   const allInvoices =
     preloadedCache.invoices.length > 0
       ? preloadedCache.invoices
       : getSyntheticInvoicesForRole(roleScope);
+
+  const candidateNotifs = userId
+    ? preloadedCache.notificationsByUserId[userId] ||
+      getDefaultNotificationsByUserId()[userId] ||
+      []
+    : [];
+
+  const authorizedNotifications = authorizeAndFilterNotificationsForAccount({
+    notifications: candidateNotifs,
+    roleScope,
+    activeUserId: userId,
+    invoices: allInvoices,
+  });
 
   return {
     invoices: allInvoices,
@@ -431,7 +791,7 @@ export function getPreloadedBillingSnapshot(
     connection:
       preloadedCache.connectionsByUserId[userId] || getDefaultPayPalConnection(roleScope),
     auditEvents: preloadedCache.auditEvents,
-    notifications: preloadedCache.notificationsByUserId[userId] || [],
+    notifications: authorizedNotifications,
     isLiveStagingData: preloadedCache.isLiveStagingData,
   };
 }
@@ -512,12 +872,22 @@ export async function fetchBillingDashboardData(
 
   try {
     if (process.env.NODE_ENV === 'test' || !sb?.from || !sb?.rpc) {
-      const fallbackUserId =
-        targetUserId ||
-        (roleScope === 'doctor'
-          ? DEMO_USER_IDS.sarah_jenkins
-          : DEMO_USER_IDS.alex_rivera);
+      const hasExplicitInvalid =
+        targetUserId !== undefined &&
+        (typeof targetUserId !== 'string' || !targetUserId.trim());
+      const fallbackUserId = hasExplicitInvalid
+        ? ''
+        : targetUserId ||
+          (roleScope === 'doctor'
+            ? DEMO_USER_IDS.sarah_jenkins
+            : DEMO_USER_IDS.alex_rivera);
       const defaultNotifs = getDefaultNotificationsByUserId();
+      const authorizedNotifs = authorizeAndFilterNotificationsForAccount({
+        notifications: fallbackUserId ? defaultNotifs[fallbackUserId] || [] : [],
+        roleScope,
+        activeUserId: fallbackUserId,
+        invoices: fallbackInvoices,
+      });
       return {
         invoices: fallbackInvoices,
         catalog: DEFAULT_SERVICE_CATALOG,
@@ -525,9 +895,16 @@ export async function fetchBillingDashboardData(
         settings: getDefaultBillingAISettings(fallbackUserId),
         connection: defaultConnection,
         auditEvents: [],
-        notifications: defaultNotifs[fallbackUserId] || [],
+        notifications: authorizedNotifs,
         isLiveStagingData: false,
       };
+    }
+
+    if (
+      targetUserId !== undefined &&
+      (typeof targetUserId !== 'string' || !targetUserId.trim())
+    ) {
+      return getPreloadedBillingSnapshot(roleScope, '');
     }
 
     let userId: string | undefined = targetUserId;
@@ -626,9 +1003,40 @@ export async function fetchBillingDashboardData(
           overrideMap.set(String(ov.invoice_id), ov);
         }
       }
+      const localOverridesForSession =
+        localSessionInvoiceOverridesBySession.get(demoSessionId);
+      if (localOverridesForSession) {
+        for (const [invId, localOv] of localOverridesForSession.entries()) {
+          overrideMap.set(invId, { ...(overrideMap.get(invId) || {}), ...localOv });
+        }
+      }
 
       const dbInvoices: any[] = rawDbInvoices.map((raw) => {
-        const ov = overrideMap.get(String(raw.id));
+        const rawId = String(raw.id);
+        const ov = overrideMap.get(rawId);
+        const seedBaseline = CANONICAL_SEED_INVOICE_BASELINE[rawId];
+        if (!ov && seedBaseline && demoSessionId !== 'canonical') {
+          const offsetDate = new Date(
+            Date.now() + seedBaseline.days_offset_due * 86400000
+          )
+            .toISOString()
+            .slice(0, 10);
+          return {
+            ...raw,
+            issuer_user_id: seedBaseline.issuer_user_id,
+            recipient_user_id: seedBaseline.recipient_user_id,
+            status: seedBaseline.status,
+            total_minor: seedBaseline.total_minor,
+            amount_paid_minor: seedBaseline.amount_paid_minor,
+            amount_refunded_minor: seedBaseline.amount_refunded_minor,
+            balance_due_minor: seedBaseline.balance_due_minor,
+            due_date: offsetDate,
+            paid_at: seedBaseline.status === 'paid' ? raw.paid_at || raw.created_at : null,
+            voided_at: seedBaseline.status === 'void' ? raw.voided_at || raw.created_at : null,
+            refunded_at:
+              seedBaseline.status === 'refunded' ? raw.refunded_at || raw.created_at : null,
+          };
+        }
         if (!ov) return raw;
         return {
           ...raw,
@@ -839,8 +1247,10 @@ export async function fetchBillingDashboardData(
           organizationName:
             orgNameMap.get(String(inv.organization_id)) ||
             'Jenkins Wellness & Telehealth Practice',
+          issuerUserId: String(inv.issuer_user_id || DEMO_USER_IDS.sarah_jenkins),
           issuerDoctorName:
             nameMap.get(String(inv.issuer_user_id)) || 'Dr. Sarah Jenkins',
+          recipientUserId: String(inv.recipient_user_id || ''),
           patientDisplayName:
             nameMap.get(String(inv.recipient_user_id)) || 'Authorized Customer',
           allowedRoleScopes: ['doctor', 'patient'],
@@ -976,18 +1386,26 @@ export async function fetchBillingDashboardData(
       }
 
       const defaultSeededNotifs = getDefaultNotificationsByUserId();
-      const nextNotificationsByUser: Record<string, BillingNotificationItem[]> = {
-        [DEMO_USER_IDS.sarah_jenkins]: [],
-        [DEMO_USER_IDS.alex_rivera]: [],
-        [DEMO_USER_IDS.jordan_taylor]: [],
+      const rawCandidateNotificationsByUser: Record<string, BillingNotificationItem[]> = {
+        [DEMO_USER_IDS.sarah_jenkins]: [...(defaultSeededNotifs[DEMO_USER_IDS.sarah_jenkins] || [])],
+        [DEMO_USER_IDS.alex_rivera]: [...(defaultSeededNotifs[DEMO_USER_IDS.alex_rivera] || [])],
+        [DEMO_USER_IDS.jordan_taylor]: [...(defaultSeededNotifs[DEMO_USER_IDS.jordan_taylor] || [])],
       };
       const notifRows: any[] = Array.isArray(notifRes?.data) ? notifRes.data : [];
-      const seenNotifKeyByUser = new Set<string>();
 
       for (const n of notifRows) {
-        const recUid = String(n.user_id || DEMO_USER_IDS.sarah_jenkins);
-        if (!nextNotificationsByUser[recUid]) {
-          nextNotificationsByUser[recUid] = [];
+        const rowSession = String(n.demo_session_id || 'canonical');
+        // Only merge session-specific notifications created in the active visitor session.
+        // Canonical baseline notifications come from the reconciled getDefaultNotificationsByUserId()
+        // so historical misassigned or polluted 'canonical' DB rows never leak across customers or after Reset Demo.
+        if (rowSession !== demoSessionId || demoSessionId === 'canonical') {
+          continue;
+        }
+
+        const recUid = String(n.user_id || '').trim();
+        if (!recUid) continue;
+        if (!rawCandidateNotificationsByUser[recUid]) {
+          rawCandidateNotificationsByUser[recUid] = [];
         }
         const rawMetaInvId = n.metadata?.invoiceId
           ? String(n.metadata.invoiceId)
@@ -1009,56 +1427,50 @@ export async function fetchBillingDashboardData(
             ? sessionInvoicesByNumber.get(extractedInvNum)
             : undefined);
 
-        // Exclude notifications belonging to other visitors' ephemeral demo sessions
-        const rowSession = String(n.demo_session_id || 'canonical');
-        if (
-          rowSession !== 'canonical' &&
-          rowSession !== demoSessionId &&
-          !matchedSessionInv
-        ) {
-          continue;
-        }
-        if ((rawMetaInvId || extractedInvNum) && !matchedSessionInv) {
+        if (!matchedSessionInv) {
           continue;
         }
 
-        const resolvedInvoiceId = matchedSessionInv?.id || rawMetaInvId || null;
+        const resolvedInvoiceId = matchedSessionInv.id;
         const notifId = String(n.id);
-        const dedupeKey = `${recUid}:${resolvedInvoiceId || notifId}:${String(
-          n.title || ''
-        )}`;
-        if (seenNotifKeyByUser.has(dedupeKey)) {
-          continue;
-        }
-        seenNotifKeyByUser.add(dedupeKey);
 
-        nextNotificationsByUser[recUid].push({
+        rawCandidateNotificationsByUser[recUid].unshift({
           id: notifId,
           recipientUserId: recUid,
+          organizationId: matchedSessionInv.organizationId,
           invoiceId: resolvedInvoiceId,
+          invoiceNumber: matchedSessionInv.invoiceNumber,
           type: String(n.metadata?.kind || n.type || 'billing_alert'),
           title: String(n.title || 'Billing Notification'),
           body: String(n.body || ''),
-          deepLink: resolvedInvoiceId
-            ? `/billing?invoiceId=${encodeURIComponent(resolvedInvoiceId)}`
-            : String(n.metadata?.route || n.deep_link || '/billing'),
+          deepLink: `/billing?invoiceId=${encodeURIComponent(resolvedInvoiceId)}`,
           isRead:
-            localReadNotificationIds.has(notifId) ||
+            isNotificationMarkedReadLocally(recUid, notifId) ||
             Boolean(n.read ?? n.is_read),
           createdAt: String(n.created_at || new Date().toISOString()),
         });
       }
 
-      // Ensure each persona has its canonical seed notifications if DB returned none for that persona
-      for (const uid of ALL_DEMO_USER_IDS) {
-        if (
-          (!nextNotificationsByUser[uid] ||
-            nextNotificationsByUser[uid].length === 0) &&
-          defaultSeededNotifs[uid]
-        ) {
-          nextNotificationsByUser[uid] = defaultSeededNotifs[uid];
-        }
-      }
+      const nextNotificationsByUser: Record<string, BillingNotificationItem[]> = {
+        [DEMO_USER_IDS.sarah_jenkins]: authorizeAndFilterNotificationsForAccount({
+          notifications: rawCandidateNotificationsByUser[DEMO_USER_IDS.sarah_jenkins] || [],
+          roleScope: 'doctor',
+          activeUserId: DEMO_USER_IDS.sarah_jenkins,
+          invoices: effectiveSessionInvoices,
+        }),
+        [DEMO_USER_IDS.alex_rivera]: authorizeAndFilterNotificationsForAccount({
+          notifications: rawCandidateNotificationsByUser[DEMO_USER_IDS.alex_rivera] || [],
+          roleScope: 'patient',
+          activeUserId: DEMO_USER_IDS.alex_rivera,
+          invoices: effectiveSessionInvoices,
+        }),
+        [DEMO_USER_IDS.jordan_taylor]: authorizeAndFilterNotificationsForAccount({
+          notifications: rawCandidateNotificationsByUser[DEMO_USER_IDS.jordan_taylor] || [],
+          roleScope: 'patient',
+          activeUserId: DEMO_USER_IDS.jordan_taylor,
+          invoices: effectiveSessionInvoices,
+        }),
+      };
 
       const mappedSettings = mapDbSettingsRow(settingsRes?.data, userId!);
       preloadedCache.sessionId = demoSessionId;
@@ -1107,27 +1519,151 @@ function dbOrgsFromRes(data: any[]): any[] {
   return Array.isArray(data) ? data : [];
 }
 
-export async function markBillingNotificationRead(notificationId: string): Promise<boolean> {
-  if (!notificationId) return false;
-  localReadNotificationIds.add(notificationId);
-  // Immediately update preloaded memory cache
-  for (const uid of Object.keys(preloadedCache.notificationsByUserId)) {
-    preloadedCache.notificationsByUserId[uid] = (
-      preloadedCache.notificationsByUserId[uid] || []
-    ).map((n) => (n.id === notificationId ? { ...n, isRead: true } : n));
+export async function markBillingNotificationRead(
+  notificationId: string,
+  context?: {
+    activeUserId?: string | null;
+    roleScope?: BillingRoleScope | null;
   }
-  if (!sb?.from || notificationId.startsWith('notif-seed-')) {
+): Promise<boolean> {
+  if (!notificationId || typeof notificationId !== 'string' || !notificationId.trim()) {
+    return false;
+  }
+  const cleanNotifId = notificationId.trim();
+
+  // If explicit context is provided and activeUserId is empty/invalid, fail closed
+  if (
+    context &&
+    'activeUserId' in context &&
+    (!context.activeUserId || !String(context.activeUserId).trim())
+  ) {
+    return false;
+  }
+
+  const callerUserId = context?.activeUserId
+    ? String(context.activeUserId).trim()
+    : getActiveDemoUserId(context?.roleScope || 'patient');
+  const callerRole: BillingRoleScope =
+    context?.roleScope ||
+    (callerUserId === DEMO_USER_IDS.sarah_jenkins ? 'doctor' : 'patient');
+
+  if (!callerUserId) {
+    return false;
+  }
+
+  const allInvoices =
+    preloadedCache.invoices.length > 0
+      ? preloadedCache.invoices
+      : getSyntheticInvoicesForRole('doctor');
+
+  // Verify the notification exists in the caller's authorized notification list
+  const callerCandidates =
+    preloadedCache.notificationsByUserId[callerUserId] ||
+    getDefaultNotificationsByUserId()[callerUserId] ||
+    [];
+  const authorizedCallerList = authorizeAndFilterNotificationsForAccount({
+    notifications: callerCandidates,
+    roleScope: callerRole,
+    activeUserId: callerUserId,
+    invoices: allInvoices,
+  });
+
+  const ownedTarget = authorizedCallerList.find((n) => n.id === cleanNotifId);
+  if (!ownedTarget) {
+    // Reject cross-customer or unauthorized mark-as-read attempt
+    return false;
+  }
+
+  localReadNotificationIds.add(`${callerUserId}:${cleanNotifId}`);
+  preloadedCache.notificationsByUserId[callerUserId] = callerCandidates.map((n) =>
+    n.id === cleanNotifId && n.recipientUserId === callerUserId
+      ? { ...n, isRead: true }
+      : n
+  );
+
+  if (!sb?.from || cleanNotifId.startsWith('notif-seed-')) {
     return true;
   }
   try {
     const { error } = await sb
       .from('billing_notifications')
       .update({ read: true })
-      .eq('id', notificationId);
+      .eq('id', cleanNotifId)
+      .eq('user_id', callerUserId);
     return !error;
   } catch {
     return true;
   }
+}
+
+export async function markAllBillingNotificationsRead(context?: {
+  activeUserId?: string | null;
+  roleScope?: BillingRoleScope | null;
+}): Promise<number> {
+  if (
+    context &&
+    'activeUserId' in context &&
+    (!context.activeUserId || !String(context.activeUserId).trim())
+  ) {
+    return 0;
+  }
+
+  const callerUserId = context?.activeUserId
+    ? String(context.activeUserId).trim()
+    : getActiveDemoUserId(context?.roleScope || 'patient');
+  const callerRole: BillingRoleScope =
+    context?.roleScope ||
+    (callerUserId === DEMO_USER_IDS.sarah_jenkins ? 'doctor' : 'patient');
+
+  if (!callerUserId) {
+    return 0;
+  }
+
+  const allInvoices =
+    preloadedCache.invoices.length > 0
+      ? preloadedCache.invoices
+      : getSyntheticInvoicesForRole('doctor');
+  const callerCandidates =
+    preloadedCache.notificationsByUserId[callerUserId] ||
+    getDefaultNotificationsByUserId()[callerUserId] ||
+    [];
+  const authorizedCallerList = authorizeAndFilterNotificationsForAccount({
+    notifications: callerCandidates,
+    roleScope: callerRole,
+    activeUserId: callerUserId,
+    invoices: allInvoices,
+  });
+
+  let markedCount = 0;
+  const authorizedIds = new Set<string>();
+  for (const item of authorizedCallerList) {
+    authorizedIds.add(item.id);
+    if (!item.isRead) {
+      markedCount += 1;
+    }
+    localReadNotificationIds.add(`${callerUserId}:${item.id}`);
+  }
+
+  preloadedCache.notificationsByUserId[callerUserId] = callerCandidates.map((n) =>
+    authorizedIds.has(n.id) && n.recipientUserId === callerUserId
+      ? { ...n, isRead: true }
+      : n
+  );
+
+  if (sb?.from) {
+    try {
+      const demoSessionId = getOrCreateDemoSessionIdSync();
+      await sb
+        .from('billing_notifications')
+        .update({ read: true })
+        .eq('user_id', callerUserId)
+        .eq('demo_session_id', demoSessionId);
+    } catch {
+      // Ignore network error in offline/test mode
+    }
+  }
+
+  return markedCount;
 }
 
 export type NotificationInvoiceResolution =
@@ -1157,10 +1693,25 @@ export function resolveNotificationLinkedInvoice(params: {
   const { notification, roleScope, activeUserId, activeFullName, allInvoices } = params;
   const notifId = String(notification?.id || '');
 
+  if (
+    (roleScope !== 'doctor' && roleScope !== 'patient') ||
+    typeof activeUserId !== 'string' ||
+    !activeUserId.trim()
+  ) {
+    return {
+      status: 'unauthorized',
+      notificationId: notifId,
+      message:
+        'Access Restricted: Valid authenticated user context is required to open linked statements.',
+    };
+  }
+
+  const normalizedActiveUid = activeUserId.trim().toLowerCase();
+
   // If notification itself belongs to a different recipientUserId, reject cross-account access
   if (
-    notification?.recipientUserId &&
-    notification.recipientUserId !== activeUserId
+    !notification?.recipientUserId ||
+    notification.recipientUserId.trim().toLowerCase() !== normalizedActiveUid
   ) {
     return {
       status: 'unauthorized',
@@ -1190,7 +1741,11 @@ export function resolveNotificationLinkedInvoice(params: {
   const textNumMatch = `${notification?.title || ''} ${notification?.body || ''}`.match(
     /\b((?:PPB|HER)-INV-\d{4}-\d+)\b/i
   );
-  const extractedInvNumber = textNumMatch ? textNumMatch[1].toUpperCase() : null;
+  const extractedInvNumber = (
+    notification?.invoiceNumber || (textNumMatch ? textNumMatch[1] : '')
+  )
+    .trim()
+    .toUpperCase();
 
   const candidateId = rawInvId || deepLinkInvId;
   if (!candidateId && !extractedInvNumber) {
@@ -1202,23 +1757,29 @@ export function resolveNotificationLinkedInvoice(params: {
     };
   }
 
-  const matchedInvoice = (allInvoices || []).find((inv) => {
-    if (candidateId) {
-      if (
-        inv.id.toLowerCase() === candidateId.toLowerCase() ||
-        inv.invoiceNumber.toLowerCase() === candidateId.toLowerCase()
-      ) {
-        return true;
-      }
-    }
-    if (
-      extractedInvNumber &&
-      inv.invoiceNumber.toUpperCase() === extractedInvNumber
-    ) {
-      return true;
-    }
-    return false;
-  });
+  const byId = candidateId
+    ? (allInvoices || []).find(
+        (inv) =>
+          inv.id.toLowerCase() === candidateId.toLowerCase() ||
+          inv.invoiceNumber.toLowerCase() === candidateId.toLowerCase()
+      )
+    : undefined;
+  const byNum = extractedInvNumber
+    ? (allInvoices || []).find(
+        (inv) => inv.invoiceNumber.toUpperCase() === extractedInvNumber
+      )
+    : undefined;
+
+  if (byId && byNum && byId.id !== byNum.id) {
+    return {
+      status: 'unauthorized',
+      notificationId: notifId,
+      message:
+        'Access Restricted: Notification statement identifier mismatch detected.',
+    };
+  }
+
+  const matchedInvoice = byId || byNum;
 
   if (!matchedInvoice) {
     return {
@@ -1231,14 +1792,29 @@ export function resolveNotificationLinkedInvoice(params: {
 
   // Verify active account authorization for the matched invoice
   if (roleScope === 'patient') {
+    if (
+      matchedInvoice.recipientUserId &&
+      matchedInvoice.recipientUserId.trim().toLowerCase() !== normalizedActiveUid
+    ) {
+      return {
+        status: 'unauthorized',
+        notificationId: notifId,
+        message:
+          'Access Restricted: Your active customer account is not authorized to view this statement.',
+      };
+    }
+
     const expectedName =
       activeFullName ||
-      (activeUserId === DEMO_USER_IDS.jordan_taylor
+      (normalizedActiveUid === DEMO_USER_IDS.jordan_taylor.toLowerCase()
         ? 'Jordan Taylor'
-        : 'Alex Rivera');
-    const matchesDisplayName =
-      matchedInvoice.patientDisplayName.toLowerCase() ===
-      expectedName.toLowerCase();
+        : normalizedActiveUid === DEMO_USER_IDS.alex_rivera.toLowerCase()
+          ? 'Alex Rivera'
+          : '');
+    const matchesDisplayName = expectedName
+      ? matchedInvoice.patientDisplayName.toLowerCase() ===
+        expectedName.toLowerCase()
+      : true;
 
     if (!matchesDisplayName) {
       return {
@@ -1255,6 +1831,19 @@ export function resolveNotificationLinkedInvoice(params: {
         notificationId: notifId,
         message:
           'Access Restricted: Draft statements are only visible to the issuing provider until sent.',
+      };
+    }
+  } else {
+    if (
+      matchedInvoice.authorizedDoctorScope !== 'org_primary_demo' ||
+      (matchedInvoice.issuerUserId &&
+        matchedInvoice.issuerUserId.trim().toLowerCase() !== normalizedActiveUid)
+    ) {
+      return {
+        status: 'unauthorized',
+        notificationId: notifId,
+        message:
+          'Access Restricted: This statement belongs to an external merchant organization.',
       };
     }
   }
@@ -1428,13 +2017,16 @@ export async function simulateBillingDemoRefund(
 
 export async function resetBillingDemoSession(): Promise<void> {
   const demoSessionId = await getOrCreateDemoSessionId();
-  const { error } = await sb.rpc('billing_reset_demo_session', {
-    p_demo_session_id: demoSessionId,
-  });
-  if (error) {
-    throw new Error(error.message || 'Could not reset demo session.');
+  if (sb?.rpc) {
+    const { error } = await sb.rpc('billing_reset_demo_session', {
+      p_demo_session_id: demoSessionId,
+    });
+    if (error && process.env.NODE_ENV !== 'test') {
+      throw new Error(error.message || 'Could not reset demo session.');
+    }
   }
   localReadNotificationIds.clear();
+  localSessionInvoiceOverridesBySession.clear();
   preloadedCache.invoices = getSyntheticInvoicesForRole('doctor');
   preloadedCache.notificationsByUserId = getDefaultNotificationsByUserId();
   preloadedCache.loadedAt = 0;
@@ -1634,6 +2226,7 @@ export async function payInvoiceWithSandboxCard(params: {
   message?: string;
   data?: any;
 }> {
+  const demoSessionId = getOrCreateDemoSessionIdSync();
   const result = await invokePayPalBillingFunction({
     action: 'pay-with-sandbox-card',
     invoiceId: params.invoiceId,
@@ -1641,6 +2234,25 @@ export async function payInvoiceWithSandboxCard(params: {
     cardProfile: params.cardProfile || 'visa_sandbox',
     intent: params.intent || 'CAPTURE',
   });
+  if (result.ok && params.invoiceId) {
+    let sessionMap = localSessionInvoiceOverridesBySession.get(demoSessionId);
+    if (!sessionMap) {
+      sessionMap = new Map();
+      localSessionInvoiceOverridesBySession.set(demoSessionId, sessionMap);
+    }
+    const existingInv = preloadedCache.invoices.find(
+      (i) => i.id === params.invoiceId
+    );
+    const totalMinor = existingInv?.totalCents ?? 5000;
+    sessionMap.set(params.invoiceId, {
+      invoice_id: params.invoiceId,
+      status: 'paid',
+      amount_paid_minor: totalMinor,
+      amount_refunded_minor: 0,
+      balance_due_minor: 0,
+      paid_at: new Date().toISOString(),
+    });
+  }
   preloadedCache.loadedAt = 0;
   return result;
 }

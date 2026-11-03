@@ -51,8 +51,13 @@ import {
   DEFAULT_BILLABLE_PATIENTS,
   DEFAULT_SERVICE_CATALOG,
   DEMO_USER_IDS,
+  authorizeAndFilterNotificationsForAccount,
   getDefaultBillingAISettings,
   getDefaultNotificationsByUserId,
+  getPreloadedBillingSnapshot,
+  markAllBillingNotificationsRead,
+  markBillingNotificationRead,
+  resetBillingDemoSession,
   resolveNotificationLinkedInvoice,
   searchAuthorizedBillingRecords,
   type BillingAuditEventItem,
@@ -64,6 +69,10 @@ import {
 import {
   clearBillingAIClientCacheForTests,
   sendBillingAIMessage,
+  loadBillingAIHistory,
+  clearBillingAIConversation,
+  invalidateSessionBillingAIConversations,
+  buildBillingAIConversationScopeKey,
   setBillingAIMinProcessingMsForTests,
   getBillingAIMinProcessingMs,
 } from '../src/billing/api/billingAIClient';
@@ -485,6 +494,13 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     );
 
     expect(getByText('DEMO PROFILE AVAILABLE')).toBeTruthy();
+    expect(getByTestId('paypal-connect-toggle-details-btn')).toBeTruthy();
+    expect(getByText('View Details')).toBeTruthy();
+    expect(queryByTestId('paypal-connected-account-summary')).toBeNull();
+
+    // Expand details via View Details toggle
+    fireEvent.press(getByTestId('paypal-connect-toggle-details-btn'));
+    expect(getByText('Hide Details')).toBeTruthy();
     expect(getByTestId('paypal-connected-account-summary')).toBeTruthy();
 
     // 3. Sandbox Authenticated + Account Linked state (backed by real PayPal OAuth 2.0)
@@ -510,6 +526,11 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     expect(getByTestId('paypal-disconnect-cta-btn')).toBeTruthy();
     expect(queryByTestId('paypal-connect-form')).toBeNull();
     expect(queryByTestId('paypal-connect-cta-btn')).toBeNull();
+
+    // Collapse back via Hide Details toggle
+    fireEvent.press(getByTestId('paypal-connect-toggle-details-btn'));
+    expect(getByText('View Details')).toBeTruthy();
+    expect(queryByTestId('paypal-connected-account-summary')).toBeNull();
   });
 
   it('Section 9 Regression: Jordan Taylor #PPB-INV-2026-1004 failed payment statement opens cleanly and retries without "Invoice not found."', async () => {
@@ -1277,5 +1298,306 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
       expect(getByTestId('billing-notifications-error-banner')).toBeTruthy();
       expect(getByText(/Statement Unavailable/i)).toBeTruthy();
     });
+  });
+
+  it('Issues #7–#13: Simplified Payment Button Labels, Billing AI Grounded Question Answering ("hello", "why did it fail?", "when?", "how much?", "can I try again?"), and Strict Invoice/Account Conversation Isolation', async () => {
+    clearBillingAIClientCacheForTests();
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+    const inv1002 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1002')!;
+    const inv1003 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1003')!;
+    const inv1004 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1004')!;
+
+    // 1. Issue #7 & Consistent Payment Button: Single unified Pay with PayPal button (no competing Pay with Sandbox Card button)
+    const { getByText: getDetailText, queryByText: queryDetailText } = render(
+      <BillingInvoiceDetailModal
+        visible={true}
+        invoice={inv1002}
+        roleScope="patient"
+        onClose={jest.fn()}
+        onUpdated={jest.fn()}
+        onAskAI={jest.fn()}
+      />
+    );
+    expect(getDetailText('Pay with PayPal')).toBeTruthy();
+    expect(queryDetailText('Pay with Sandbox Card')).toBeNull();
+    expect(queryDetailText('Simulate Settlement')).toBeNull();
+
+    // 2. Issue #9: Greeting on focused overdue invoice #PPB-INV-2026-1002 responds conversationally (not an unprompted summary dump)
+    const helloTurn = await sendBillingAIMessage({
+      message: 'hello',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(helloTurn.reply.content).toMatch(/Hello/i);
+    expect(helloTurn.reply.content).toContain('PPB-INV-2026-1002');
+    expect(helloTurn.reply.content).toMatch(/Ask me anything|How can I help/i);
+
+    // 3. Issue #9: "why did it fail?" on OVERDUE #PPB-INV-2026-1002 explains 0 failed payment attempts (due date passed, not a failed payment)
+    const whyFailOn1002 = await sendBillingAIMessage({
+      message: 'why did it fail?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(whyFailOn1002.reply.content).toMatch(/zero \(0\) failed payment attempts|0 failed payment attempts/i);
+    expect(whyFailOn1002.reply.content).toMatch(/OVERDUE/i);
+    expect(whyFailOn1002.reply.content).not.toContain('Jordan Taylor');
+
+    // 4. Issue #9: Contextual follow-ups ("when?", "how much?", "can I try again?") on #PPB-INV-2026-1002
+    const whenTurn = await sendBillingAIMessage({
+      message: 'when?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(whenTurn.reply.content).toContain('PPB-INV-2026-1002');
+    expect(whenTurn.reply.content).toMatch(/Oct 15, 2026/);
+
+    const howMuchTurn = await sendBillingAIMessage({
+      message: 'how much?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(howMuchTurn.reply.content).toContain('$75.00');
+
+    const retryTurn = await sendBillingAIMessage({
+      message: 'can I try again?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(retryTurn.reply.content).toMatch(/Pay with PayPal/i);
+
+    // 5. Issue #9: "why did it fail?" on Jordan Taylor's FAILED #PPB-INV-2026-1004 reports the actual recorded failure
+    const whyFailOn1004 = await sendBillingAIMessage({
+      message: 'why did it fail?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      focusedInvoiceId: inv1004.id,
+    });
+    expect(whyFailOn1004.reply.content).toContain('PPB-INV-2026-1004');
+    expect(whyFailOn1004.reply.content).toMatch(/DEMO-ORD-DECLINED-1004|declined/i);
+
+    // 6. Issue #10: Invoice & Account Conversation Isolation
+    const history1002Before = await loadBillingAIHistory(
+      'patient',
+      inv1002.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1002Before.messages.length).toBeGreaterThanOrEqual(10); // 5 user + 5 assistant turns
+
+    // Open #PPB-INV-2026-1003 for Alex Rivera -> starts completely clean with 0 messages from 1002
+    const history1003Initial = await loadBillingAIHistory(
+      'patient',
+      inv1003.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1003Initial.messages).toHaveLength(0);
+
+    await sendBillingAIMessage({
+      message: 'Was this statement paid?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1003.id,
+    });
+
+    const history1003After = await loadBillingAIHistory(
+      'patient',
+      inv1003.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1003After.messages).toHaveLength(2);
+    expect(history1003After.messages[1].content).toContain('PPB-INV-2026-1003');
+    expect(history1003After.messages.some((m) => m.content === 'why did it fail?')).toBe(false);
+
+    // Return to #PPB-INV-2026-1002 -> restores 1002's conversation intact without 1003's messages
+    const history1002Restored = await loadBillingAIHistory(
+      'patient',
+      inv1002.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1002Restored.messages.length).toBe(history1002Before.messages.length);
+    expect(history1002Restored.messages.some((m) => m.content === 'why did it fail?')).toBe(true);
+    expect(history1002Restored.messages.some((m) => m.content === 'Was this statement paid?')).toBe(false);
+
+    // Clear only 1003's conversation via New Chat -> 1002 remains intact
+    await clearBillingAIConversation({
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1003.id,
+    });
+    expect(
+      (await loadBillingAIHistory('patient', inv1003.id, DEMO_USER_IDS.alex_rivera)).messages
+    ).toHaveLength(0);
+    expect(
+      (await loadBillingAIHistory('patient', inv1002.id, DEMO_USER_IDS.alex_rivera)).messages.length
+    ).toBe(history1002Before.messages.length);
+
+    // Reset Demo invalidates all session-scoped conversations
+    invalidateSessionBillingAIConversations();
+    expect(
+      (await loadBillingAIHistory('patient', inv1002.id, DEMO_USER_IDS.alex_rivera)).messages
+    ).toHaveLength(0);
+    expect(
+      (await loadBillingAIHistory('patient', inv1004.id, DEMO_USER_IDS.jordan_taylor)).messages
+    ).toHaveLength(0);
+
+    // Verify scope key includes session + role + user + invoice
+    const keyA = buildBillingAIConversationScopeKey({
+      demoSessionId: 'sess-1',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    const keyB = buildBillingAIConversationScopeKey({
+      demoSessionId: 'sess-1',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1003.id,
+    });
+    const keyC = buildBillingAIConversationScopeKey({
+      demoSessionId: 'sess-1',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(keyA).not.toBe(keyB);
+    expect(keyA).not.toBe(keyC);
+  });
+
+  it('Issues #14 & #15 + Combined Multi-Statement Proposal: Header New Chat Button, Cross-Customer Notification Isolation, Demo Reset Notification Restoration, and "Pay Both" AI Proposal', async () => {
+    setBillingAIMinProcessingMsForTests(0);
+    clearBillingAIClientCacheForTests();
+    await resetBillingDemoSession();
+
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+    const inv1002 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1002')!;
+    const inv1004 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1004')!;
+
+    // 1. Issue #14: Header New Chat button in upper-left corner of Billing AI modal
+    const { getByTestId: getAiByTestId } = render(
+      <BillingAIAssistantModal
+        visible={true}
+        roleScope="patient"
+        activeUserId={DEMO_USER_IDS.jordan_taylor}
+        focusedInvoice={inv1004}
+        invoices={allInvoices.filter((i) => i.recipientUserId === DEMO_USER_IDS.jordan_taylor)}
+        onClose={jest.fn()}
+        onDataChanged={jest.fn()}
+      />
+    );
+    const newChatBtn = getAiByTestId('billing-ai-new-chat-btn');
+    expect(newChatBtn).toBeTruthy();
+    expect(newChatBtn.props.accessibilityLabel).toBe('New Chat');
+
+    // 2. Issue #15: Reconciled Canonical Notification Ownership & Dual-Ownership Isolation
+    const defaultsByUser = getDefaultNotificationsByUserId();
+    const jordanNotifs = authorizeAndFilterNotificationsForAccount({
+      notifications: defaultsByUser[DEMO_USER_IDS.jordan_taylor],
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      invoices: allInvoices,
+    });
+    const alexNotifs = authorizeAndFilterNotificationsForAccount({
+      notifications: defaultsByUser[DEMO_USER_IDS.alex_rivera],
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      invoices: allInvoices,
+    });
+    const sarahNotifs = authorizeAndFilterNotificationsForAccount({
+      notifications: defaultsByUser[DEMO_USER_IDS.sarah_jenkins],
+      roleScope: 'doctor',
+      activeUserId: DEMO_USER_IDS.sarah_jenkins,
+      invoices: allInvoices,
+    });
+
+    // Jordan Taylor sees ONLY PPB-INV-2026-1004 (1 unread) and NEVER sees Alex Rivera's 1003 or 1006
+    expect(jordanNotifs).toHaveLength(1);
+    expect(jordanNotifs[0].invoiceNumber).toBe('PPB-INV-2026-1004');
+    expect(jordanNotifs.some((n) => n.invoiceNumber === 'PPB-INV-2026-1003')).toBe(false);
+    expect(jordanNotifs.some((n) => n.invoiceNumber === 'PPB-INV-2026-1006')).toBe(false);
+
+    // Alex Rivera sees 1002, 1001, 1003, 1006 (3 unread) and NEVER sees Jordan Taylor's 1004
+    expect(alexNotifs.map((n) => n.invoiceNumber)).toEqual([
+      'PPB-INV-2026-1002',
+      'PPB-INV-2026-1001',
+      'PPB-INV-2026-1003',
+      'PPB-INV-2026-1006',
+    ]);
+    expect(alexNotifs.filter((n) => !n.isRead)).toHaveLength(3);
+    expect(alexNotifs.some((n) => n.invoiceNumber === 'PPB-INV-2026-1004')).toBe(false);
+
+    // Dr. Sarah Jenkins sees provider notifications for 1003, 1002, 1004
+    expect(sarahNotifs.map((n) => n.invoiceNumber)).toEqual([
+      'PPB-INV-2026-1003',
+      'PPB-INV-2026-1002',
+      'PPB-INV-2026-1004',
+    ]);
+
+    // 3. Cross-customer mark-as-read is rejected; valid owner mark-as-read succeeds and is restored on Reset Demo
+    const crossMarkResult = await markBillingNotificationRead('notif-seed-alex-1002', {
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      roleScope: 'patient',
+    });
+    expect(crossMarkResult).toBe(false);
+
+    const validMarkResult = await markBillingNotificationRead('notif-seed-jordan-1004', {
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      roleScope: 'patient',
+    });
+    expect(validMarkResult).toBe(true);
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.jordan_taylor).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(0);
+
+    await markAllBillingNotificationsRead({
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      roleScope: 'patient',
+    });
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.alex_rivera).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(0);
+
+    // Reset Demo restores all notifications and unread badge counts for all accounts
+    await resetBillingDemoSession();
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.jordan_taylor).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(1);
+    expect(
+      getPreloadedBillingSnapshot('patient', DEMO_USER_IDS.alex_rivera).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(3);
+    expect(
+      getPreloadedBillingSnapshot('doctor', DEMO_USER_IDS.sarah_jenkins).notifications.filter(
+        (n) => !n.isRead
+      )
+    ).toHaveLength(3);
+
+    // 4. Combined Multi-Statement Payment Proposal ("can you pay both at the same time?")
+    const payBothTurn = await sendBillingAIMessage({
+      message: 'can you pay both at the same time?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(payBothTurn.reply.content).toMatch(/Yes — you can settle all \*\*2\*\* open statements together/i);
+    expect(payBothTurn.reply.content).toContain('#PPB-INV-2026-1002');
+    expect(payBothTurn.reply.content).toContain('#PPB-INV-2026-1001');
+    expect(payBothTurn.reply.content).toContain('$225.00 USD');
+    expect(payBothTurn.reply.proposal).toBeTruthy();
+    expect(payBothTurn.reply.proposal?.amountMinor).toBe(22500);
+    expect(payBothTurn.reply.proposal?.title).toContain('#PPB-INV-2026-1001');
+    expect(payBothTurn.reply.proposal?.title).toContain('#PPB-INV-2026-1002');
+    expect(Array.isArray(payBothTurn.reply.proposal?.payload?.invoice_ids)).toBe(true);
+    expect((payBothTurn.reply.proposal?.payload?.invoice_ids as string[])).toHaveLength(2);
   });
 });

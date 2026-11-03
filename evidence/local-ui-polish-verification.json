@@ -1,0 +1,204 @@
+{
+  "timestamp": "2026-11-03T11:46:11.707Z",
+  "targetUrl": "http://localhost:8081",
+  "passed": 20,
+  "failed": 0,
+  "total": 20,
+  "screenshotsSaved": [
+    "docs/screenshots/local-polish/01-collapsed-paypal-merchant-card.png",
+    "docs/screenshots/local-polish/02-expanded-paypal-merchant-card.png",
+    "docs/screenshots/local-polish/03-statement-details-modal-desktop-and-mobile.png",
+    "docs/screenshots/local-polish/04-simplified-payment-buttons-layout.png",
+    "docs/screenshots/local-polish/05-billing-ai-composer-alignment.png",
+    "docs/screenshots/local-polish/06-billing-ai-greeting-response.png",
+    "docs/screenshots/local-polish/07-billing-ai-failed-payment-investigation.png",
+    "docs/screenshots/local-polish/08-billing-ai-isolated-conversations-1002-vs-1003.png",
+    "docs/screenshots/local-polish/09-search-focused-and-unfocused.png",
+    "docs/screenshots/local-polish/10-reset-demo-temporary-toast.png"
+  ],
+  "checks": [
+    {
+      "name": "Issue #13: PayPal Merchant Sandbox card is collapsed by default with View Details button",
+      "ok": true,
+      "details": {
+        "toggleTextCollapsed": "View Details",
+        "summaryVisibleWhenCollapsed": false,
+        "collapsedHeightPx": 60
+      }
+    },
+    {
+      "name": "Issue #13: Clicking View Details expands PayPal card to reveal account summary, firewall strip, and actions",
+      "ok": true,
+      "details": {
+        "toggleTextExpanded": "Hide Details",
+        "summaryVisibleWhenExpanded": true,
+        "disconnectVisibleWhenExpanded": true,
+        "expandedHeightPx": 249
+      }
+    },
+    {
+      "name": "Issue #11: Inline search removes inner rectangular browser outline and applies single rounded container focus border",
+      "ok": true,
+      "details": {
+        "unfocusedBorderColor": "rgb(226, 232, 240)",
+        "cardBorderColor": "rgb(245, 158, 11)",
+        "cardBorderRadius": "14px",
+        "inputOutlineStyle": "none"
+      }
+    },
+    {
+      "name": "Issue #7: Unified single Pay with PayPal button label and balanced single-row desktop layout",
+      "ok": true,
+      "details": {
+        "noCompetingSandboxCardBtn": true,
+        "ppLabel": "Pay with PayPal",
+        "allFooterSingleRowOnDesktop": true,
+        "ppHeight": 46
+      }
+    },
+    {
+      "name": "Issue #7: Mobile 390px Statement Details action buttons use clean 2-row grid without overflow",
+      "ok": true,
+      "details": {
+        "topRowAligned": true,
+        "ppFullWidthSecondRow": true,
+        "noHorizontalOverflow": true
+      }
+    },
+    {
+      "name": "Issue #8: Billing AI composer pill (44px), inner input, and send button (44px) are vertically centered along same axis when focused",
+      "ok": true,
+      "details": {
+        "pillHeight": 44,
+        "inputHeight": 22,
+        "sendHeight": 44,
+        "centerDeltaY": 0,
+        "inputToPillCenterDeltaY": 0,
+        "inputOutlineStyle": "none",
+        "inputRowsAttr": "1"
+      }
+    },
+    {
+      "name": "Issue #14: New Chat button is in the upper-left corner of the Billing AI modal header opposite the Close button (36x36px, top-aligned)",
+      "ok": true,
+      "details": {
+        "exists": true,
+        "width": 36,
+        "height": 36,
+        "topDeltaToCloseBtn": 0,
+        "isUpperLeft": true,
+        "ariaLabel": "New Chat"
+      }
+    },
+    {
+      "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter",
+      "ok": true,
+      "details": {
+        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex, Welcome! I'm here to assist you with your bill"
+      }
+    },
+    {
+      "name": "Issue #9: Asking \"why did it fail?\" on OVERDUE #PPB-INV-2026-1002 explains 0 failed payment attempts exist on #1002",
+      "ok": true,
+      "details": {
+        "investigationPreview": "ment fee) is marked OVERDUE because its payment due date (Oct 29, 2026) has passed without settlement — not because a payment failed. • Recorded Payment Attempts: 0 attempts (no failure reason exists on #PPB-INV-2026-1002). • Remaining Balance Due: $75.00 USD."
+      }
+    },
+    {
+      "name": "Issue #10: Opening Billing AI on #PPB-INV-2026-1003 isolates conversation from #PPB-INV-2026-1002",
+      "ok": true,
+      "details": {
+        "leaked1002Into1003": false,
+        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 Was this statement paid? Yes, statement #PPB-INV-2026-1003 was p"
+      }
+    },
+    {
+      "name": "Issue #12: Reset Demo displays floating toast immediately and auto-dismisses after ~3 seconds",
+      "ok": true,
+      "details": {
+        "toastText": "Demo session reset: all 6 canonical statements (#PPB-INV-2026-1001 to #PPB-INV-2026-1006), AI chats, and notifications restored.",
+        "toastVisibleImmediately": true,
+        "toastVisibleAfter3s": false
+      }
+    },
+    {
+      "name": "Responsive viewport 320x640 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 320,
+        "scrollWidth": 320,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 375x812 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 375,
+        "scrollWidth": 375,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 390x844 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 390,
+        "scrollWidth": 390,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 430x932 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 430,
+        "scrollWidth": 430,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 768x1024 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 768,
+        "scrollWidth": 768,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 1024x768 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 1024,
+        "scrollWidth": 1024,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 1440x900 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 1440,
+        "scrollWidth": 1440,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Responsive viewport 1920x1080 has zero horizontal page overflow",
+      "ok": true,
+      "details": {
+        "docWidth": 1920,
+        "scrollWidth": 1920,
+        "hasHorizontalOverflow": false
+      }
+    },
+    {
+      "name": "Zero console errors during entire local verification flow",
+      "ok": true,
+      "details": {
+        "consoleErrors": []
+      }
+    }
+  ]
+}

@@ -17,3 +17,24 @@ coverage/
 .env*
 !.env.example
 supabase/.temp/
+
+# Private hackathon presentation, video recordings, voiceover scripts & local demo package
+local-demo/
+docs/videos/
+.tmp-video-recordings/
+*.mp4
+*.mov
+*.webm
+*.m4v
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.m4a
+*.aac
+scripts/record-*.mjs
+docs/MEDIA_AUDIT_MANIFEST.md
+evidence/media-audit-manifest.json
+docs/screenshots/local-polish/
+docs/screenshots/mobile-polish/
+

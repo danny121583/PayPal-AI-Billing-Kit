@@ -1,0 +1,186 @@
+{
+  "verifiedAt": "2026-11-03T12:10:01.469Z",
+  "targetUrl": "http://localhost:8081",
+  "totalCases": 20,
+  "passedCount": 20,
+  "failedCount": 0,
+  "results": [
+    {
+      "caseNumber": 1,
+      "name": "Jordan Taylor sees only Jordan Taylor's notifications (PPB-INV-2026-1004)",
+      "passed": true,
+      "details": {
+        "jordanHas1004": true
+      }
+    },
+    {
+      "caseNumber": 2,
+      "name": "Jordan Taylor does NOT see PPB-INV-2026-1003 ($125.00 Alex Rivera)",
+      "passed": true,
+      "details": {
+        "jordanHas1003": false
+      }
+    },
+    {
+      "caseNumber": 3,
+      "name": "Jordan Taylor does NOT see PPB-INV-2026-1006 ($45.00 refunded Alex Rivera)",
+      "passed": true,
+      "details": {
+        "jordanHas1006": false
+      }
+    },
+    {
+      "caseNumber": 4,
+      "name": "Jordan Taylor clicking PPB-INV-2026-1004 notification opens Statement #PPB-INV-2026-1004",
+      "passed": true,
+      "details": {
+        "jordanOpened1004": true
+      }
+    },
+    {
+      "caseNumber": 5,
+      "name": "Alex Rivera sees all 4 of Alex Rivera's notifications (1001, 1002, 1003, 1006)",
+      "passed": true,
+      "details": {
+        "alexHasAll4": true
+      }
+    },
+    {
+      "caseNumber": 6,
+      "name": "Alex Rivera does NOT see PPB-INV-2026-1004 ($50.00 Jordan Taylor)",
+      "passed": true,
+      "details": {
+        "alexHas1004": false
+      }
+    },
+    {
+      "caseNumber": 7,
+      "name": "Alex Rivera clicking PPB-INV-2026-1003 notification opens Statement #PPB-INV-2026-1003",
+      "passed": true,
+      "details": {
+        "alexOpened1003": true
+      }
+    },
+    {
+      "caseNumber": 8,
+      "name": "Alex Rivera clicking PPB-INV-2026-1006 notification opens Statement #PPB-INV-2026-1006 ($45.00 Refunded)",
+      "passed": true,
+      "details": {
+        "alexOpened1006": true
+      }
+    },
+    {
+      "caseNumber": 9,
+      "name": "Provider Dr. Sarah Jenkins sees only authorized practice notifications (1003, 1002, 1004)",
+      "passed": true,
+      "details": {
+        "sarahHasAuthorized": true
+      }
+    },
+    {
+      "caseNumber": 10,
+      "name": "Provider clicking notification opens the linked practice statement (#PPB-INV-2026-1003)",
+      "passed": true,
+      "details": {
+        "sarahOpened1003": true
+      }
+    },
+    {
+      "caseNumber": 11,
+      "name": "Unread badge count matches visible authorized unread notifications (Jordan=1, Alex=3, Sarah=3)",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "jordanUnread": 1,
+        "alexUnread": 3,
+        "sarahUnread": 3
+      }
+    },
+    {
+      "caseNumber": 12,
+      "name": "Marking one notification read updates only that notification and only for its owner",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "markOneOk": true
+      }
+    },
+    {
+      "caseNumber": 13,
+      "name": "Marking all notifications read affects only the active user's notifications",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "markedAllCount": 2
+      }
+    },
+    {
+      "caseNumber": 14,
+      "name": "Forged or stale notification IDs belonging to another customer are rejected",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "forgedMarkJordan": false,
+        "forgedOpenStatus": "unauthorized",
+        "forgedDeepLinkStatus": "unauthorized"
+      }
+    },
+    {
+      "caseNumber": 15,
+      "name": "Notification with mismatched recipientUserId and invoice.recipientUserId is rejected",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "filteredLength": 0,
+        "resolvedStatus": "unauthorized"
+      }
+    },
+    {
+      "caseNumber": 16,
+      "name": "Notification referencing a deleted or missing invoice is handled safely",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "filteredLength": 0,
+        "resolvedStatus": "not_found"
+      }
+    },
+    {
+      "caseNumber": 17,
+      "name": "Switching accounts clears the previous account's notifications immediately",
+      "passed": true,
+      "details": {
+        "case17And18Pass": true
+      }
+    },
+    {
+      "caseNumber": 18,
+      "name": "Rapid account switching (Jordan -> Alex -> Provider -> Jordan) does not leak notifications across users",
+      "passed": true,
+      "details": {
+        "case17And18Pass": true
+      }
+    },
+    {
+      "caseNumber": 19,
+      "name": "Reset Demo restores consistent notification and invoice ownership and resets unread counts",
+      "passed": true,
+      "details": {
+        "jordanUnread": 1,
+        "alexUnread": 3,
+        "sarahUnread": 3
+      }
+    },
+    {
+      "caseNumber": 20,
+      "name": "Unauthenticated or missing user context returns zero notifications and fails closed",
+      "passed": true,
+      "details": {
+        "pass": true,
+        "unauthListLength": 0,
+        "unauthMark": false,
+        "unauthDeepLinkStatus": "unauthenticated"
+      }
+    }
+  ]
+}

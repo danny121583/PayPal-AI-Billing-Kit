@@ -16,7 +16,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-1001',
     organizationId: '22222222-2222-4222-8222-222222222201',
     organizationName: 'Jenkins Wellness & Telehealth Practice',
+    issuerUserId: '11111111-1111-4111-8111-111111111101',
     issuerDoctorName: 'Dr. Sarah Jenkins',
+    recipientUserId: '11111111-1111-4111-8111-111111111102',
     patientDisplayName: 'Alex Rivera',
     allowedRoleScopes: ['doctor', 'patient'],
     authorizedDoctorScope: 'org_primary_demo',
@@ -55,7 +57,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-1002',
     organizationId: '22222222-2222-4222-8222-222222222201',
     organizationName: 'Jenkins Wellness & Telehealth Practice',
+    issuerUserId: '11111111-1111-4111-8111-111111111101',
     issuerDoctorName: 'Dr. Sarah Jenkins',
+    recipientUserId: '11111111-1111-4111-8111-111111111102',
     patientDisplayName: 'Alex Rivera',
     allowedRoleScopes: ['doctor', 'patient'],
     authorizedDoctorScope: 'org_primary_demo',
@@ -92,7 +96,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-1003',
     organizationId: '22222222-2222-4222-8222-222222222201',
     organizationName: 'Jenkins Wellness & Telehealth Practice',
+    issuerUserId: '11111111-1111-4111-8111-111111111101',
     issuerDoctorName: 'Dr. Sarah Jenkins',
+    recipientUserId: '11111111-1111-4111-8111-111111111102',
     patientDisplayName: 'Alex Rivera',
     allowedRoleScopes: ['doctor', 'patient'],
     authorizedDoctorScope: 'org_primary_demo',
@@ -146,7 +152,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-1004',
     organizationId: '22222222-2222-4222-8222-222222222201',
     organizationName: 'Jenkins Wellness & Telehealth Practice',
+    issuerUserId: '11111111-1111-4111-8111-111111111101',
     issuerDoctorName: 'Dr. Sarah Jenkins',
+    recipientUserId: '11111111-1111-4111-8111-111111111103',
     patientDisplayName: 'Jordan Taylor',
     allowedRoleScopes: ['doctor', 'patient'],
     authorizedDoctorScope: 'org_primary_demo',
@@ -200,7 +208,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-1005',
     organizationId: '22222222-2222-4222-8222-222222222201',
     organizationName: 'Jenkins Wellness & Telehealth Practice',
+    issuerUserId: '11111111-1111-4111-8111-111111111101',
     issuerDoctorName: 'Dr. Sarah Jenkins',
+    recipientUserId: '11111111-1111-4111-8111-111111111103',
     patientDisplayName: 'Jordan Taylor',
     allowedRoleScopes: ['doctor', 'patient'],
     authorizedDoctorScope: 'org_primary_demo',
@@ -239,7 +249,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-1006',
     organizationId: '22222222-2222-4222-8222-222222222201',
     organizationName: 'Jenkins Wellness & Telehealth Practice',
+    issuerUserId: '11111111-1111-4111-8111-111111111101',
     issuerDoctorName: 'Dr. Sarah Jenkins',
+    recipientUserId: '11111111-1111-4111-8111-111111111102',
     patientDisplayName: 'Alex Rivera',
     allowedRoleScopes: ['doctor', 'patient'],
     authorizedDoctorScope: 'org_primary_demo',
@@ -294,7 +306,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
     invoiceNumber: 'PPB-INV-2026-9999',
     organizationId: 'org-external-unrelated',
     organizationName: 'Unrelated External Clinic',
+    issuerUserId: '11111111-1111-4111-8111-999999999901',
     issuerDoctorName: 'Dr. Marcus Vance',
+    recipientUserId: '11111111-1111-4111-8111-999999999902',
     patientDisplayName: 'Unrelated External Customer',
     allowedRoleScopes: [],
     authorizedDoctorScope: 'other_org_restricted',
@@ -485,6 +499,7 @@ export function filterSyntheticInvoices(
 export function resolveBillingDeepLinkInvoice(params: {
   isAuthenticated: boolean;
   role: BillingRoleScope | null;
+  activeUserId?: string | null;
   invoiceId?: string | null;
   notificationId?: string | null;
   additionalInvoices?: SyntheticBillingInvoice[];
@@ -494,6 +509,10 @@ export function resolveBillingDeepLinkInvoice(params: {
     typeof params.notificationId === 'string' && params.notificationId.trim()
       ? params.notificationId.trim()
       : undefined;
+  const rawActiveUserId =
+    typeof params.activeUserId === 'string' && params.activeUserId.trim()
+      ? params.activeUserId.trim()
+      : null;
 
   if (!rawInvoiceId) {
     return { status: 'none' };
@@ -511,10 +530,23 @@ export function resolveBillingDeepLinkInvoice(params: {
     ...ALL_SYNTHETIC_INVOICES,
   ];
 
+  const CANONICAL_SEED_ID_MAP: Record<string, string> = {
+    '33333333-3333-4333-8333-333333333301': 'PPB-INV-2026-1001',
+    '33333333-3333-4333-8333-333333333302': 'PPB-INV-2026-1002',
+    '33333333-3333-4333-8333-333333333303': 'PPB-INV-2026-1003',
+    '33333333-3333-4333-8333-333333333304': 'PPB-INV-2026-1004',
+    '33333333-3333-4333-8333-333333333305': 'PPB-INV-2026-1005',
+    '33333333-3333-4333-8333-333333333306': 'PPB-INV-2026-1006',
+  };
+  const mappedCanonicalNumber =
+    CANONICAL_SEED_ID_MAP[rawInvoiceId.toLowerCase()] || null;
+
   const matchedRecord = combined.find(
     (inv) =>
       inv.id.toLowerCase() === rawInvoiceId.toLowerCase() ||
-      inv.invoiceNumber.toLowerCase() === rawInvoiceId.toLowerCase()
+      inv.invoiceNumber.toLowerCase() === rawInvoiceId.toLowerCase() ||
+      (mappedCanonicalNumber &&
+        inv.invoiceNumber.toUpperCase() === mappedCanonicalNumber)
   );
 
   if (!matchedRecord) {
@@ -539,6 +571,41 @@ export function resolveBillingDeepLinkInvoice(params: {
       message:
         'Access Denied: You do not have permission to view this invoice under your current role or organization.',
     };
+  }
+
+  if (params.role === 'patient' && rawActiveUserId) {
+    if (matchedRecord.status === 'draft') {
+      return {
+        status: 'unauthorized',
+        invoiceId: rawInvoiceId,
+        message: 'Access Denied: Draft statements are not accessible to customers.',
+      };
+    }
+    if (
+      matchedRecord.recipientUserId &&
+      matchedRecord.recipientUserId.toLowerCase() !== rawActiveUserId.toLowerCase()
+    ) {
+      return {
+        status: 'unauthorized',
+        invoiceId: rawInvoiceId,
+        message:
+          'Access Denied: This statement belongs to another customer account and cannot be opened under your active customer profile.',
+      };
+    }
+  }
+
+  if (params.role === 'doctor' && rawActiveUserId) {
+    if (
+      matchedRecord.issuerUserId &&
+      matchedRecord.issuerUserId.toLowerCase() !== rawActiveUserId.toLowerCase()
+    ) {
+      return {
+        status: 'unauthorized',
+        invoiceId: rawInvoiceId,
+        message:
+          'Access Denied: This statement belongs to a different provider or merchant organization.',
+      };
+    }
   }
 
   return {
