@@ -89,7 +89,7 @@ export default function BillingMaaSMcpModal({
           json?.result?.structuredContent || json,
           null,
           2
-        ).slice(0, 1200)
+        ).slice(0, 2800)
       );
     } catch (err: any) {
       setLiveOutput(
@@ -105,7 +105,7 @@ export default function BillingMaaSMcpModal({
       visible={visible}
       onClose={onClose}
       title="Unified MCP Agent Interface"
-      subtitle="Connect AI agents to 26 unified application & PayPal Sandbox tools through Model Context Protocol (MCP)."
+      subtitle={`Connect AI agents to ${UNIFIED_MCP_REGISTRY_SUMMARY.totalTools} unified application & PayPal Sandbox tools (26 baseline + 4 Sandbox card & PDF tools) through Model Context Protocol (MCP).`}
       testID="billing-maas-mcp-modal"
       closeTestID="billing-maas-mcp-close-btn"
       closeAccessibilityLabel="Close MCP Agent Interface modal"

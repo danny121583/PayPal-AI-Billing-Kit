@@ -1,6 +1,6 @@
 {
   "name": "paypal-ai-billing-kit",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -16,6 +16,7 @@
     "verify:maas": "node scripts/verify-maas-mcp.mjs",
     "verify:ai-security": "node scripts/verify-security-and-ai.mjs",
     "verify:paypal-sandbox": "node scripts/verify-live-paypal-sandbox.mjs",
+    "verify:paypal-full": "node scripts/verify-paypal-full.mjs",
     "verify:e2e": "node scripts/verify-public-vercel-e2e.mjs",
     "sync:secrets": "node scripts/sync-local-env-secrets.mjs",
     "build:web": "EXPO_NO_TELEMETRY=1 npx expo export --platform web && node scripts/inject-web-favicon.mjs",

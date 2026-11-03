@@ -19,6 +19,16 @@ export interface SyntheticInvoiceLineItem {
   lineTotalCents: number;
 }
 
+export type PaymentAttemptClassification =
+  | 'awaiting_buyer_approval'
+  | 'approval_required'
+  | 'payment_declined'
+  | 'buyer_canceled'
+  | 'authorized'
+  | 'captured'
+  | 'refunded'
+  | 'processing_error';
+
 export interface SyntheticPaymentAttempt {
   id: string;
   attemptedAt: string;
@@ -28,6 +38,13 @@ export interface SyntheticPaymentAttempt {
   statusLabel: string;
   failureReason?: string;
   demoReferenceCode: string;
+  attemptClassification?: PaymentAttemptClassification;
+  isGenuineFailure?: boolean;
+  paymentSourceType?: 'paypal_wallet' | 'paypal_card' | 'demo_simulation';
+  paypalErrorCode?: string;
+  actionableMessage?: string;
+  cardBrand?: string;
+  cardLastDigits?: string;
 }
 
 export interface SyntheticBillingInvoice {

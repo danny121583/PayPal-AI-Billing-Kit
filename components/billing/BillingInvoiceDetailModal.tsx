@@ -30,6 +30,7 @@ import {
 import {
   getOrCreateDemoSessionIdSync,
   invokePayPalBillingFunction,
+  payInvoiceWithSandboxCard,
   sendBillingPaymentReminder,
   sendDraftBillingInvoice,
   simulateBillingDemoRefund,
@@ -114,8 +115,17 @@ export default function BillingInvoiceDetailModal({
     invoice.settlementVerificationStatus === 'paypal_verified' ||
     (Boolean(activeLocalReceipt) && !activeLocalReceipt?.isSample);
   const primaryServiceCode = invoice.lineItems[0]?.serviceCode || 'ADMIN-SERVICE';
+  const latestApprovalPending = invoice.paymentAttempts.find(
+    (a) =>
+      a.attemptClassification === 'approval_required' ||
+      a.attemptClassification === 'awaiting_buyer_approval'
+  );
   const latestFailure = invoice.paymentAttempts.find(
-    (a) => a.status === 'failed_demo' && a.failureReason
+    (a) =>
+      a.status === 'failed_demo' &&
+      a.failureReason &&
+      a.attemptClassification !== 'approval_required' &&
+      a.attemptClassification !== 'awaiting_buyer_approval'
   );
 
   const handlePayWithPayPal = async () => {
@@ -194,10 +204,18 @@ export default function BillingInvoiceDetailModal({
         order_id: activeOrderId,
       });
       if (!res.ok) {
+        const isApprovalRequired =
+          res.code === 'ORDER_NOT_APPROVED' ||
+          res.data?.attempt_classification === 'approval_required' ||
+          String(res.message || '').includes('ORDER_NOT_APPROVED') ||
+          String(res.message || '').includes('waiting for buyer approval');
         setBannerMessage({
-          type: 'error',
-          text: res.message || 'PayPal Sandbox capture failed.',
+          type: isApprovalRequired ? 'info' : 'error',
+          text: isApprovalRequired
+            ? 'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.'
+            : res.message || 'PayPal Sandbox capture failed.',
         });
+        onInvoiceMutated?.();
         return;
       }
       const captureId = res.data?.capture_id || res.data?.captureId || 'COMPLETED';
@@ -301,6 +319,50 @@ export default function BillingInvoiceDetailModal({
       setBannerMessage({
         type: 'error',
         text: err?.message || 'Failed to simulate demo settlement.',
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handlePayWithSandboxCard = async () => {
+    setBannerMessage(null);
+    setBusyAction('pay_with_sandbox_card');
+    try {
+      const res = await payInvoiceWithSandboxCard({
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        cardProfile: 'visa_sandbox',
+        intent: 'CAPTURE',
+      });
+      if (!res.ok) {
+        setBannerMessage({
+          type: 'error',
+          text:
+            res.message ||
+            'PayPal Sandbox Direct Card payment failed. Please check card profile or credentials.',
+        });
+        onInvoiceMutated?.();
+        return;
+      }
+      const captureId =
+        res.data?.capture_id || res.data?.captureId || 'COMPLETED';
+      const orderId = res.data?.order_id || res.data?.orderId || '';
+      setLocalSettledReceipt({
+        invoiceId: invoice.id,
+        receiptNumber: `PP-CAP-${captureId}`,
+        isSample: false,
+      });
+      setBannerMessage({
+        type: 'success',
+        text: `PayPal Sandbox Direct Card Payment Captured! Order ${orderId} • Capture ID: ${captureId} (VISA •••• ${res.data?.card_last_digits || '0191'}).`,
+      });
+      setActiveOrderId(null);
+      onInvoiceMutated?.();
+    } catch (err: any) {
+      setBannerMessage({
+        type: 'error',
+        text: err?.message || 'Unable to execute PayPal Sandbox Direct Card payment.',
       });
     } finally {
       setBusyAction(null);
@@ -587,7 +649,7 @@ export default function BillingInvoiceDetailModal({
         </View>
       ) : null}
 
-      {/* Customer Demo Settlement Option */}
+      {/* Customer Demo & Direct Card Settlement Options */}
       {canCustomerPay ? (
         <View style={styles.providerActionsBox}>
           <Text style={styles.sectionTitle}>Sandbox & Demo Settlement Options</Text>
@@ -599,21 +661,36 @@ export default function BillingInvoiceDetailModal({
               marginBottom: 8,
             }}
           >
-            Use &ldquo;Pay with PayPal Sandbox&rdquo; below to test the PayPal Sandbox REST API order flow, or simulate an immediate demo settlement in your isolated visitor session (explicitly labeled as a Sample Demo Record).
+            Choose between PayPal Sandbox Wallet Checkout (footer button), automated server-side PayPal Sandbox Direct Card Checkout (`payment_source.card`), or an explicitly labeled Sample Demo Settlement.
           </Text>
-          <Pressable
-            style={[billingModalStyles.secondaryButton, { alignSelf: 'flex-start' }]}
-            onPress={handleSimulateDemoSettlement}
-            disabled={Boolean(busyAction)}
-            accessibilityRole="button"
-            testID="billing-detail-simulate-demo-settlement-btn"
-          >
-            <Text style={billingModalStyles.secondaryButtonText}>
-              {busyAction === 'simulate_demo_settlement'
-                ? 'Simulating Settlement...'
-                : 'Simulate Demo Settlement (Sample Record)'}
-            </Text>
-          </Pressable>
+          <View style={styles.providerButtonsRow}>
+            <Pressable
+              style={[billingModalStyles.primaryButton, { alignSelf: 'flex-start' }]}
+              onPress={handlePayWithSandboxCard}
+              disabled={Boolean(busyAction)}
+              accessibilityRole="button"
+              testID="billing-detail-sandbox-card-btn"
+            >
+              <Text style={billingModalStyles.primaryButtonText}>
+                {busyAction === 'pay_with_sandbox_card'
+                  ? 'Capturing Sandbox Card...'
+                  : 'Pay with PayPal Sandbox Card (VISA Test Card)'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[billingModalStyles.secondaryButton, { alignSelf: 'flex-start' }]}
+              onPress={handleSimulateDemoSettlement}
+              disabled={Boolean(busyAction)}
+              accessibilityRole="button"
+              testID="billing-detail-simulate-demo-settlement-btn"
+            >
+              <Text style={billingModalStyles.secondaryButtonText}>
+                {busyAction === 'simulate_demo_settlement'
+                  ? 'Simulating Settlement...'
+                  : 'Simulate Demo Settlement (Sample Record)'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -704,6 +781,28 @@ export default function BillingInvoiceDetailModal({
           </Text>
         </View>
       </View>
+
+      {/* Awaiting Buyer Approval Diagnostics */}
+      {invoice.status !== 'paid' &&
+      invoice.status !== 'refunded' &&
+      invoice.status !== 'void' &&
+      latestApprovalPending ? (
+        <View
+          style={[styles.feedbackBanner, styles.feedbackInfo]}
+          testID="billing-detail-approval-pending-card"
+        >
+          <AlertTriangle size={16} color="#1D4ED8" />
+          <View style={styles.failureTextCol}>
+            <Text style={[styles.failureTitle, { color: '#1E40AF' }]}>
+              Awaiting PayPal Buyer Approval ({latestApprovalPending.demoReferenceCode})
+            </Text>
+            <Text style={[styles.failureBody, { color: '#1D4ED8' }]}>
+              {latestApprovalPending.actionableMessage ||
+                'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.'}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {/* Failed Attempt Diagnostics */}
       {latestFailure?.failureReason ? (

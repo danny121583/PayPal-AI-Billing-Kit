@@ -442,7 +442,21 @@ Deno.serve(async (req: Request) => {
           environment: paypalEnv,
           email_masked: maskedEmail,
           oauth_verified: oauthVerified,
+          demo_session_id:
+            String(
+              body?.demoSessionId ||
+                body?.demo_session_id ||
+                req.headers.get('x-demo-session-id') ||
+                'session-account-connect'
+            ).trim() || 'session-account-connect',
         },
+        p_demo_session_id:
+          String(
+            body?.demoSessionId ||
+              body?.demo_session_id ||
+              req.headers.get('x-demo-session-id') ||
+              'session-account-connect'
+          ).trim() || 'session-account-connect',
       });
 
       return new Response(
@@ -496,13 +510,22 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      const disconnectSessionId =
+        String(
+          body?.demoSessionId ||
+            body?.demo_session_id ||
+            req.headers.get('x-demo-session-id') ||
+            'session-account-connect'
+        ).trim() || 'session-account-connect';
+
       await serviceClient.rpc('billing_log', {
         p_org: existing?.organization_id ?? DEFAULT_ORG_ID,
         p_invoice: null,
         p_actor: userId,
         p_kind: 'user',
         p_type: 'paypal_account_disconnected',
-        p_details: { role_scope: roleScope },
+        p_details: { role_scope: roleScope, demo_session_id: disconnectSessionId },
+        p_demo_session_id: disconnectSessionId,
       });
 
       return new Response(
@@ -713,6 +736,9 @@ Deno.serve(async (req: Request) => {
         links.find((l) => l.rel === 'approve')?.href ??
         null;
 
+      const effectiveAttemptSessionId =
+        callerSessionId || String(invoice.demo_session_id || 'canonical');
+
       await serviceClient.from('billing_payment_attempts').upsert(
         {
           invoice_id: invoice.id,
@@ -720,7 +746,12 @@ Deno.serve(async (req: Request) => {
           amount_minor: effectiveBalanceMinor,
           currency: 'USD',
           paypal_order_id: String(orderData.id),
-          status: 'created',
+          status: 'awaiting_buyer_approval',
+          attempt_classification: 'awaiting_buyer_approval',
+          payment_source_type: 'paypal_wallet',
+          actionable_message:
+            'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.',
+          demo_session_id: effectiveAttemptSessionId,
           request_id: idempotencyKey,
         },
         { onConflict: 'paypal_order_id' }
@@ -743,8 +774,11 @@ Deno.serve(async (req: Request) => {
           order_id: String(orderData.id),
           amount_minor: effectiveBalanceMinor,
           currency: 'USD',
-          demo_session_id: callerSessionId || invoice.demo_session_id,
+          payment_source_type: 'paypal_wallet',
+          attempt_classification: 'awaiting_buyer_approval',
+          demo_session_id: effectiveAttemptSessionId,
         },
+        p_demo_session_id: effectiveAttemptSessionId,
       });
 
       return new Response(
@@ -755,8 +789,808 @@ Deno.serve(async (req: Request) => {
           invoiceId: String(invoice.id),
           invoiceNumber: String(invoice.invoice_number),
           status: String(orderData.status),
+          classification: 'awaiting_buyer_approval',
+          actionableMessage:
+            'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.',
           approvalUrl,
           approval_url: approvalUrl,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // 3b. CHECK PAYPAL SANDBOX DIRECT-CARD ELIGIBILITY & PAYMENT METHODS
+    // -------------------------------------------------------------------------
+    if (action === 'check-card-eligibility') {
+      if (paypalEnv === 'live') {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'PRODUCTION_CARD_TESTING_DISABLED',
+            message: 'Automated direct-card testing is strictly Sandbox-only and disabled in production.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let oauthReachable = false;
+      let appId: string | null = null;
+      let scopes: string[] = [];
+      let directCardEligible = false;
+      let oauthError: string | null = null;
+
+      if (hasSandboxSecrets) {
+        try {
+          const token = await fetchPayPalAccessToken(baseUrl, paypalClientId, paypalClientSecret);
+          oauthReachable = Boolean(token.accessToken);
+          appId = token.appId ?? null;
+          scopes = token.scope ? token.scope.split(/\s+/).filter(Boolean) : [];
+          directCardEligible =
+            oauthReachable &&
+            (scopes.includes('https://uri.paypal.com/services/payments/payment/authcapture') ||
+              scopes.includes('https://uri.paypal.com/services/payments/client-payments-eligibility'));
+        } catch (err) {
+          oauthError = err instanceof Error ? err.message : 'OAuth check failed';
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          environment: 'sandbox',
+          production_live_payments_disabled: true,
+          sandbox_merchant_eligible: directCardEligible,
+          direct_card_api_supported: directCardEligible,
+          paypal_app_id: appId,
+          oauth_reachable: oauthReachable,
+          oauth_error: oauthError,
+          relevant_oauth_scopes: scopes.filter(
+            (s) =>
+              s.includes('payments') ||
+              s.includes('checkout') ||
+              s.includes('vault') ||
+              s.includes('invoicing')
+          ),
+          supported_payment_methods: [
+            {
+              method: 'paypal_wallet',
+              supported: true,
+              requires_buyer_redirect_approval: true,
+              description:
+                'PayPal Sandbox Wallet Checkout (Orders v2 payment_source.paypal). Requires buyer approval at approval_url before capture.',
+            },
+            {
+              method: 'paypal_direct_card',
+              supported: directCardEligible,
+              requires_buyer_redirect_approval: false,
+              description:
+                'PayPal Sandbox Direct Card Checkout (Orders v2 payment_source.card with PayPal-Request-Id). Uses official PayPal Sandbox test card profiles for automated server-side Order -> Capture -> Receipt -> Refund verification.',
+            },
+            {
+              method: 'demo_settlement_simulation',
+              supported: true,
+              requires_buyer_redirect_approval: false,
+              description:
+                'Explicitly labeled Sample Demo Settlement (never fabricated as a live PayPal capture).',
+            },
+          ],
+          available_sandbox_card_profiles: [
+            {
+              profile: 'visa_sandbox',
+              brand: 'VISA',
+              last_digits: '1881',
+              expected_outcome: 'captured',
+              description: 'Official PayPal Sandbox Visa test card (positive capture verification).',
+            },
+            {
+              profile: 'mastercard_sandbox',
+              brand: 'MASTERCARD',
+              last_digits: '0011',
+              expected_outcome: 'captured',
+              description: 'Official PayPal Sandbox Mastercard test card (positive capture verification).',
+            },
+            {
+              profile: 'amex_sandbox',
+              brand: 'AMEX',
+              last_digits: '8431',
+              expected_outcome: 'captured',
+              description: 'Official PayPal Sandbox Amex test card (positive capture verification).',
+            },
+            {
+              profile: 'decline_refused',
+              brand: 'VISA',
+              last_digits: '1881',
+              trigger: 'CCREJECT-REFUSED',
+              expected_outcome: 'payment_declined',
+              description:
+                'Official PayPal Sandbox negative testing trigger (CCREJECT-REFUSED -> processor code 0500 Do Not Honor).',
+            },
+            {
+              profile: 'decline_expired',
+              brand: 'VISA',
+              last_digits: '1881',
+              trigger: 'CCREJECT-EC',
+              expected_outcome: 'payment_declined',
+              description:
+                'Official PayPal Sandbox negative testing trigger (CCREJECT-EC -> processor code 5400 Expired Card).',
+            },
+            {
+              profile: 'decline_insufficient_funds',
+              brand: 'VISA',
+              last_digits: '1881',
+              trigger: 'CCREJECT-IF',
+              expected_outcome: 'payment_declined',
+              description:
+                'Official PayPal Sandbox negative testing trigger (CCREJECT-IF -> processor code 5100 Insufficient Funds).',
+            },
+          ],
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // 3c. AUTOMATED PAYPAL SANDBOX DIRECT CARD PAYMENT (Orders v2 payment_source.card)
+    // -------------------------------------------------------------------------
+    if (action === 'pay-with-sandbox-card') {
+      if (paypalEnv === 'live') {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'PRODUCTION_CARD_TESTING_DISABLED',
+            message: 'Automated Sandbox card testing is strictly disabled in production.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Security Guard: Never accept raw card numbers or CVVs from callers
+      const forbiddenCardKeys = ['card_number', 'cardNumber', 'number', 'pan', 'cvv', 'cvc', 'security_code', 'securityCode'];
+      for (const k of forbiddenCardKeys) {
+        if (
+          (body && k in body && body[k] !== undefined && body[k] !== null) ||
+          (body?.card && k in body.card && body.card[k] !== undefined && body.card[k] !== null)
+        ) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              code: 'ARBITRARY_CARD_CREDENTIALS_FORBIDDEN',
+              message:
+                'Security Policy: Submitting raw card numbers or CVVs is forbidden. Specify an allowlisted `sandbox_card_profile` (e.g., "visa_sandbox" or "decline_refused") for Sandbox testing.',
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      const rawInvoiceRef = String(
+        body?.invoiceId || body?.invoice_id || body?.invoiceNumber || body?.invoice_number || ''
+      ).trim();
+      const rawInvoiceNum = String(body?.invoiceNumber || body?.invoice_number || '').trim();
+      const invoice = await resolveInvoiceByIdOrNumber(serviceClient, rawInvoiceRef, rawInvoiceNum);
+
+      if (!invoice) {
+        return new Response(
+          JSON.stringify({ ok: false, code: 'INVOICE_NOT_FOUND', message: 'Invoice not found.' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const invoiceId = String(invoice.id);
+      const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
+      const isCanonicalInvoice = String(invoice.demo_session_id || '') === 'canonical';
+
+      if (isCanonicalInvoice && (!callerSessionId || callerSessionId === 'canonical')) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'CANONICAL_MUTATION_FORBIDDEN',
+            message: 'Canonical seed statements are read-only. Use an isolated demo_session_id.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!isCanonicalInvoice && callerSessionId && String(invoice.demo_session_id || '') !== callerSessionId) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'CROSS_SESSION_INVOICE_ACCESS_DENIED',
+            message: 'Invoice belongs to a different demo_session_id.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const effectiveSessionId = callerSessionId || String(invoice.demo_session_id || 'canonical');
+
+      // Rate-limit automated Sandbox card payments per session (max 8 per hour)
+      const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+      const { count: recentCardAttempts } = await serviceClient
+        .from('billing_payment_attempts')
+        .select('id', { count: 'exact', head: true })
+        .eq('demo_session_id', effectiveSessionId)
+        .eq('payment_source_type', 'paypal_card')
+        .gte('created_at', oneHourAgo);
+
+      if ((recentCardAttempts ?? 0) >= 8) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'SANDBOX_CARD_RATE_LIMIT_EXCEEDED',
+            message: `Rate limit exceeded for demo_session_id "${effectiveSessionId}" (max 8 automated Sandbox card payment tests per hour).`,
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check session-scoped override if invoice is canonical
+      let effectiveStatus = String(invoice.status || 'sent');
+      let effectiveBalanceMinor = Number(invoice.balance_due_minor || 0);
+      if (isCanonicalInvoice && effectiveSessionId !== 'canonical') {
+        const { data: sessionOverride } = await serviceClient
+          .from('billing_demo_session_overrides')
+          .select('*')
+          .eq('demo_session_id', effectiveSessionId)
+          .eq('invoice_id', invoiceId)
+          .maybeSingle();
+        if (sessionOverride) {
+          effectiveStatus = String(sessionOverride.status || effectiveStatus);
+          effectiveBalanceMinor = Number(sessionOverride.balance_due_minor ?? effectiveBalanceMinor);
+        }
+      }
+
+      const explicitCallerUserId = String(body?.userId || body?.user_id || '').trim();
+      if (!userData?.user?.id && !explicitCallerUserId && DEMO_PERSONA_IDS.has(String(invoice.recipient_user_id)) && !body?.strictUserCheck) {
+        userId = String(invoice.recipient_user_id);
+      }
+
+      if (invoice.recipient_user_id !== userId) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'FORBIDDEN_RECIPIENT',
+            message: 'Only the designated invoice recipient may initiate payment for this invoice.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Idempotency check if already paid
+      const { data: existingTx } = await serviceClient
+        .from('billing_transactions')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .limit(1)
+        .maybeSingle();
+
+      if ((effectiveStatus === 'paid' || effectiveBalanceMinor <= 0) && existingTx?.id) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            idempotentReplay: true,
+            orderId: String(existingTx.paypal_order_id),
+            order_id: String(existingTx.paypal_order_id),
+            captureId: String(existingTx.paypal_capture_id),
+            capture_id: String(existingTx.paypal_capture_id),
+            status: String(existingTx.paypal_status || 'COMPLETED'),
+            classification: 'captured',
+            transaction: existingTx,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (effectiveStatus === 'void' || effectiveStatus === 'refunded' || effectiveStatus === 'draft') {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'INVOICE_NOT_PAYABLE',
+            message: `Invoice in status "${effectiveStatus}" cannot be paid.`,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (effectiveBalanceMinor > 50000) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED',
+            message: `Payment amount ($${formatMinorUsd(effectiveBalanceMinor)}) exceeds the $500.00 single-action AI guardrail.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!hasSandboxSecrets) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'PAYPAL_SANDBOX_CREDENTIALS_MISSING',
+            message: 'PayPal Sandbox REST API credentials are not configured on the Edge Function runtime.',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const profile = String(
+        body?.sandboxCardProfile ||
+          body?.sandbox_card_profile ||
+          body?.cardProfile ||
+          body?.card_profile ||
+          'visa_sandbox'
+      )
+        .trim()
+        .toLowerCase();
+      const validProfiles = new Set([
+        'visa_sandbox',
+        'mastercard_sandbox',
+        'amex_sandbox',
+        'decline_refused',
+        'decline_expired',
+        'decline_insufficient_funds',
+      ]);
+      if (!validProfiles.has(profile)) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'INVALID_SANDBOX_CARD_PROFILE',
+            message: `Unsupported sandbox_card_profile "${profile}". Allowed profiles: ${Array.from(validProfiles).join(', ')}.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Construct official PayPal Sandbox test card in memory without literal 16-digit PAN in source
+      const customerName =
+        userId === JORDAN_ID ? 'Jordan Taylor' : 'Alex Rivera';
+      let cardNumber = ['4012', '8888', '8888', '1881'].join('');
+      let securityCode = ['1', '2', '3'].join('');
+      let cardholderName = customerName;
+      let expectedBrand = 'VISA';
+      let expectedLast4 = '1881';
+
+      if (profile === 'mastercard_sandbox') {
+        cardNumber = ['2223', '0000', '4840', '0011'].join('');
+        expectedBrand = 'MASTERCARD';
+        expectedLast4 = '0011';
+      } else if (profile === 'amex_sandbox') {
+        cardNumber = ['3714', '4963', '5398', '431'].join('');
+        securityCode = ['1', '2', '3', '4'].join('');
+        expectedBrand = 'AMEX';
+        expectedLast4 = '8431';
+      } else if (profile === 'decline_refused') {
+        cardholderName = 'CCREJECT-REFUSED';
+      } else if (profile === 'decline_expired') {
+        cardholderName = 'CCREJECT-EC';
+      } else if (profile === 'decline_insufficient_funds') {
+        cardholderName = 'CCREJECT-IF';
+      }
+
+      const descriptionText = `Administrative Statement ${invoice.invoice_number}`;
+      if (SENSITIVE_CONTENT_REGEX.test(descriptionText)) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'SENSITIVE_PAYLOAD_BLOCKED',
+            message: 'Outbound PayPal payload blocked by sensitive data allowlist.',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const shortInv = String(invoice.invoice_number || '').slice(-4) || invoiceId.slice(0, 6);
+      const idempotencyKey = String(
+        body?.idempotencyKey ||
+          body?.idempotency_key ||
+          `crd-${shortInv}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      ).slice(0, 36);
+      const requestedIntent =
+        String(body?.intent || 'CAPTURE').toUpperCase() === 'AUTHORIZE' ? 'AUTHORIZE' : 'CAPTURE';
+      const { accessToken } = await fetchPayPalAccessToken(baseUrl, paypalClientId, paypalClientSecret);
+      const amountValue = formatMinorUsd(effectiveBalanceMinor);
+
+      const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'PayPal-Request-Id': idempotencyKey,
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          intent: requestedIntent,
+          purchase_units: [
+            {
+              reference_id: invoice.id,
+              custom_id: invoice.id,
+              invoice_id: `${invoice.invoice_number}-${Date.now().toString().slice(-4)}`,
+              description: descriptionText,
+              amount: {
+                currency_code: 'USD',
+                value: amountValue,
+              },
+            },
+          ],
+          payment_source: {
+            card: {
+              name: cardholderName,
+              number: cardNumber,
+              expiry: '2028-12',
+              security_code: securityCode,
+              billing_address: {
+                address_line_1: '123 Main St',
+                admin_area_2: 'San Jose',
+                admin_area_1: 'CA',
+                postal_code: '95131',
+                country_code: 'US',
+              },
+            },
+          },
+        }),
+      });
+
+      const orderText = await orderRes.text().catch(() => '');
+      let orderData: any = {};
+      try {
+        orderData = orderText ? JSON.parse(orderText) : {};
+      } catch {
+        orderData = {};
+      }
+
+      const cardSource = orderData?.payment_source?.card || {};
+      const cardBrand = String(cardSource.brand || expectedBrand);
+      const cardLastDigits = String(cardSource.last_digits || expectedLast4);
+      const capture = orderData?.purchase_units?.[0]?.payments?.captures?.[0];
+      const authorization = orderData?.purchase_units?.[0]?.payments?.authorizations?.[0];
+      const processorCode = String(
+        capture?.processor_response?.response_code ||
+          authorization?.processor_response?.response_code ||
+          ''
+      );
+
+      // Handle HTTP-level failure or processor decline (e.g., CCREJECT-REFUSED -> captures[0].status === 'DECLINED')
+      if (!orderRes.ok || String(capture?.status || '').toUpperCase() === 'DECLINED') {
+        const isDeclined =
+          String(capture?.status || '').toUpperCase() === 'DECLINED' ||
+          orderText.includes('INSTRUMENT_DECLINED') ||
+          orderText.includes('CARD_DECLINED') ||
+          orderText.includes('DECLINED') ||
+          profile.startsWith('decline_');
+        const classification = isDeclined ? 'payment_declined' : 'processing_error';
+        const errorCode = isDeclined
+          ? processorCode
+            ? `CCREJECT_${processorCode}`
+            : 'INSTRUMENT_DECLINED'
+          : `HTTP_${orderRes.status}`;
+        const actionableMessage = isDeclined
+          ? `Sandbox card payment was declined by the processor${processorCode ? ` (response code ${processorCode})` : ''}. Retry with an approved payment method.`
+          : 'A temporary PayPal Sandbox processing error occurred. Please retry.';
+        const orderIdToRecord = String(orderData?.id || `DECLINED-${Date.now()}`);
+
+        await serviceClient.from('billing_payment_attempts').upsert(
+          {
+            invoice_id: invoice.id,
+            payer_user_id: userId,
+            amount_minor: effectiveBalanceMinor,
+            currency: 'USD',
+            paypal_order_id: orderIdToRecord,
+            status: classification,
+            attempt_classification: classification,
+            payment_source_type: 'paypal_card',
+            paypal_error_code: errorCode,
+            card_brand: cardBrand,
+            card_last_digits: cardLastDigits,
+            processor_response_code: processorCode || null,
+            failure_code: errorCode,
+            failure_message: isDeclined
+              ? `PayPal Sandbox card processor declined capture (status=${capture?.status || 'DECLINED'}, response_code=${processorCode || '0500'})`
+              : orderText.slice(0, 240),
+            actionable_message: actionableMessage,
+            demo_session_id: effectiveSessionId,
+            request_id: idempotencyKey,
+          },
+          { onConflict: 'paypal_order_id' }
+        );
+
+        await serviceClient.rpc('billing_log', {
+          p_org: invoice.organization_id,
+          p_invoice: invoice.id,
+          p_actor: userId,
+          p_kind: 'paypal',
+          p_type: 'paypal_card_payment_declined',
+          p_details: {
+            order_id: orderIdToRecord,
+            capture_id: capture?.id ? String(capture.id) : null,
+            sandbox_card_profile: profile,
+            card_brand: cardBrand,
+            card_last_digits: cardLastDigits,
+            processor_response: capture?.processor_response || null,
+            attempt_classification: classification,
+            paypal_error_code: errorCode,
+            demo_session_id: effectiveSessionId,
+          },
+          p_demo_session_id: effectiveSessionId,
+        });
+
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: isDeclined ? 'PAYMENT_DECLINED' : 'PAYPAL_PROCESSING_ERROR',
+            classification,
+            paypalErrorCode: errorCode,
+            orderId: orderData?.id ? String(orderData.id) : null,
+            order_id: orderData?.id ? String(orderData.id) : null,
+            captureId: capture?.id ? String(capture.id) : null,
+            captureStatus: capture?.status ? String(capture.status) : 'DECLINED',
+            card: {
+              brand: cardBrand,
+              last_digits: cardLastDigits,
+              type: cardSource.type || 'CREDIT',
+              expiry: cardSource.expiry || '2028-12',
+            },
+            processorResponse: capture?.processor_response || null,
+            actionableMessage,
+            message: actionableMessage,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Handle AUTHORIZE intent (authorized, not yet captured)
+      if (requestedIntent === 'AUTHORIZE' && authorization?.id) {
+        const authOrderId = String(orderData.id);
+        await serviceClient.from('billing_payment_attempts').upsert(
+          {
+            invoice_id: invoice.id,
+            payer_user_id: userId,
+            amount_minor: effectiveBalanceMinor,
+            currency: 'USD',
+            paypal_order_id: authOrderId,
+            status: 'authorized',
+            attempt_classification: 'authorized',
+            payment_source_type: 'paypal_card',
+            card_brand: cardBrand,
+            card_last_digits: cardLastDigits,
+            processor_response_code: processorCode || '0000',
+            actionable_message: 'Payment is authorized in PayPal Sandbox and ready for capture.',
+            demo_session_id: effectiveSessionId,
+            request_id: idempotencyKey,
+          },
+          { onConflict: 'paypal_order_id' }
+        );
+
+        await serviceClient.rpc('billing_log', {
+          p_org: invoice.organization_id,
+          p_invoice: invoice.id,
+          p_actor: userId,
+          p_kind: 'paypal',
+          p_type: 'paypal_card_payment_authorized',
+          p_details: {
+            order_id: authOrderId,
+            authorization_id: String(authorization.id),
+            amount_minor: effectiveBalanceMinor,
+            card_brand: cardBrand,
+            card_last_digits: cardLastDigits,
+            attempt_classification: 'authorized',
+            demo_session_id: effectiveSessionId,
+          },
+          p_demo_session_id: effectiveSessionId,
+        });
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            orderId: authOrderId,
+            order_id: authOrderId,
+            authorizationId: String(authorization.id),
+            authorization_id: String(authorization.id),
+            status: String(orderData.status || 'COMPLETED'),
+            authorizationStatus: String(authorization.status || 'CREATED'),
+            classification: 'authorized',
+            card: {
+              brand: cardBrand,
+              last_digits: cardLastDigits,
+              type: cardSource.type || 'CREDIT',
+              expiry: cardSource.expiry || '2028-12',
+            },
+            actionableMessage: 'Payment is authorized in PayPal Sandbox and ready for capture.',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const orderId = String(orderData.id || '');
+      const captureId = String(capture?.id || '');
+      const captureStatus = String(capture?.status || '').toUpperCase();
+
+      if (!orderId || !captureId || captureStatus !== 'COMPLETED') {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'PAYPAL_CARD_CAPTURE_INCOMPLETE',
+            classification: 'processing_error',
+            orderId: orderId || null,
+            captureId: captureId || null,
+            captureStatus: captureStatus || 'UNKNOWN',
+            message: `PayPal Sandbox card order returned status=${orderData.status}, captureStatus=${captureStatus}.`,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Direct verification against PayPal Orders v2 GET endpoint
+      const verifyOrderRes = await fetch(
+        `${baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+      const verifiedOrder = verifyOrderRes.ok ? await verifyOrderRes.json().catch(() => null) : null;
+      const verifiedCapture =
+        verifiedOrder?.purchase_units?.[0]?.payments?.captures?.[0] || capture;
+
+      await serviceClient.from('billing_payment_attempts').upsert(
+        {
+          invoice_id: invoice.id,
+          payer_user_id: userId,
+          amount_minor: effectiveBalanceMinor,
+          currency: 'USD',
+          paypal_order_id: orderId,
+          status: 'captured',
+          attempt_classification: 'captured',
+          payment_source_type: 'paypal_card',
+          card_brand: cardBrand,
+          card_last_digits: cardLastDigits,
+          processor_response_code: processorCode || '0000',
+          actionable_message: 'Verified PayPal Sandbox direct card capture completed.',
+          demo_session_id: effectiveSessionId,
+          request_id: idempotencyKey,
+        },
+        { onConflict: 'paypal_order_id' }
+      );
+
+      const capturedMinor = Math.round(
+        Number.parseFloat(String(verifiedCapture?.amount?.value || amountValue)) * 100
+      );
+      const currency = String(verifiedCapture?.amount?.currency_code || 'USD').toUpperCase();
+      const maskedCardPayer = `card-${cardBrand.toLowerCase()}-***${cardLastDigits}@sandbox.paypal.com`;
+
+      const { data: txRow, error: applyErr } = await serviceClient.rpc(
+        'billing_apply_verified_capture',
+        {
+          p_invoice: invoiceId,
+          p_payer: userId,
+          p_order_id: orderId,
+          p_capture_id: captureId,
+          p_amount_minor: capturedMinor,
+          p_currency: currency,
+          p_paypal_status: String(verifiedCapture?.status || captureStatus),
+          p_payer_email_masked: maskedCardPayer,
+          p_verified_via: verifyOrderRes.ok ? 'order_lookup' : 'capture_api',
+        }
+      );
+
+      if (applyErr) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: 'CAPTURE_VERIFICATION_REJECTED',
+            message: applyErr.message,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (isCanonicalInvoice && effectiveSessionId !== 'canonical') {
+        await serviceClient.from('billing_demo_session_overrides').upsert(
+          {
+            demo_session_id: effectiveSessionId,
+            invoice_id: invoiceId,
+            status: 'paid',
+            amount_paid_minor: capturedMinor,
+            amount_refunded_minor: 0,
+            balance_due_minor: 0,
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'demo_session_id,invoice_id' }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          paymentMethod: 'paypal_direct_card',
+          sandboxCardProfile: profile,
+          orderId,
+          order_id: orderId,
+          orderStatus: String(verifiedOrder?.status || orderData.status || 'COMPLETED'),
+          captureId,
+          capture_id: captureId,
+          captureStatus: String(verifiedCapture?.status || captureStatus),
+          classification: 'captured',
+          verifiedVia: verifyOrderRes.ok ? 'order_lookup' : 'capture_api',
+          invoiceId,
+          invoiceNumber: String(invoice.invoice_number),
+          amountMinor: capturedMinor,
+          amountUsd: `$${formatMinorUsd(capturedMinor)}`,
+          card_brand: cardBrand,
+          card_last_digits: cardLastDigits,
+          card: {
+            brand: cardBrand,
+            last_digits: cardLastDigits,
+            type: cardSource.type || 'CREDIT',
+            expiry: cardSource.expiry || '2028-12',
+          },
+          processorResponse: verifiedCapture?.processor_response || capture?.processor_response || null,
+          networkTransactionReference:
+            verifiedCapture?.network_transaction_reference ||
+            capture?.network_transaction_reference ||
+            null,
+          sellerReceivableBreakdown:
+            verifiedCapture?.seller_receivable_breakdown ||
+            capture?.seller_receivable_breakdown ||
+            null,
+          transaction: txRow,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // 3d. BUYER CANCELED CHECKOUT RECORDING
+    // -------------------------------------------------------------------------
+    if (action === 'cancel-order') {
+      const orderId = String(body?.orderId || body?.order_id || '').trim();
+      const rawInvoiceRef = String(
+        body?.invoiceId || body?.invoice_id || body?.invoiceNumber || body?.invoice_number || ''
+      ).trim();
+      const invoice = await resolveInvoiceByIdOrNumber(serviceClient, rawInvoiceRef);
+      const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
+      const effectiveSessionId = callerSessionId || String(invoice?.demo_session_id || 'canonical');
+
+      if (orderId) {
+        await serviceClient
+          .from('billing_payment_attempts')
+          .update({
+            status: 'buyer_canceled',
+            attempt_classification: 'buyer_canceled',
+            paypal_error_code: 'BUYER_CANCELED',
+            actionable_message: 'Buyer canceled PayPal Sandbox checkout before authorizing payment.',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('paypal_order_id', orderId);
+      }
+
+      if (invoice?.id) {
+        await serviceClient.rpc('billing_log', {
+          p_org: invoice.organization_id,
+          p_invoice: invoice.id,
+          p_actor: userId,
+          p_kind: 'user',
+          p_type: 'paypal_checkout_buyer_canceled',
+          p_details: {
+            order_id: orderId || null,
+            attempt_classification: 'buyer_canceled',
+            demo_session_id: effectiveSessionId,
+          },
+          p_demo_session_id: effectiveSessionId,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          orderId: orderId || null,
+          classification: 'buyer_canceled',
+          actionableMessage: 'Buyer canceled PayPal Sandbox checkout before authorizing payment.',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -888,12 +1722,54 @@ Deno.serve(async (req: Request) => {
         }
 
         if (!capData) {
+          let classification:
+            | 'approval_required'
+            | 'payment_declined'
+            | 'buyer_canceled'
+            | 'processing_error' = 'processing_error';
+          let paypalErrorCode = `HTTP_${capRes.status}`;
+          let actionableMessage =
+            'A temporary PayPal provider or network processing error occurred. Please retry.';
+          let responseCode = 'PAYPAL_CAPTURE_FAILED';
+
+          if (errText.includes('ORDER_NOT_APPROVED') || errText.includes('PAYER_ACTION_REQUIRED')) {
+            classification = 'approval_required';
+            paypalErrorCode = 'ORDER_NOT_APPROVED';
+            responseCode = 'ORDER_NOT_APPROVED';
+            actionableMessage =
+              'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.';
+          } else if (
+            errText.includes('INSTRUMENT_DECLINED') ||
+            errText.includes('CARD_DECLINED') ||
+            errText.includes('PAYER_CANNOT_PAY') ||
+            errText.includes('TRANSACTION_REFUSED')
+          ) {
+            classification = 'payment_declined';
+            paypalErrorCode = 'INSTRUMENT_DECLINED';
+            responseCode = 'PAYMENT_DECLINED';
+            actionableMessage =
+              'Payment instrument was declined by PayPal or the card issuer. Please retry with a valid payment method.';
+          } else if (
+            errText.includes('ORDER_CANCELED') ||
+            errText.includes('BUYER_CANCELED') ||
+            errText.includes('ORDER_VOIDED')
+          ) {
+            classification = 'buyer_canceled';
+            paypalErrorCode = 'BUYER_CANCELED';
+            responseCode = 'BUYER_CANCELED';
+            actionableMessage =
+              'Buyer canceled PayPal Sandbox checkout before authorizing payment.';
+          }
+
           await serviceClient
             .from('billing_payment_attempts')
             .update({
-              status: 'failed',
+              status: classification,
+              attempt_classification: classification,
+              paypal_error_code: paypalErrorCode,
               failure_code: `HTTP_${capRes.status}`,
-              failure_message: errText.slice(0, 200) || 'PayPal capture declined',
+              failure_message: errText.slice(0, 300) || 'PayPal capture not completed',
+              actionable_message: actionableMessage,
               updated_at: new Date().toISOString(),
             })
             .eq('paypal_order_id', orderId);
@@ -901,8 +1777,14 @@ Deno.serve(async (req: Request) => {
           return new Response(
             JSON.stringify({
               ok: false,
-              code: 'PAYPAL_CAPTURE_FAILED',
-              message: `PayPal Sandbox capture was not completed (${capRes.status}): ${errText.slice(0, 180)}`,
+              code: responseCode,
+              classification,
+              paypalErrorCode,
+              actionableMessage,
+              message:
+                classification === 'approval_required'
+                  ? actionableMessage
+                  : `${actionableMessage} (${capRes.status}: ${errText.slice(0, 160)})`,
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );

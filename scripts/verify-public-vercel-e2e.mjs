@@ -28,7 +28,7 @@ const TARGET_URL =
 
 const ARTIFACT_DIR =
   process.env.ARTIFACT_DIR ||
-  '/Users/danny/.gemini/antigravity/brain/ee72edcf-894e-4f91-94d4-b2c49c83a710';
+  '/Users/danny/.gemini/antigravity/brain/540b46d9-7812-4c0c-a15b-2028e3e58096';
 
 const SCREENSHOTS_DIR = path.join(
   '/Users/danny/Desktop/PayPal-AI-Billing-Kit',
@@ -494,14 +494,14 @@ async function run() {
     });
     const modalText = await page.locator('[data-testid="billing-maas-mcp-modal"]').innerText();
     check(
-      'Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 26 tools, source badges, PDF receipt endpoint, and zero MaaS branding',
+      'Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 30 tools, source badges, PDF receipt endpoint, and zero MaaS branding',
       mcpBtnText.includes('MCP Agent Interface') &&
         !mcpBtnText.includes('MaaS') &&
         modalText.includes('MCP Agent Interface') &&
-        modalText.includes('26 Exposed Tools by Permission Tier') &&
-        modalText.includes('20 Native Application') &&
+        modalText.includes('30 Exposed Tools by Permission Tier') &&
+        modalText.includes('21 Native Application') &&
         modalText.includes('1 Official PayPal MCP') &&
-        modalText.includes('5 PayPal REST Adapter') &&
+        modalText.includes('8 PayPal REST Adapter') &&
         !modalText.includes('MaaS') &&
         !modalText.includes('Model-as-a-Service')
     );

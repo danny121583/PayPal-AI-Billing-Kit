@@ -2,6 +2,7 @@ import { supabase } from '@/src/lib/supabase';
 import type {
   BillingNotificationItem,
   BillingRoleScope,
+  PaymentAttemptClassification,
   SyntheticBillingInvoice,
   SyntheticInvoiceLineItem,
   SyntheticInvoiceStatus,
@@ -475,7 +476,11 @@ export async function fetchBillingDashboardData(
           .order('created_at', { ascending: false })
           .limit(100),
         sb.from('billing_invoice_items').select('*').order('position', { ascending: true }),
-        sb.from('billing_payment_attempts').select('*').order('created_at', { ascending: false }),
+        sb
+          .from('billing_payment_attempts')
+          .select('*')
+          .in('demo_session_id', sessionScope)
+          .order('created_at', { ascending: false }),
         sb.from('billing_transactions').select('*').order('captured_at', { ascending: false }),
         sb.from('billing_organizations').select('id, name, owner_user_id'),
         sb
@@ -490,7 +495,7 @@ export async function fetchBillingDashboardData(
           .in('user_id', ALL_DEMO_USER_IDS),
         sb
           .from('billing_audit_events')
-          .select('id, event_type, actor_kind, created_at, details')
+          .select('id, event_type, actor_kind, created_at, details, demo_session_id')
           .in('demo_session_id', sessionScope)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -576,32 +581,126 @@ export async function fetchBillingDashboardData(
         const invAttempts: SyntheticPaymentAttempt[] = dbAttempts
           .filter((at) => at.invoice_id === inv.id)
           .map((at) => {
-            const isFailed =
-              at.status === 'failed' || at.status === 'cancelled' || at.status === 'expired';
-            const isCompleted = at.status === 'completed';
+            const rawStatus = String(at.status || '').toLowerCase();
+            const rawClass = String(at.attempt_classification || '').toLowerCase();
+            const rawErrCode = String(
+              at.paypal_error_code || at.failure_code || ''
+            ).toUpperCase();
+            const rawMsg = String(at.failure_message || '').toUpperCase();
+            const isApprovalRequired =
+              rawClass === 'approval_required' ||
+              rawStatus === 'approval_required' ||
+              rawErrCode === 'ORDER_NOT_APPROVED' ||
+              rawMsg.includes('ORDER_NOT_APPROVED');
+            const isAwaitingApproval =
+              rawClass === 'awaiting_buyer_approval' ||
+              rawStatus === 'awaiting_buyer_approval' ||
+              rawStatus === 'created' ||
+              rawStatus === 'pending';
+            const isBuyerCanceled =
+              rawClass === 'buyer_canceled' ||
+              rawStatus === 'buyer_canceled' ||
+              rawStatus === 'cancelled';
+            const isRefunded = rawClass === 'refunded' || rawStatus === 'refunded';
+            const isAuthorized = rawClass === 'authorized' || rawStatus === 'authorized';
+            const isCompleted = rawClass === 'captured' || rawStatus === 'completed';
+            const isProcessingError =
+              rawClass === 'processing_error' || rawStatus === 'processing_error';
+            const isPaymentDeclined =
+              !isApprovalRequired &&
+              !isAwaitingApproval &&
+              !isBuyerCanceled &&
+              !isRefunded &&
+              !isAuthorized &&
+              !isCompleted &&
+              !isProcessingError &&
+              (rawClass === 'payment_declined' ||
+                rawStatus === 'payment_declined' ||
+                rawStatus === 'failed' ||
+                rawStatus === 'expired');
+
+            const classification: PaymentAttemptClassification = isRefunded
+              ? 'refunded'
+              : isCompleted
+                ? 'captured'
+                : isAuthorized
+                  ? 'authorized'
+                  : isApprovalRequired
+                    ? 'approval_required'
+                    : isAwaitingApproval
+                      ? 'awaiting_buyer_approval'
+                      : isBuyerCanceled
+                        ? 'buyer_canceled'
+                        : isProcessingError
+                          ? 'processing_error'
+                          : isPaymentDeclined
+                            ? 'payment_declined'
+                            : 'awaiting_buyer_approval';
+
+            const isGenuineFailure = classification === 'payment_declined';
+            const paymentSourceType = (at.payment_source_type || 'paypal_wallet') as
+              | 'paypal_wallet'
+              | 'paypal_card'
+              | 'demo_simulation';
+
+            const statusLabel =
+              classification === 'approval_required'
+                ? 'Awaiting PayPal Buyer Approval (ORDER_NOT_APPROVED)'
+                : classification === 'awaiting_buyer_approval'
+                  ? 'PayPal Checkout Created — Awaiting Buyer Approval'
+                  : classification === 'buyer_canceled'
+                    ? 'Buyer Canceled Checkout'
+                    : classification === 'authorized'
+                      ? 'PayPal Payment Authorized (Awaiting Capture)'
+                      : classification === 'refunded'
+                        ? 'PayPal Capture Refunded'
+                        : classification === 'captured'
+                          ? isSampleSeedSettlement
+                            ? 'Sample Demo Settlement (Seeded)'
+                            : paymentSourceType === 'paypal_card'
+                              ? 'Verified PayPal Sandbox Direct Card Capture'
+                              : 'Verified PayPal Sandbox Capture'
+                          : classification === 'processing_error'
+                            ? 'Provider / Network Processing Error'
+                            : 'Declined Payment Instrument';
+
+            const actionableMessage = at.actionable_message
+              ? String(at.actionable_message)
+              : classification === 'approval_required' ||
+                  classification === 'awaiting_buyer_approval'
+                ? 'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.'
+                : undefined;
+
             return {
               id: String(at.id),
               attemptedAt: String(at.created_at),
               amountCents: Number(at.amount_minor || 0),
               currencyCode: 'USD' as const,
-              status: isFailed
-                ? 'failed_demo'
+              status: isRefunded
+                ? 'refunded_demo'
                 : isCompleted
                   ? 'simulated_paid_demo'
-                  : 'pending_demo',
-              statusLabel: isFailed
-                ? 'Unsuccessful PayPal Attempt'
-                : isCompleted
-                  ? isSampleSeedSettlement
-                    ? 'Sample Demo Settlement (Seeded)'
-                    : 'Verified PayPal Sandbox Capture'
-                  : 'PayPal Checkout Initiated',
+                  : isGenuineFailure
+                    ? 'failed_demo'
+                    : 'pending_demo',
+              statusLabel,
               failureReason: at.failure_message ? String(at.failure_message) : undefined,
               demoReferenceCode: String(at.paypal_order_id || at.request_id || at.id),
+              attemptClassification: classification,
+              isGenuineFailure,
+              paymentSourceType,
+              paypalErrorCode: at.paypal_error_code
+                ? String(at.paypal_error_code)
+                : isApprovalRequired
+                  ? 'ORDER_NOT_APPROVED'
+                  : undefined,
+              actionableMessage,
+              cardBrand: at.card_brand ? String(at.card_brand) : undefined,
+              cardLastDigits: at.card_last_digits ? String(at.card_last_digits) : undefined,
             };
           });
 
-        const hasFailedAttempt = invAttempts.some((a) => a.status === 'failed_demo');
+        const hasFailedAttempt = invAttempts.some((a) => a.isGenuineFailure === true);
         const dueDateStr = String(inv.due_date || new Date().toISOString().slice(0, 10));
         const mappedStatus = mapDbInvoiceStatus(inv.status, dueDateStr, hasFailedAttempt);
 
@@ -690,14 +789,31 @@ export async function fetchBillingDashboardData(
             }))
           : DEFAULT_BILLABLE_PATIENTS;
 
+      const sessionInvoiceIds = new Set(mappedDbInvoices.map((inv) => inv.id));
       const auditEvents: BillingAuditEventItem[] = Array.isArray(auditRes?.data)
-        ? auditRes.data.map((a: any) => ({
-            id: Number(a.id),
-            eventType: String(a.event_type),
-            actorKind: (a.actor_kind || 'system') as BillingAuditEventItem['actorKind'],
-            createdAt: String(a.created_at),
-            details: a.details && typeof a.details === 'object' ? a.details : {},
-          }))
+        ? auditRes.data
+            .filter((a: any) => {
+              const rowSession = String(a.demo_session_id || 'canonical');
+              if (demoSessionId === 'canonical') {
+                return Number(a.id) <= 4 || rowSession === 'canonical';
+              }
+              if (rowSession === demoSessionId) return true;
+              if (Number(a.id) <= 4) return true;
+              const detSession = a.details?.demo_session_id
+                ? String(a.details.demo_session_id)
+                : null;
+              if (detSession === demoSessionId) return true;
+              const detInvId = a.details?.invoice_id ? String(a.details.invoice_id) : null;
+              if (detInvId && sessionInvoiceIds.has(detInvId) && !detSession) return true;
+              return false;
+            })
+            .map((a: any) => ({
+              id: Number(a.id),
+              eventType: String(a.event_type),
+              actorKind: (a.actor_kind || 'system') as BillingAuditEventItem['actorKind'],
+              createdAt: String(a.created_at),
+              details: a.details && typeof a.details === 'object' ? a.details : {},
+            }))
         : [];
 
       // Populate multi-persona connection cache
@@ -1151,4 +1267,43 @@ export async function invokePayPalBillingFunction(
           : 'Could not reach the PayPal Sandbox backend.',
     };
   }
+}
+
+export async function payInvoiceWithSandboxCard(params: {
+  invoiceId: string;
+  invoiceNumber?: string;
+  cardProfile?:
+    | 'visa_sandbox'
+    | 'mastercard_sandbox'
+    | 'amex_sandbox'
+    | 'decline_refused'
+    | 'decline_expired'
+    | 'decline_insufficient_funds';
+  intent?: 'CAPTURE' | 'AUTHORIZE';
+}): Promise<{
+  ok: boolean;
+  code?: string;
+  message?: string;
+  data?: any;
+}> {
+  const result = await invokePayPalBillingFunction({
+    action: 'pay-with-sandbox-card',
+    invoiceId: params.invoiceId,
+    invoiceNumber: params.invoiceNumber,
+    cardProfile: params.cardProfile || 'visa_sandbox',
+    intent: params.intent || 'CAPTURE',
+  });
+  preloadedCache.loadedAt = 0;
+  return result;
+}
+
+export async function checkPayPalCardEligibility(): Promise<{
+  ok: boolean;
+  code?: string;
+  message?: string;
+  data?: any;
+}> {
+  return invokePayPalBillingFunction({
+    action: 'check-card-eligibility',
+  });
 }

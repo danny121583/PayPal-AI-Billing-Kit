@@ -140,11 +140,11 @@ async function main() {
     '_meta',
   ]);
   const strictSchemaValid =
-    tools.length === 26 &&
+    tools.length === 30 &&
     tools.every((t) => Object.keys(t).every((k) => allowedTopKeys.has(k)) && t._meta?.permissionTier);
   assert(
     strictSchemaValid,
-    `MCP \`tools/list\` exposes all 26 Unified MCP tools with strict MCP schema compliance (count=${tools.length})`
+    `MCP \`tools/list\` exposes all 30 Unified MCP tools (26 baseline + 4 Sandbox Card/PDF tools) with strict MCP schema compliance (count=${tools.length})`
   );
 
   // 7. Tool 1: discover_billing_capabilities

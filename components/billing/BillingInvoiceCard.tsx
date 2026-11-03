@@ -111,8 +111,17 @@ export default function BillingInvoiceCard({
   const isVerifiedPayPalCapture =
     invoice.settlementVerificationStatus === 'paypal_verified';
   const primaryServiceCode = invoice.lineItems[0]?.serviceCode || 'ADMIN-SERVICE';
+  const latestApprovalPending = invoice.paymentAttempts.find(
+    (a) =>
+      a.attemptClassification === 'approval_required' ||
+      a.attemptClassification === 'awaiting_buyer_approval'
+  );
   const latestFailure = invoice.paymentAttempts.find(
-    (a) => a.status === 'failed_demo' && a.failureReason
+    (a) =>
+      a.status === 'failed_demo' &&
+      a.failureReason &&
+      a.attemptClassification !== 'approval_required' &&
+      a.attemptClassification !== 'awaiting_buyer_approval'
   );
 
   return (
@@ -255,6 +264,23 @@ export default function BillingInvoiceCard({
       <Text style={styles.descriptionText} numberOfLines={2}>
         {invoice.statementMemoSafe}
       </Text>
+
+      {/* Awaiting Buyer Approval Actionable Notice */}
+      {invoice.status !== 'paid' &&
+      invoice.status !== 'refunded' &&
+      invoice.status !== 'void' &&
+      latestApprovalPending ? (
+        <View
+          style={styles.approvalPendingBanner}
+          testID={`billing-invoice-approval-pending-${invoice.id}`}
+        >
+          <AlertTriangle size={15} color="#1D4ED8" />
+          <Text style={styles.approvalPendingBannerText} numberOfLines={2}>
+            {latestApprovalPending.actionableMessage ||
+              'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.'}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Failed Payment Reason Banner */}
       {invoice.status === 'failed' && latestFailure?.failureReason ? (
@@ -479,6 +505,25 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: '#374151',
     marginTop: 8,
+  },
+  approvalPendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  approvalPendingBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1E40AF',
+    lineHeight: 17,
   },
   failureBanner: {
     flexDirection: 'row',

@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.7.0] - 2026-11-02
+
+### Added
+- **Automated Server-Side PayPal Sandbox Card Payments (`supabase/functions/paypal-billing/index.ts`, `supabase/functions/billing-maas-mcp/index.ts`, `worker/src/index.ts`, `packages/paypal-billing-kit/src/mcpRegistry.ts`):**
+  - Expanded the unified MCP gateway (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp` and `https://paypal-ai-billing-kit.vercel.app/api/mcp`) from 26 tools to **30 unified tools** (`18 Read-Only`, `3 Proposal-Only`, `9 Confirmed Write`; `21 Native Application`, `1 Official PayPal MCP`, `8 PayPal REST Adapter`).
+  - Added `paypal_check_card_eligibility` (`[READ_ONLY]`) to verify PayPal Sandbox OAuth 2.0 reachability, Orders v2 `payment_source.card` direct-card merchant eligibility (`direct_card_eligible: true`), and allowlisted Sandbox card profiles (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`).
+  - Added `execute_sandbox_card_payment` (`[CONFIRMED_WRITE]`) to execute server-side PayPal Sandbox card payments via `POST /v2/checkout/orders` with `payment_source.card`, verify captures directly against `GET /v2/checkout/orders/{id}`, and reconcile `billing_transactions` and `billing_invoices`. Rejects caller-supplied raw PAN/CVV (`RAW_CARD_CREDENTIALS_FORBIDDEN`).
+  - Added `generate_receipt_pdf` (`[READ_ONLY]`) to generate and validate binary PDF 1.4 receipts for paid or refunded invoices while refusing unpaid/draft/void invoices (`RECEIPT_UNAVAILABLE_UNPAID_INVOICE`).
+  - Added `run_sandbox_card_lifecycle_test` (`[CONFIRMED_WRITE]`) to run an isolated 7-step real PayPal Sandbox card lifecycle test (`Invoice → Card Order → Capture → Direct PayPal Verify → PDF Receipt → Refund → Direct PayPal Refund Verify`).
+- **25-Stage End-to-End Automated Verification Suite (`scripts/verify-paypal-full.mjs`, `npm run verify:paypal-full`):**
+  - Added comprehensive 25-stage automated verification script covering standalone repo & Supabase isolation, secret scanning, PayPal Sandbox OAuth & card eligibility, 30-tool MCP discovery, Official PayPal MCP SSE discovery, conversational capability/hypothetical/anti-spoofing/guardrail checks, wallet checkout `awaiting_buyer_approval` & `approval_required` (`ORDER_NOT_APPROVED`) classification, live Sandbox card Order (`6M891981CF190590M`), Capture (`0CD44204BD166461N`), PDF rendering (`%PDF-1.4` + PNG visual verification), Refund (`4P971203UB311032F`), cross-session audit isolation, and demo session reset.
+
+### Fixed
+- **8-State Payment-Attempt Classification & Premature Capture (`ORDER_NOT_APPROVED`) Handling (`supabase/migrations/20261103000000_card_checkout_classification_and_audit_isolation.sql`, `supabase/functions/paypal-billing/index.ts`, `components/billing/BillingInvoiceDetailModal.tsx`):**
+  - Implemented explicit 8-state payment-attempt classification (`awaiting_buyer_approval`, `approval_required`, `payment_declined`, `buyer_canceled`, `authorized`, `captured`, `refunded`, `processing_error`).
+  - Reclassified premature capture attempts (`HTTP 422 — ORDER_NOT_APPROVED`, including Order `02M869433T525841J` on `#PPB-INV-2026-1069`) from `failed` to `approval_required` with actionable guidance (`"PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment."`), while preserving original `failure_code` and `failure_message` audit metadata.
+  - Updated `failed_payment_attempts_count` and `failedPaymentsCount` metrics to count only genuine payment instrument declines (`payment_declined`).
+- **Audit-History Session Isolation (`supabase/functions/billing-maas-mcp/index.ts`, `src/billing/api/billingService.ts`, `supabase/migrations/20261103000000_card_checkout_classification_and_audit_isolation.sql`):**
+  - Hardened `get_financial_audit_history` and `public.billing_log` so private `demo_session_id` queries (including `chatgpt-full-sandbox-20261102`) strictly return only events belonging to that session or canonical seed invoices (`record_scope: "canonical_seed"` vs `"session_private"`), blocking cross-session `target_demo_session_id` access (`CROSS_SESSION_AUDIT_ACCESS_DENIED`) and customer access to other customers' records.
+- **Conversational Authorization Anti-Spoofing (`packages/paypal-billing-kit/src/conversationalAuth.ts`, `supabase/functions/billing-maas-mcp/index.ts`):**
+  - Blocked role impersonation when a customer persona supplies `actor_role: "provider"` (`ROLE_IMPERSONATION_BLOCKED`), blocked fabricated approval flags (`FABRICATED_APPROVAL_BLOCKED`), and ensured capability/hypothetical questions never execute even when `prior_execution_intent: true` is passed.
+- **PDF 1.4 Multi-Line Administrative Description Wrapping (`packages/paypal-billing-kit/src/pdfReceipt.ts`, `supabase/functions/billing-maas-mcp/index.ts`):**
+  - Replaced 45-character ellipsis truncation on PDF receipt line item descriptions with clean word-wrapped two-line rendering so full administrative descriptions display without cut-off strings.
+
+---
+
 ## [1.6.0] - 2026-11-02
 
 ### Added

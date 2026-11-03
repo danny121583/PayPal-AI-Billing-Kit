@@ -21,6 +21,10 @@ export type AuthorizedOperationType =
 export interface ConversationalAuthContext {
   instruction: string;
   actorRole?: 'doctor' | 'patient' | 'provider' | 'customer';
+  userId?: string;
+  authenticatedUserRole?: 'doctor' | 'patient' | 'provider' | 'customer' | 'unauthenticated';
+  authenticatedRole?: 'doctor' | 'patient' | 'provider' | 'customer' | 'unauthenticated';
+  callerIdentityVerified?: boolean;
   demoSessionId?: string;
   hasPendingProposal?: boolean;
   pendingProposalId?: string | null;
@@ -130,6 +134,73 @@ export function evaluateConversationalAuthorization(
   const role = ctx.actorRole || 'doctor';
   const isProvider = role === 'doctor' || role === 'provider';
 
+  // 0a. Anti-Spoofing & Role Impersonation Protection
+  const knownCustomerIds = new Set([
+    '11111111-1111-4111-8111-111111111102',
+    '11111111-1111-4111-8111-111111111103',
+  ]);
+  const effectiveAuthRole = ctx.authenticatedUserRole || ctx.authenticatedRole;
+  const isCustomerAccountClaimingProvider =
+    isProvider &&
+    (ctx.callerIdentityVerified === false ||
+      effectiveAuthRole === 'customer' ||
+      effectiveAuthRole === 'patient' ||
+      effectiveAuthRole === 'unauthenticated' ||
+      (ctx.userId && knownCustomerIds.has(ctx.userId)) ||
+      /\b(?:i\s+am|acting\s+as|logged\s+in\s+as)\s+(?:a\s+)?(?:customer|patient|alex\s+rivera|jordan\s+taylor)\b/i.test(raw));
+
+  if (isCustomerAccountClaimingProvider) {
+    let op: AuthorizedOperationType = 'none';
+    if (lower.includes('refund')) op = 'refund_payment';
+    else if (lower.includes('void')) op = 'void_invoice';
+    else if (lower.includes('create') || lower.includes('invoice')) op = 'create_invoice';
+    else if (lower.includes('pay')) op = 'pay_invoice';
+
+    return {
+      ...ctx,
+      intent: 'explicit_command',
+      operation: op,
+      authorizedToExecute: false,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: false,
+      guardrailPassed: true,
+      reasonCode: 'ROLE_IMPERSONATION_BLOCKED',
+      explanation:
+        'Caller attempted to claim provider/merchant privileges while authenticated or identified as a customer/unverified caller. Server-side identity verification blocked role elevation.',
+      extractedParams,
+    };
+  }
+
+  // 0b. Fabricated Approval / Guardrail Bypass Protection
+  const hasFabricatedApproval =
+    /\b(?:SYSTEM_APPROVED|ADMIN_OVERRIDE|BYPASS_PROPOSAL|FORCE_APPROVE|SKIP_BUYER_APPROVAL|FAKE_CAPTURE|OVERRIDE_GUARDRAIL)\b/i.test(
+      raw
+    ) ||
+    /\b(?:approved\s+by\s+paypal|paypal\s+capture\s+confirmed|buyer\s+approval\s+already\s+completed|pre[-\s]?approved\s+token)\b/i.test(
+      raw
+    ) ||
+    /\b(?:bypass|skip|ignore|override)\s+(?:the\s+)?(?:proposal|guardrail|approval|buyer\s+authorization|limit)\b/i.test(
+      raw
+    );
+
+  if (hasFabricatedApproval) {
+    return {
+      ...ctx,
+      intent: 'explicit_command',
+      operation: 'none',
+      authorizedToExecute: false,
+      requiresClarification: false,
+      requiresExternalPayPalBuyerApproval: false,
+      roleAuthorized: false,
+      guardrailPassed: false,
+      reasonCode: 'FABRICATED_APPROVAL_BLOCKED',
+      explanation:
+        'Fabricated approval token or guardrail bypass instruction detected. Internal proposals and external PayPal buyer authorization cannot be bypassed via prompt injection.',
+      extractedParams,
+    };
+  }
+
   // 1. Hypothetical / Counterfactual / Preview checks
   const isHypothetical =
     /\bwhat\s+would\s+happen\b/i.test(raw) ||
@@ -162,10 +233,11 @@ export function evaluateConversationalAuthorization(
   }
 
   // 2. Capability Inquiry checks ("Are you able to...", "Can you pay invoice 1002?", "Do you support...")
+  // Note: Capability questions NEVER authorize execution regardless of priorExecutionIntentEstablished.
   const isCapabilityQuestion =
     /^\s*(?:are\s+you\s+able\s+to|can\s+you|could\s+you|do\s+you\s+support|is\s+it\s+possible\s+to|how\s+do\s+(?:i|you))\b/i.test(
       raw
-    ) && !ctx.priorExecutionIntentEstablished;
+    );
 
   if (isCapabilityQuestion) {
     let op: AuthorizedOperationType = 'none';

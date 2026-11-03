@@ -1,6 +1,6 @@
-# Unified PayPal MCP Gateway, Conversational Authorization & PDF Receipt Architecture
+# Unified PayPal MCP Gateway, Automated Sandbox Card Checkout, Conversational Authorization & PDF Receipt Architecture
 
-**Project:** PayPal AI Billing Kit (`v1.6.0`)  
+**Project:** PayPal AI Billing Kit (`v1.7.0`)  
 **Unified MCP Endpoint:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`  
 **Vercel MCP Mirror:** `https://paypal-ai-billing-kit.vercel.app/api/mcp`  
 **OpenAPI 3.1.0 Spec:** `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json`  
@@ -8,17 +8,17 @@
 
 ---
 
-## 1. Unified MCP Gateway Architecture (26 Tools)
+## 1. Unified MCP Gateway Architecture (30 Tools)
 
-External AI clients (ChatGPT MCP, Claude Desktop, MCP Inspector, or custom agents) connect to **one single MCP endpoint** (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`) and gain access to **26 unified tools** across three source categories and three permission tiers.
+External AI clients (ChatGPT MCP, Claude Desktop, MCP Inspector, or custom agents) connect to **one single MCP endpoint** (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`) and gain access to **30 unified tools** (26 baseline + 4 Sandbox card & PDF receipt tools) across three source categories and three permission tiers.
 
 ### 1.1 Tool Breakdown by Source
 
 | Source Category | Count | Tools |
 | --- | --- | --- |
-| **Native Application (`native_app`)** | 20 | `discover_billing_capabilities`, `list_demo_customers`, `search_invoices`, `get_invoice_details`, `explain_outstanding_balances`, `get_transaction_history`, `get_payment_receipt`, `get_financial_audit_history`, `get_paypal_sandbox_status`, `get_business_metrics`, `create_invoice_proposal`, `prepare_payment_proposal`, `prepare_refund_proposal`, `create_approved_invoice`, `create_paypal_checkout_order`, `capture_paypal_checkout_order`, `execute_approved_refund`, `void_unpaid_invoice`, `reset_demo_session`, `execute_conversational_instruction` |
+| **Native Application (`native_app`)** | 21 | `discover_billing_capabilities`, `list_demo_customers`, `search_invoices`, `get_invoice_details`, `explain_outstanding_balances`, `get_transaction_history`, `get_payment_receipt`, `generate_receipt_pdf`, `get_financial_audit_history`, `get_paypal_sandbox_status`, `get_business_metrics`, `create_invoice_proposal`, `prepare_payment_proposal`, `prepare_refund_proposal`, `create_approved_invoice`, `create_paypal_checkout_order`, `capture_paypal_checkout_order`, `execute_approved_refund`, `void_unpaid_invoice`, `reset_demo_session`, `execute_conversational_instruction` |
 | **Official PayPal MCP (`official_paypal_mcp`)** | 1 | `paypal_discover_official_mcp` |
-| **PayPal REST Adapter (`paypal_rest_adapter`)** | 5 | `paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes` |
+| **PayPal REST Adapter (`paypal_rest_adapter`)** | 8 | `paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `paypal_check_card_eligibility`, `execute_sandbox_card_payment`, `run_sandbox_card_lifecycle_test` |
 
 ### 1.2 Official PayPal Sandbox MCP Server Diagnostic (`https://mcp.sandbox.paypal.com`)
 
@@ -74,3 +74,30 @@ Every paid, partially refunded, or refunded invoice has a structured JSON receip
 - Line item breakdown, subtotal, discount, tax, total, amount paid, and refunded amount
 - Authentic PayPal Sandbox Order ID, Capture ID, and Refund IDs
 - Direct download endpoint: `GET https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/:invoice_number.pdf` (`Content-Type: application/pdf`).
+
+---
+
+## 4. Automated Server-Side PayPal Sandbox Card Payments & 8-State Attempt Classification (`v1.7.0`)
+
+### 4.1 Server-Side Sandbox Direct-Card Checkout (`payment_source.card`)
+To enable deterministic, end-to-end automated testing (`Order → Capture → Receipt → Refund`) without requiring manual PayPal wallet login while preserving the wallet checkout flow:
+1. `paypal_check_card_eligibility` verifies OAuth 2.0 reachability and Orders v2 `payment_source.card` merchant eligibility (`APP-5SK74342S6474230W`).
+2. `execute_sandbox_card_payment` accepts only allowlisted Sandbox card profile identifiers (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`) and rejects any caller-supplied raw PAN or CVV (`RAW_CARD_CREDENTIALS_FORBIDDEN`).
+3. Server-side `paypal-billing` constructs the PayPal Orders v2 `payment_source.card` payload in memory inside Sandbox-only mode, verifies the resulting capture via `GET /v2/checkout/orders/{id}`, and records only masked metadata (`card_brand`, `card_last_digits`, `processor_response_code`).
+
+### 4.2 8-State Payment-Attempt Classification
+All payment attempts in `public.billing_payment_attempts` are classified into one of 8 states:
+- `awaiting_buyer_approval` — Wallet checkout order created (`PAYER_ACTION_REQUIRED`), waiting for buyer approval.
+- `approval_required` — Capture attempted before buyer approval (`HTTP 422 — ORDER_NOT_APPROVED`). Does **not** increment `failed_payment_attempts_count`.
+- `payment_declined` — Card or funding instrument genuinely declined (`INSTRUMENT_DECLINED`, `CARD_DECLINED`, processor response `0500`/`5400`/`5100`). Increments `failed_payment_attempts_count`.
+- `buyer_canceled` — Buyer canceled checkout before authorizing payment.
+- `authorized` — Payment authorized (`intent: "AUTHORIZE"`), awaiting capture.
+- `captured` — Payment capture verified against PayPal Sandbox (`COMPLETED`).
+- `refunded` — Captured payment subsequently refunded via PayPal Captures v2 (`COMPLETED`).
+- `processing_error` — Upstream network or provider error.
+
+### 4.3 Session-Scoped Financial Audit Isolation
+`get_financial_audit_history` enforces strict session and role isolation:
+- Visitors with a private `demo_session_id` see only events belonging to their `demo_session_id` (`record_scope: "session_private"`) plus canonical seed baseline events (`record_scope: "canonical_seed"`).
+- Cross-session requests (`target_demo_session_id !== demo_session_id` without verified admin privileges) are rejected with `CROSS_SESSION_AUDIT_ACCESS_DENIED`.
+- Customer personas (`actor_role: "customer"`) see only audit events tied to their own invoices.

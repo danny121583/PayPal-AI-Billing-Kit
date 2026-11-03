@@ -408,13 +408,13 @@
       }
     ]
   },
-  "proof_version": "1.6.0",
-  "verified_at": "2026-11-02T22:49:18.380Z",
+  "proof_version": "1.7.0",
+  "verified_at": "2026-11-03T01:08:38.970Z",
   "unified_mcp_endpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
   "official_paypal_mcp_diagnostic": {
     "ok": true,
     "source": "official_paypal_mcp",
-    "demo_session_id": "live-sbx-v16-1793659741573",
+    "demo_session_id": "live-sbx-v16-1793667870300",
     "official_paypal_mcp": {
       "server_info": {
         "name": "PayPal MCP Agent",
@@ -426,7 +426,7 @@
         "http_note": "https://mcp.sandbox.paypal.com/http returns HTTP 404; PayPal hosts its official MCP server on /sse and /mcp (OAuth 2.0 protected).",
         "sse_endpoint": "https://mcp.sandbox.paypal.com/sse",
         "sse_authenticated_reachable": true,
-        "sse_session_endpoint_sample": "/sse/message?sessionId=b914aa4b5d433d647c4293e46de4a88e410999f9a92e2e8dc1e6a98d30db6d9c",
+        "sse_session_endpoint_sample": "/sse/message?sessionId=080b885e4b023e66b7e0c4e21526a4285f7d9490ded6b672ce7cafcee3ef8df2",
         "oauth_metadata_endpoint": "https://mcp.sandbox.paypal.com/.well-known/oauth-authorization-server",
         "oauth_issuer": "https://mcp.sandbox.paypal.com"
       },
@@ -481,33 +481,33 @@
     }
   },
   "conversational_execution_proof": {
-    "demo_session_id": "live-sbx-v16-1793659741573",
+    "demo_session_id": "live-sbx-v16-1793667870300",
     "created_invoice": {
-      "id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
-      "invoice_number": "PPB-INV-2026-1062",
+      "id": "6676c7b5-71fd-45cd-9e10-222159eca978",
+      "invoice_number": "PPB-INV-2026-1084",
       "status": "sent",
       "customer_name": "Alex Rivera",
       "service_code": "ADMIN-FORMS",
       "total_minor": 3500,
       "total_usd": "$35.00",
-      "due_date": "2026-11-16"
+      "due_date": "2026-11-17"
     },
     "created_paypal_order": {
       "ok": true,
-      "demo_session_id": "live-sbx-v16-1793659741573",
+      "demo_session_id": "live-sbx-v16-1793667870300",
       "checkout_mode": "paypal_sandbox_live",
-      "invoice_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
-      "invoice_number": "PPB-INV-2026-1062",
+      "invoice_id": "6676c7b5-71fd-45cd-9e10-222159eca978",
+      "invoice_number": "PPB-INV-2026-1084",
       "customer_name": "Alex Rivera",
       "amount_minor": 3500,
       "amount_usd": "$35.00",
-      "order_id": "3FT930933B6256512",
+      "order_id": "6FX02632ST422445S",
       "order_status": "PAYER_ACTION_REQUIRED",
-      "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=3FT930933B6256512",
-      "message": "PayPal Sandbox Order 3FT930933B6256512 created for Statement #PPB-INV-2026-1062 ($35.00 USD). Open the approval_url to authorize as the Sandbox buyer, then call `capture_paypal_checkout_order`."
+      "approval_url": "https://www.sandbox.paypal.com/checkoutnow?token=6FX02632ST422445S",
+      "message": "PayPal Sandbox Order 6FX02632ST422445S created for Statement #PPB-INV-2026-1084 ($35.00 USD). Open the approval_url to authorize as the Sandbox buyer, then call `capture_paypal_checkout_order`."
     },
     "paypal_get_order_verification": {
-      "id": "3FT930933B6256512",
+      "id": "6FX02632ST422445S",
       "intent": "CAPTURE",
       "status": "PAYER_ACTION_REQUIRED",
       "payment_source": {
@@ -515,7 +515,7 @@
       },
       "purchase_units": [
         {
-          "reference_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
+          "reference_id": "6676c7b5-71fd-45cd-9e10-222159eca978",
           "amount": {
             "currency_code": "USD",
             "value": "35.00",
@@ -528,20 +528,20 @@
               "brand_name": "PayPal AI Billing Kit Sandbox"
             }
           },
-          "description": "Administrative Statement PPB-INV-2026-1062",
-          "custom_id": "28954bb6-0404-46d1-bdca-6d55e6f375cd",
-          "invoice_id": "PPB-INV-2026-1062-0292"
+          "description": "Administrative Statement PPB-INV-2026-1084",
+          "custom_id": "6676c7b5-71fd-45cd-9e10-222159eca978",
+          "invoice_id": "PPB-INV-2026-1084-4955"
         }
       ],
-      "create_time": "2026-11-02T22:49:10Z",
+      "create_time": "2026-11-03T01:04:35Z",
       "links": [
         {
-          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/3FT930933B6256512",
+          "href": "https://api.sandbox.paypal.com/v2/checkout/orders/6FX02632ST422445S",
           "rel": "self",
           "method": "GET"
         },
         {
-          "href": "https://www.sandbox.paypal.com/checkoutnow?token=3FT930933B6256512",
+          "href": "https://www.sandbox.paypal.com/checkoutnow?token=6FX02632ST422445S",
           "rel": "payer-action",
           "method": "GET"
         }
@@ -781,6 +781,7 @@
       "organization_name": "Jenkins Wellness & Telehealth Practice",
       "provider_name": "Dr. Sarah Jenkins",
       "customer_name": "Alex Rivera",
+      "customer_email_masked": "a***@demo.paypal-billing-kit.local",
       "currency": "USD",
       "total_minor": 3500,
       "total_usd": "$35.00",
@@ -794,7 +795,11 @@
       "paid_at": "2026-11-02T21:53:02.952534+00:00",
       "refunded_at": null,
       "settlement_reference": "5HM71086SR568352C",
+      "paypal_order_id": "7FA47897KM5938009",
       "paypal_capture_id": "5HM71086SR568352C",
+      "paypal_refund_id": "2EM77813GU330222M",
+      "payment_source_type": "paypal_wallet",
+      "payment_source_label": "PayPal Sandbox Wallet Checkout (Orders v2)",
       "settlement_verification": "paypal_sandbox_verified",
       "is_live_paypal_capture": true,
       "verification_badge": "Verified PayPal Sandbox Capture",
@@ -810,16 +815,197 @@
         }
       ],
       "pdf_download_url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?session=live-sbx-1793655303922",
-      "pdf_base64": "[BASE64_PDF_OMITTED_3323_BYTES]",
-      "pdf_byte_length": 3323,
+      "pdf_base64": "[BASE64_PDF_OMITTED_3673_BYTES]",
+      "pdf_byte_length": 3673,
       "pdf_mime_type": "application/pdf"
     },
     "pdf_download_verification": {
       "url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1057.pdf?demo_session_id=live-sbx-1793655303922",
       "http_status": 200,
       "content_type": "application/pdf",
-      "byte_length": 3323,
+      "byte_length": 3673,
       "pdf_header": "%PDF-1.4"
     }
-  }
+  },
+  "automated_sandbox_direct_card_lifecycle_proof": {
+    "demo_session_id": "full-sbx-mvzznovf",
+    "invoice_number": "PPB-INV-2026-1085",
+    "amount_usd": "$35.00",
+    "payment_source_type": "paypal_card",
+    "card_profile": "visa_sandbox",
+    "card_brand": "VISA",
+    "card_last_digits": "1881",
+    "processor_response_code": "0000",
+    "paypal_order_id": "6M891981CF190590M",
+    "paypal_capture_id": "0CD44204BD166461N",
+    "paypal_refund_id": "4P971203UB311032F",
+    "negative_decline_test": {
+      "card_profile": "decline_refused",
+      "attempt_classification": "payment_declined",
+      "processor_response_code": "0500",
+      "paypal_error_code": "CCREJECT_0500"
+    },
+    "order_not_approved_reclassification_proof": {
+      "demo_session_id": "chatgpt-full-sandbox-20261102",
+      "invoice_number": "PPB-INV-2026-1069",
+      "paypal_order_id": "02M869433T525841J",
+      "status": "approval_required",
+      "attempt_classification": "approval_required",
+      "paypal_error_code": "ORDER_NOT_APPROVED",
+      "is_genuine_failure": false,
+      "actionable_message": "PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment."
+    }
+  },
+  "stages_summary": [
+    {
+      "stage": 1,
+      "name": "Standalone repo & Supabase isolation check",
+      "status": "PASS",
+      "evidence": "cwd=/Users/danny/Desktop/PayPal-AI-Billing-Kit, branch=main, version=1.7.0, supabase=dvzfesfvefggnunkjhom"
+    },
+    {
+      "stage": 2,
+      "name": "Secret & sensitive-data scan",
+      "status": "PASS",
+      "evidence": "scripts/scan-secrets.mjs passed with 0 secret or isolation leaks"
+    },
+    {
+      "stage": 3,
+      "name": "PayPal Sandbox OAuth verification",
+      "status": "PASS",
+      "evidence": "oauth_reachable=true, app_id=APP-5SK74342S6474230W, state=SANDBOX_AUTHENTICATED"
+    },
+    {
+      "stage": 4,
+      "name": "PayPal Sandbox payment-source / card eligibility check",
+      "status": "PASS",
+      "evidence": "direct_card_eligible=true, app_id=APP-5SK74342S6474230W, profiles=6"
+    },
+    {
+      "stage": 5,
+      "name": "Unified MCP discovery & schema check",
+      "status": "PASS",
+      "evidence": "tools_count=30, baseline_preserved=26"
+    },
+    {
+      "stage": 6,
+      "name": "Official PayPal Sandbox MCP discovery check",
+      "status": "PASS",
+      "evidence": "sse_reachable=true, upstream_tools=46"
+    },
+    {
+      "stage": 7,
+      "name": "Customer list & catalog check",
+      "status": "PASS",
+      "evidence": "customers=2, catalog_codes=7"
+    },
+    {
+      "stage": 8,
+      "name": "Invoice search & detail check",
+      "status": "PASS",
+      "evidence": "canonical_invoices=6, detail_verified=#PPB-INV-2026-1003"
+    },
+    {
+      "stage": 9,
+      "name": "Outstanding balance & business metrics check",
+      "status": "PASS",
+      "evidence": "outstanding=$275.00, failed_attempts=1"
+    },
+    {
+      "stage": 10,
+      "name": "Conversational capability question non-execution check",
+      "status": "PASS",
+      "evidence": "capQ1_executed=false, capQ2_with_prior_intent_executed=false"
+    },
+    {
+      "stage": 11,
+      "name": "Conversational hypothetical non-execution check",
+      "status": "PASS",
+      "evidence": "executed=false, reasonCode=HYPOTHETICAL_PREVIEW_ONLY"
+    },
+    {
+      "stage": 12,
+      "name": "Role authorization & anti-spoofing refusal check",
+      "status": "PASS",
+      "evidence": "cust_blocked=UNAUTHORIZED_ROLE_FOR_INVOICE_CREATION, spoof=ROLE_IMPERSONATION_BLOCKED, fabricated=FABRICATED_APPROVAL_BLOCKED"
+    },
+    {
+      "stage": 13,
+      "name": "Over-limit guardrail refusal check ($600 > $500)",
+      "status": "PASS",
+      "evidence": "conv_reason=GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED, prop_error=GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED"
+    },
+    {
+      "stage": 14,
+      "name": "Invoice creation in isolated demo session",
+      "status": "PASS",
+      "evidence": "invoice_number=#PPB-INV-2026-1085, amount=$35.00, session=full-sbx-mvzznovf"
+    },
+    {
+      "stage": 15,
+      "name": "PayPal wallet order creation & awaiting_buyer_approval state check",
+      "status": "PASS",
+      "evidence": "order_id=5VS33676KS279700R, classification=awaiting_buyer_approval"
+    },
+    {
+      "stage": 16,
+      "name": "Premature capture approval_required (ORDER_NOT_APPROVED) classification check",
+      "status": "PASS",
+      "evidence": "new_order=approval_required, 02M869433T525841J=approval_required, failed_metrics_unchanged=1"
+    },
+    {
+      "stage": 17,
+      "name": "Automated Sandbox card payment execution",
+      "status": "PASS",
+      "evidence": "raw_pan_blocked=RAW_CARD_CREDENTIALS_FORBIDDEN, decline=payment_declined (0500), captured_order=6M891981CF190590M, capture=0CD44204BD166461N"
+    },
+    {
+      "stage": 18,
+      "name": "Direct PayPal order & capture verification",
+      "status": "PASS",
+      "evidence": "card_order=6M891981CF190590M (COMPLETED), capture=0CD44204BD166461N (COMPLETED), historical=7FA47897KM5938009"
+    },
+    {
+      "stage": 19,
+      "name": "Invoice & ledger reconciliation verification",
+      "status": "PASS",
+      "evidence": "invoice=#PPB-INV-2026-1085, status=paid, paid=$35.00, balance=$0.00, ref=0CD44204BD166461N"
+    },
+    {
+      "stage": 20,
+      "name": "Receipt JSON & PDF visual/content verification",
+      "status": "PASS",
+      "evidence": "paid_pdf=3635B (%PDF-1.4), png_rendered=true, unpaid_blocked=RECEIPT_UNAVAILABLE_UNPAID_INVOICE"
+    },
+    {
+      "stage": 21,
+      "name": "Refund execution",
+      "status": "PASS",
+      "evidence": "refund_id=4P971203UB311032F, is_live_paypal_refund=true, amount=$35.00"
+    },
+    {
+      "stage": 22,
+      "name": "Direct PayPal refund verification",
+      "status": "PASS",
+      "evidence": "new_refund=4P971203UB311032F (COMPLETED), historical_refund=2EM77813GU330222M (COMPLETED)"
+    },
+    {
+      "stage": 23,
+      "name": "Post-refund ledger, metrics & PDF verification",
+      "status": "PASS",
+      "evidence": "status=refunded, refunded=$35.00, pdf_contains_refund_id=true"
+    },
+    {
+      "stage": 24,
+      "name": "Cross-session audit & data isolation verification",
+      "status": "PASS",
+      "evidence": "chatgpt_leaks=0, clean_leaks=0, cross_blocked=CROSS_SESSION_AUDIT_ACCESS_DENIED, immutable=AUDIT_TRAIL_IMMUTABLE_APPEND_ONLY"
+    },
+    {
+      "stage": 25,
+      "name": "Demo session reset verification",
+      "status": "PASS",
+      "evidence": "session=reset-sbx-mvzzophg, post_reset_invoices_count=6"
+    }
+  ]
 }

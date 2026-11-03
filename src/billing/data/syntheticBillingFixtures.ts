@@ -135,6 +135,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
         status: 'simulated_paid_demo',
         statusLabel: 'Sample Demo Settlement (Seeded)',
         demoReferenceCode: 'SAMPLE-DEMO-SETTLEMENT-1003',
+        attemptClassification: 'captured',
+        isGenuineFailure: false,
+        paymentSourceType: 'demo_simulation',
       },
     ],
   },
@@ -186,6 +189,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
         failureReason:
           'PayPal Sandbox funding instrument declined by issuer. No funds were captured.',
         demoReferenceCode: 'DEMO-ORD-DECLINED-1004',
+        attemptClassification: 'payment_declined',
+        isGenuineFailure: true,
+        paymentSourceType: 'paypal_card',
       },
     ],
   },
@@ -277,6 +283,9 @@ const ALL_SYNTHETIC_INVOICES: SyntheticBillingInvoice[] = [
         status: 'refunded_demo',
         statusLabel: 'Sample Demo Refund ($45.00)',
         demoReferenceCode: 'SAMPLE-DEMO-REFUND-1006',
+        attemptClassification: 'refunded',
+        isGenuineFailure: false,
+        paymentSourceType: 'demo_simulation',
       },
     ],
   },
@@ -373,7 +382,20 @@ export function computeDoctorSummaryMetrics(
       paidTotalCents += inv.amountPaidCents;
       recentPaymentsCount += 1;
     } else if (inv.status === 'failed') {
-      failedPaymentsCount += 1;
+      const hasOnlyPendingApproval =
+        inv.paymentAttempts.length > 0 &&
+        inv.paymentAttempts.every(
+          (a) =>
+            a.attemptClassification === 'approval_required' ||
+            a.attemptClassification === 'awaiting_buyer_approval' ||
+            a.isGenuineFailure === false
+        );
+      if (hasOnlyPendingApproval) {
+        pendingInvoicesCount += 1;
+        pendingBalanceCents += inv.balanceDueCents;
+      } else {
+        failedPaymentsCount += 1;
+      }
     }
   }
 

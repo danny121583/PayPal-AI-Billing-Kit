@@ -212,8 +212,17 @@ Deno.serve(async (req: Request) => {
 
     const message = String(body?.message || '').trim().slice(0, 2000);
     const rawRole = body?.roleScope ?? body?.role_scope;
-    const roleScope: 'doctor' | 'patient' =
+    const knownCustomerUserIds = new Set([
+      '11111111-1111-4111-8111-111111111102',
+      '11111111-1111-4111-8111-111111111103',
+    ]);
+    let roleImpersonationBlocked = false;
+    let roleScope: 'doctor' | 'patient' =
       rawRole === 'doctor' ? 'doctor' : 'patient';
+    if (roleScope === 'doctor' && knownCustomerUserIds.has(userId)) {
+      roleScope = 'patient';
+      roleImpersonationBlocked = true;
+    }
     const demoSessionId = String(
       body?.demoSessionId ??
         body?.demo_session_id ??
@@ -320,7 +329,10 @@ Deno.serve(async (req: Request) => {
         .select('*')
         .eq('demo_session_id', demoSessionId),
       userClient.from('billing_invoice_items').select('*'),
-      userClient.from('billing_payment_attempts').select('*'),
+      userClient
+        .from('billing_payment_attempts')
+        .select('*')
+        .in('demo_session_id', demoSessionId === 'canonical' ? ['canonical'] : ['canonical', demoSessionId]),
       userClient.from('billing_transactions').select('*'),
       userClient.from('billing_refunds').select('*'),
       serviceClient.rpc('billing_effective_ai_settings', { p_user: userId }),
@@ -432,8 +444,28 @@ Deno.serve(async (req: Request) => {
           (it: any) => `${it.service_code}: ${it.description} (${formatUsd(it.line_total_minor)})`
         ),
         failedAttempts: invAttempts
-          .filter((a: any) => a.status === 'failed')
+          .filter(
+            (a: any) =>
+              a.attempt_classification === 'payment_declined' ||
+              (a.status === 'failed' &&
+                a.attempt_classification !== 'approval_required' &&
+                a.attempt_classification !== 'awaiting_buyer_approval' &&
+                !String(a.failure_message || '').includes('ORDER_NOT_APPROVED'))
+          )
           .map((a: any) => a.failure_message || 'Declined'),
+        awaitingApprovalAttempts: invAttempts
+          .filter(
+            (a: any) =>
+              a.attempt_classification === 'awaiting_buyer_approval' ||
+              a.attempt_classification === 'approval_required' ||
+              a.status === 'approval_required' ||
+              String(a.failure_message || '').includes('ORDER_NOT_APPROVED')
+          )
+          .map(
+            (a: any) =>
+              a.actionable_message ||
+              'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.'
+          ),
         txRows: invTx,
         refundRows: invRefunds,
         captures: invTx.map((t: any) => t.paypal_capture_id),
@@ -505,7 +537,10 @@ Deno.serve(async (req: Request) => {
         message
       );
 
-    if (isHypotheticalQuestion) {
+    if (roleImpersonationBlocked) {
+      conversationalRefusalOrRecoveryText =
+        'Role Impersonation Blocked (No Action Executed): Your authenticated account is a Customer account (`patient` scope), which cannot elevate to Provider (`doctor`) privileges to create, void, or refund statements.';
+    } else if (isHypotheticalQuestion) {
       if (lower.includes('refund')) {
         const target =
           focusedOrMatchedSummary ||

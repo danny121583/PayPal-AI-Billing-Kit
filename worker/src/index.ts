@@ -903,6 +903,149 @@ const MCP_TOOLS_CATALOG = [
       },
     },
   },
+  {
+    name: 'paypal_check_card_eligibility',
+    description:
+      '[PAYPAL_REST_ADAPTER] Check PayPal Sandbox merchant eligibility for Orders v2 direct card payments (`payment_source.card`), granted OAuth 2.0 scopes, supported PayPal Sandbox test card profiles (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`), and security controls.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'PayPal Sandbox: Check Direct Card Payment Eligibility',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        demo_session_id: {
+          type: 'string',
+          description: 'Optional isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'execute_sandbox_card_payment',
+    description:
+      '[CONFIRMED_WRITE] Execute an authorized server-side PayPal Sandbox direct card payment (`POST /v2/checkout/orders` with `payment_source.card`) using an allowlisted PayPal Sandbox test card profile (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`). Rejects caller-supplied raw PAN/CVV and verifies capture directly against PayPal Orders v2.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Execute Authorized PayPal Sandbox Card Payment',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        proposal_id: {
+          type: 'string',
+          description: 'Optional UUID of a pending payment_checkout proposal prepared by prepare_payment_proposal.',
+        },
+        user_instruction: {
+          type: 'string',
+          description: 'Optional explicit natural-language user instruction authorizing payment (e.g., "Pay invoice 1002.").',
+        },
+        invoice_number: {
+          type: 'string',
+          description: 'Unpaid invoice number (e.g., "PPB-INV-2026-1001" or a session invoice).',
+        },
+        card_profile: {
+          type: 'string',
+          enum: [
+            'visa_sandbox',
+            'mastercard_sandbox',
+            'amex_sandbox',
+            'decline_refused',
+            'decline_expired',
+            'decline_insufficient_funds',
+          ],
+          description: 'Allowlisted server-side PayPal Sandbox test card profile (default: visa_sandbox).',
+        },
+        intent: {
+          type: 'string',
+          enum: ['CAPTURE', 'AUTHORIZE'],
+          description: 'PayPal Orders v2 intent (default: CAPTURE).',
+        },
+        explicit_human_approval: {
+          type: 'boolean',
+          description: 'Must be true to confirm human approval before executing the Sandbox card payment.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'generate_receipt_pdf',
+    description:
+      '[READ_ONLY] Generate and validate a downloadable PDF payment receipt (`%PDF-1.4`) for a paid or refunded statement (`invoice_number`), returning base64 PDF content, direct download URL, byte length, and provenance/refund metadata. Rejects unpaid statements.',
+    permissionTier: 'read_only',
+    annotations: {
+      title: 'Generate & Validate PDF Payment Receipt',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+    inputSchema: {
+      type: 'object',
+      required: ['invoice_number'],
+      properties: {
+        invoice_number: {
+          type: 'string',
+          description: 'Paid or refunded invoice number (e.g., "PPB-INV-2026-1003" or "PPB-INV-2026-1057").',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
+  {
+    name: 'run_sandbox_card_lifecycle_test',
+    description:
+      '[CONFIRMED_WRITE] Execute a complete, isolated PayPal Sandbox integration lifecycle test (1. Create Test Invoice -> 2. Execute Sandbox Card Order & Capture -> 3. Direct PayPal Order Lookup -> 4. Receipt & PDF Verification -> 5. Live PayPal Refund -> 6. Direct PayPal Refund Lookup -> 7. Audit & Metrics Reconciliation). Sandbox-only and rate-limited.',
+    permissionTier: 'confirmed_demo_write',
+    annotations: {
+      title: 'Run Full PayPal Sandbox Card Lifecycle Integration Test',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount_minor: {
+          type: 'integer',
+          description: 'Optional test invoice amount in USD cents (default: 3500 for $35.00, max: 10000 for $100.00).',
+        },
+        card_profile: {
+          type: 'string',
+          enum: ['visa_sandbox', 'mastercard_sandbox', 'amex_sandbox'],
+          description: 'Allowlisted PayPal Sandbox test card profile (default: visa_sandbox).',
+        },
+        include_refund: {
+          type: 'boolean',
+          description: 'Whether to also execute and verify a live PayPal Sandbox refund after capture (default: true).',
+        },
+        explicit_human_approval: {
+          type: 'boolean',
+          description: 'Must be true to authorize the automated Sandbox integration test.',
+        },
+        demo_session_id: {
+          type: 'string',
+          description: 'Isolated demo session identifier.',
+        },
+      },
+    },
+  },
 ];
 
 // Standard MCP tools format (strictly compliant with MCP specification & ChatGPT connectors)
@@ -1012,6 +1155,8 @@ const MUTATING_TOOLS = new Set([
   'capture_paypal_checkout_order',
   'execute_approved_refund',
   'execute_conversational_instruction',
+  'execute_sandbox_card_payment',
+  'run_sandbox_card_lifecycle_test',
 ]);
 
 const FORBIDDEN_BYPASS_KEYS = [
@@ -1637,7 +1782,12 @@ JWKS URI:          ${origin}/.well-known/jwks.json</code></pre>
           request.headers.get('X-Demo-Session-Id') ||
           request.headers.get('Mcp-Session-Id') ||
           '';
-        const rawArgSession = args.demo_session_id !== undefined ? String(args.demo_session_id) : '';
+        const rawArgSession =
+          args.demo_session_id !== undefined
+            ? String(args.demo_session_id)
+            : body?.demo_session_id !== undefined
+              ? String(body.demo_session_id)
+              : '';
 
         // Invariant 1: Prevent cross-session manipulation via header vs. argument mismatch
         if (

@@ -16,6 +16,7 @@ export interface StructuredPaymentReceipt {
   organization_name: string;
   provider_name: string;
   customer_name: string;
+  customer_email_masked?: string;
   currency: string;
   total_minor: number;
   total_usd: string;
@@ -32,6 +33,8 @@ export interface StructuredPaymentReceipt {
   paypal_order_id?: string | null;
   paypal_capture_id: string | null;
   paypal_refund_id?: string | null;
+  payment_source_type?: string;
+  payment_source_label?: string;
   settlement_verification:
     | 'paypal_sandbox_verified'
     | 'sample_demo_settlement_not_live_paypal';
@@ -57,6 +60,9 @@ function escapePdfString(input: string): string {
  */
 export function generateReceiptPdfString(receipt: StructuredPaymentReceipt): string {
   const isLive = Boolean(receipt.is_live_paypal_capture);
+  const isRefunded =
+    String(receipt.status || '').toLowerCase() === 'refunded' ||
+    Number(receipt.amount_refunded_minor || 0) > 0;
   const ops: string[] = [];
 
   // Top Header Banner
@@ -69,25 +75,34 @@ export function generateReceiptPdfString(receipt: StructuredPaymentReceipt): str
 
   // Header Title
   ops.push('1 1 1 rg');
-  ops.push('BT /F2 14 Tf 50 738 Td (PAYPAL AI BILLING KIT - OFFICIAL PAYMENT RECEIPT) Tj ET');
+  const headerTitle = isRefunded
+    ? 'PAYPAL AI BILLING KIT - OFFICIAL REFUND & PAYMENT RECEIPT'
+    : 'PAYPAL AI BILLING KIT - OFFICIAL PAYMENT RECEIPT';
+  ops.push(`BT /F2 13.5 Tf 48 738 Td (${escapePdfString(headerTitle)}) Tj ET`);
   const subtitle = isLive
-    ? `VERIFIED PAYPAL SANDBOX TRANSACTION | CAPTURE ID: ${receipt.paypal_capture_id || receipt.receipt_number}`
+    ? `VERIFIED PAYPAL SANDBOX TRANSACTION | CAPTURE ID: ${receipt.paypal_capture_id || receipt.receipt_number}${
+        receipt.paypal_refund_id ? ` | REFUND ID: ${receipt.paypal_refund_id}` : ''
+      }`
     : 'SAMPLE DEMO RECORD - SIMULATED SETTLEMENT (NOT A LIVE PAYPAL CAPTURE)';
-  ops.push(`BT /F1 9 Tf 50 720 Td (${escapePdfString(subtitle)}) Tj ET`);
+  ops.push(`BT /F1 8.5 Tf 48 720 Td (${escapePdfString(subtitle)}) Tj ET`);
 
   // Provenance Callout Box
   if (isLive) {
-    ops.push('0.93 0.99 0.96 rg');
+    ops.push(isRefunded ? '0.95 0.96 1.00 rg' : '0.93 0.99 0.96 rg');
     ops.push('36 666 540 32 re f');
-    ops.push('0.02 0.37 0.27 rg');
+    ops.push(isRefunded ? '0.12 0.25 0.68 rg' : '0.02 0.37 0.27 rg');
     ops.push(
       `BT /F2 9.5 Tf 48 683 Td (${escapePdfString(
-        `PROVENANCE: ${receipt.verification_badge} (${receipt.settlement_verification})`
+        `PROVENANCE: ${receipt.verification_badge} (${receipt.settlement_verification})${
+          isRefunded ? ' - REFUNDED' : ''
+        }`
       )}) Tj ET`
     );
     ops.push(
       `BT /F1 8.5 Tf 48 672 Td (${escapePdfString(
-        `Verified against PayPal Sandbox Orders/Captures v2 API. PayPal Capture ID: ${receipt.paypal_capture_id}`
+        `Verified against PayPal Sandbox Orders/Captures v2 API. PayPal Capture ID: ${receipt.paypal_capture_id}${
+          receipt.paypal_refund_id ? ` | PayPal Refund ID: ${receipt.paypal_refund_id}` : ''
+        }`
       )}) Tj ET`
     );
   } else {
@@ -110,25 +125,33 @@ export function generateReceiptPdfString(receipt: StructuredPaymentReceipt): str
     ['Receipt Number:', receipt.receipt_number],
     ['Invoice Number:', `#${receipt.invoice_number}`],
     ['Business / Provider:', `${receipt.organization_name} (${receipt.provider_name})`],
-    ['Customer Identity:', receipt.customer_name],
+    [
+      'Customer Identity:',
+      `${receipt.customer_name} (${receipt.customer_email_masked || 'a***@demo.paypal-billing-kit.local'})`,
+    ],
     ['Payment Status:', receipt.status.toUpperCase()],
+    [
+      'Payment Method:',
+      receipt.payment_source_label ||
+        (isLive ? 'PayPal Sandbox Verified Checkout' : 'Simulated Demo Settlement'),
+    ],
     ['Payment Date:', receipt.paid_at || 'N/A'],
     ['Service Date:', receipt.service_date || 'N/A'],
     ['PayPal Order ID:', receipt.paypal_order_id || (isLive ? 'Verified via Capture Lookup' : 'N/A (Demo Record)')],
     ['PayPal Capture ID:', receipt.paypal_capture_id || 'N/A (Sample Demo Settlement)'],
     [
       'Refund Status / ID:',
-      receipt.amount_refunded_minor > 0
+      isRefunded
         ? `REFUNDED ${receipt.amount_refunded_usd} (${receipt.paypal_refund_id || 'Demo Refund'}${receipt.refunded_at ? ` at ${receipt.refunded_at}` : ''})`
         : 'None ($0.00 Refunded)',
     ],
   ];
 
-  let y = 642;
+  let y = 646;
   for (const [label, value] of metaRows) {
-    ops.push(`BT /F2 9.5 Tf 48 ${y} Td (${escapePdfString(label)}) Tj ET`);
-    ops.push(`BT /F1 9.5 Tf 185 ${y} Td (${escapePdfString(value)}) Tj ET`);
-    y -= 16;
+    ops.push(`BT /F2 9 Tf 48 ${y} Td (${escapePdfString(label)}) Tj ET`);
+    ops.push(`BT /F1 9 Tf 185 ${y} Td (${escapePdfString(value)}) Tj ET`);
+    y -= 14;
   }
 
   // Divider Line
@@ -164,15 +187,24 @@ export function generateReceiptPdfString(receipt: StructuredPaymentReceipt): str
         ];
 
   for (const item of items) {
-    const desc =
-      item.description.length > 48
-        ? `${item.description.slice(0, 45)}...`
-        : item.description;
+    const rawDesc = String(item.description || '').replace(/[^\x20-\x7E]/g, '-');
+    let line1 = rawDesc;
+    let line2 = '';
+    if (rawDesc.length > 54) {
+      const splitIdx = rawDesc.lastIndexOf(' ', 54);
+      const cut = splitIdx > 24 ? splitIdx : 54;
+      line1 = rawDesc.slice(0, cut).trim();
+      line2 = rawDesc.slice(cut).trim();
+    }
     ops.push(`BT /F3 8.5 Tf 44 ${y} Td (${escapePdfString(item.service_code)}) Tj ET`);
-    ops.push(`BT /F1 8.5 Tf 140 ${y} Td (${escapePdfString(desc)}) Tj ET`);
+    ops.push(`BT /F1 8.5 Tf 140 ${y} Td (${escapePdfString(line1)}) Tj ET`);
     ops.push(`BT /F1 8.5 Tf 424 ${y} Td (${escapePdfString(String(item.quantity))}) Tj ET`);
     ops.push(`BT /F1 8.5 Tf 460 ${y} Td (${escapePdfString(item.unit_amount_usd)}) Tj ET`);
     ops.push(`BT /F2 8.5 Tf 520 ${y} Td (${escapePdfString(item.line_total_usd)}) Tj ET`);
+    if (line2) {
+      y -= 12;
+      ops.push(`BT /F1 8.5 Tf 140 ${y} Td (${escapePdfString(line2)}) Tj ET`);
+    }
     y -= 16;
   }
 

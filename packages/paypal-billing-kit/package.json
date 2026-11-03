@@ -1,6 +1,6 @@
 {
   "name": "@paypal-ai-billing-kit/sdk",
-  "version": "1.0.0",
+  "version": "1.7.0",
   "description": "Reusable PayPal Sandbox & AI Billing Guardrail SDK (Orders v2, Captures v2, Refunds, Webhooks, Sensitive-Data Allowlist, and Server-Enforced AI Guardrails)",
   "main": "src/index.ts",
   "types": "src/index.ts",
