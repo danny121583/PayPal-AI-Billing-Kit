@@ -328,10 +328,10 @@ async function main() {
     });
     await page.waitForTimeout(250);
 
-    // Focus composer input and measure alignment (Issue #8)
+    // Click & focus composer input and measure alignment (Issue #8)
     const aiInput = page.locator('[data-testid="billing-ai-chat-input"]');
-    await aiInput.focus();
-    await page.waitForTimeout(150);
+    await aiInput.click();
+    await page.waitForTimeout(200);
 
     const composerMetrics = await page.evaluate(() => {
       const pill = document.querySelector(
@@ -344,22 +344,28 @@ async function main() {
         '[data-testid="billing-ai-chat-send"]'
       );
       const rPill = pill?.getBoundingClientRect();
+      const rInput = input?.getBoundingClientRect();
       const rSend = sendBtn?.getBoundingClientRect();
       const inputStyle = input ? getComputedStyle(input) : null;
       const pillCenterY = rPill ? rPill.top + rPill.height / 2 : 0;
+      const inputCenterY = rInput ? rInput.top + rInput.height / 2 : 0;
       const sendCenterY = rSend ? rSend.top + rSend.height / 2 : 0;
       return {
         pillHeight: Math.round(rPill?.height || 0),
+        inputHeight: Math.round(rInput?.height || 0),
         sendHeight: Math.round(rSend?.height || 0),
         centerDeltaY: Math.abs(pillCenterY - sendCenterY),
+        inputToPillCenterDeltaY: Math.abs(inputCenterY - pillCenterY),
         inputOutlineStyle: inputStyle?.outlineStyle || '',
-        inputPaddingLeft: inputStyle?.paddingLeft || '',
+        inputRowsAttr: input?.getAttribute('rows') || '',
       };
     });
 
     recordCheck(
-      'Issue #8: Billing AI composer pill and send button are vertically centered along same axis with no inner outline',
-      composerMetrics.centerDeltaY <= 2 &&
+      'Issue #8: Billing AI composer pill (44px), inner input, and send button (44px) are vertically centered along same axis when focused',
+      composerMetrics.pillHeight <= 46 &&
+        composerMetrics.centerDeltaY <= 1.5 &&
+        composerMetrics.inputToPillCenterDeltaY <= 1.5 &&
         composerMetrics.inputOutlineStyle === 'none',
       composerMetrics
     );
@@ -385,10 +391,11 @@ async function main() {
       .locator('[data-testid="billing-ai-assistant-modal"]')
       .innerText();
     recordCheck(
-      'Issue #9: Sending "hello" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002',
+      'Issue #9: Sending "hello" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter',
       /hello|hi/i.test(greetingText) &&
         /1002/.test(greetingText) &&
-        !/hello,?\s*doctor/i.test(greetingText),
+        !/hello,?\s*doctor/i.test(greetingText) &&
+        !/Verified via Gemini/i.test(greetingText),
       { greetingPreview: greetingText.replace(/\s+/g, ' ').slice(0, 220) }
     );
 

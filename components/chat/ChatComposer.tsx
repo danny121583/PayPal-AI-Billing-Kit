@@ -16,7 +16,8 @@ import { AppSpinner } from '../ui/AppSpinner';
 import { shadow } from '../../src/lib/shadow';
 
 const COMPOSER_MIN_HEIGHT = 44;
-const COMPOSER_MAX_HEIGHT = 120;
+const SINGLE_LINE_INPUT_HEIGHT = 22;
+const COMPOSER_MAX_HEIGHT = 112;
 
 export interface ChatComposerProps {
   value: string;
@@ -60,7 +61,7 @@ export function ChatComposer({
   accessibilityLabel = 'Chat message input',
   sendAccessibilityLabel = 'Send message',
 }: ChatComposerProps) {
-  const [composerHeight, setComposerHeight] = useState(COMPOSER_MIN_HEIGHT);
+  const [composerHeight, setComposerHeight] = useState(SINGLE_LINE_INPUT_HEIGHT);
   const [isFocused, setIsFocused] = useState(false);
 
   const isSendable =
@@ -70,21 +71,29 @@ export function ChatComposer({
 
   useEffect(() => {
     if (!value || !value.trim()) {
-      setComposerHeight(COMPOSER_MIN_HEIGHT);
+      setComposerHeight(SINGLE_LINE_INPUT_HEIGHT);
     }
   }, [value]);
 
   const handleContentSizeChange = useCallback(
     (e: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
+      if (!value || !value.trim()) {
+        setComposerHeight(SINGLE_LINE_INPUT_HEIGHT);
+        return;
+      }
       const contentH = e?.nativeEvent?.contentSize?.height ?? 0;
       if (!contentH) return;
+      if (!value.includes('\n') && contentH <= 32) {
+        setComposerHeight(SINGLE_LINE_INPUT_HEIGHT);
+        return;
+      }
       const next = Math.min(
         COMPOSER_MAX_HEIGHT,
-        Math.max(COMPOSER_MIN_HEIGHT, Math.ceil(contentH))
+        Math.max(SINGLE_LINE_INPUT_HEIGHT, Math.ceil(contentH))
       );
       setComposerHeight((prev) => (prev === next ? prev : next));
     },
-    []
+    [value]
   );
 
   const handleKeyPress = useCallback(
@@ -131,7 +140,7 @@ export function ChatComposer({
           accessibilityLabel={accessibilityLabel}
           style={[
             styles.input,
-            { height: Math.max(COMPOSER_MIN_HEIGHT - 2, composerHeight) },
+            { height: Math.max(SINGLE_LINE_INPUT_HEIGHT, composerHeight) },
           ]}
           placeholder={placeholder}
           placeholderTextColor="#94A3B8"
@@ -139,9 +148,18 @@ export function ChatComposer({
           onChangeText={onChangeText}
           onContentSizeChange={handleContentSizeChange}
           onKeyPress={handleKeyPress}
-          onFocus={() => setIsFocused(true)}
+          onFocus={() => {
+            setIsFocused(true);
+            if (!value || !value.trim()) {
+              setComposerHeight(SINGLE_LINE_INPUT_HEIGHT);
+            }
+          }}
           onBlur={() => setIsFocused(false)}
           multiline
+          numberOfLines={1}
+          {...(Platform.OS === 'web'
+            ? ({ rows: 1 } as Record<string, unknown>)
+            : {})}
           maxLength={maxLength}
           editable={!sending && !disabled}
           textAlignVertical="center"
@@ -181,12 +199,13 @@ const styles = StyleSheet.create({
   inputPillWrapper: {
     flex: 1,
     minHeight: COMPOSER_MIN_HEIGHT,
-    maxHeight: COMPOSER_MAX_HEIGHT + 4,
+    maxHeight: COMPOSER_MAX_HEIGHT + 22,
     backgroundColor: '#F8FAFC',
     borderRadius: 22,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     justifyContent: 'center',
   },
   inputPillWrapperFocused: {
@@ -198,13 +217,14 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '100%',
-    minHeight: COMPOSER_MIN_HEIGHT - 2,
+    minHeight: SINGLE_LINE_INPUT_HEIGHT,
     maxHeight: COMPOSER_MAX_HEIGHT,
     backgroundColor: 'transparent',
     borderWidth: 0,
     paddingHorizontal: 0,
-    paddingTop: Platform.OS === 'ios' ? 11 : 10,
-    paddingBottom: Platform.OS === 'ios' ? 11 : 10,
+    paddingTop: Platform.OS === 'ios' ? 2 : 1,
+    paddingBottom: Platform.OS === 'ios' ? 2 : 1,
+    margin: 0,
     fontSize: 15,
     color: '#0F172A',
     ...(Platform.OS === 'web'

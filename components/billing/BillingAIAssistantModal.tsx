@@ -763,21 +763,6 @@ export default function BillingAIAssistantModal({
                 <FormattedAssistantMessage content={m.content} />
               )}
 
-              {m.role === 'assistant' && m.telemetry ? (
-                <View
-                  style={styles.telemetryFooter}
-                  testID={`billing-ai-telemetry-${m.telemetry.responseSource}`}
-                >
-                  <Text style={styles.telemetryText}>
-                    {m.telemetry.responseSource === 'gemini_live'
-                      ? 'Verified via Gemini 3.5 Flash-Lite'
-                      : m.telemetry.responseSource === 'guardrail_immediate'
-                        ? 'Security & Guardrail Verification'
-                        : 'Verified Billing Ledger Record'}
-                  </Text>
-                </View>
-              ) : null}
-
               {m.status === 'failed' ? (
                 <Text style={styles.failedTag}>Not sent</Text>
               ) : null}

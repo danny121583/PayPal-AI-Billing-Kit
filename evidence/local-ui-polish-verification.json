@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-03T09:10:13.216Z",
+  "timestamp": "2026-11-03T09:17:36.934Z",
   "targetUrl": "http://localhost:8081",
   "passed": 19,
   "failed": 0,
@@ -70,28 +70,30 @@
       }
     },
     {
-      "name": "Issue #8: Billing AI composer pill and send button are vertically centered along same axis with no inner outline",
+      "name": "Issue #8: Billing AI composer pill (44px), inner input, and send button (44px) are vertically centered along same axis when focused",
       "ok": true,
       "details": {
-        "pillHeight": 46,
+        "pillHeight": 44,
+        "inputHeight": 22,
         "sendHeight": 44,
         "centerDeltaY": 0,
+        "inputToPillCenterDeltaY": 0,
         "inputOutlineStyle": "none",
-        "inputPaddingLeft": "0px"
+        "inputRowsAttr": "1"
       }
     },
     {
-      "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002",
+      "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter",
       "ok": true,
       "details": {
-        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 New Chat hello Hello Alex! I see your account has an active admi"
+        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 New Chat hello Hello Alex! Welcome. I see we have your account p"
       }
     },
     {
       "name": "Issue #9: Asking \"why did it fail?\" on OVERDUE #PPB-INV-2026-1002 explains 0 failed payment attempts exist on #1002",
       "ok": true,
       "details": {
-        "investigationPreview": "ause its payment due date (Oct 28, 2026) has passed without settlement — not because a payment failed. • Recorded Payment Attempts: 0 attempts (no failure reason exists on #PPB-INV-2026-1002). • Remaining Balance Due: $75.00 USD. Verified Billing Ledger Record"
+        "investigationPreview": "ment fee) is marked OVERDUE because its payment due date (Oct 28, 2026) has passed without settlement — not because a payment failed. • Recorded Payment Attempts: 0 attempts (no failure reason exists on #PPB-INV-2026-1002). • Remaining Balance Due: $75.00 USD."
       }
     },
     {
@@ -99,7 +101,7 @@
       "ok": true,
       "details": {
         "leaked1002Into1003": false,
-        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 New Chat Was this statement paid? Yes, Alex Rivera, statement #P"
+        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 New Chat Was this statement paid? Yes, statement #PPB-INV-2026-1"
       }
     },
     {
