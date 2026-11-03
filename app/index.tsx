@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import {
   UserCheck,
   RotateCcw,
   Cpu,
+  CheckCircle2,
+  X,
 } from 'lucide-react-native';
 import { supabase } from '../src/lib/supabase';
 import {
@@ -143,7 +145,9 @@ export default function BillingScreen() {
     getOrCreateDemoSessionIdSync()
   );
   const [isResettingDemo, setIsResettingDemo] = useState(false);
-  const [resetBannerText, setResetBannerText] = useState<string | null>(null);
+  const [resetToastText, setResetToastText] = useState<string | null>(null);
+  const [resetErrorText, setResetErrorText] = useState<string | null>(null);
+  const resetToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openedFromNotifications, setOpenedFromNotifications] = useState(false);
   const [notificationErrorText, setNotificationErrorText] = useState<
     string | null
@@ -179,6 +183,22 @@ export default function BillingScreen() {
   );
   const [refreshing, setRefreshing] = useState(false);
 
+  const dismissResetToast = useCallback(() => {
+    if (resetToastTimerRef.current) {
+      clearTimeout(resetToastTimerRef.current);
+      resetToastTimerRef.current = null;
+    }
+    setResetToastText(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resetToastTimerRef.current) {
+        clearTimeout(resetToastTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSelectDemoAccount = useCallback(
     (key: DemoAccountKey) => {
       if (key === activePreset.key) return;
@@ -189,9 +209,10 @@ export default function BillingScreen() {
         targetPreset.roleScope,
         targetPreset.id
       );
+      dismissResetToast();
+      setResetErrorText(null);
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
-      setResetBannerText(null);
       setNotificationErrorText(null);
       setOpenedFromNotifications(false);
       setCheckoutReturnState(null);
@@ -206,7 +227,7 @@ export default function BillingScreen() {
       setNotifications(snap.notifications);
       void switchDemoAccount(key);
     },
-    [activePreset.key, switchDemoAccount]
+    [activePreset.key, dismissResetToast, switchDemoAccount]
   );
 
   useEffect(() => {
@@ -249,24 +270,29 @@ export default function BillingScreen() {
   const handleResetDemoSession = useCallback(async () => {
     if (isResettingDemo) return;
     setIsResettingDemo(true);
-    setResetBannerText(null);
+    dismissResetToast();
+    setResetErrorText(null);
     try {
       await resetBillingDemoSession();
       clearBillingAIClientCacheForTests();
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
       await refreshBillingData(true);
-      setResetBannerText(
+      setResetToastText(
         'Demo session reset to the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).'
       );
+      resetToastTimerRef.current = setTimeout(() => {
+        setResetToastText(null);
+        resetToastTimerRef.current = null;
+      }, 3000);
     } catch (err: any) {
-      setResetBannerText(
+      setResetErrorText(
         err?.message || 'Could not reset demo session.'
       );
     } finally {
       setIsResettingDemo(false);
     }
-  }, [isResettingDemo, refreshBillingData]);
+  }, [dismissResetToast, isResettingDemo, refreshBillingData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -775,13 +801,17 @@ export default function BillingScreen() {
           </View>
         ) : null}
 
-        {/* Deep-Link Error / Unauthorized Banner */}
-        {resetBannerText ? (
+        {/* Demo Reset Error Banner (errors remain visible until dismissed or retried) */}
+        {resetErrorText ? (
           <View
-            style={styles.deepLinkResolvedBanner}
-            testID="billing-demo-reset-banner"
+            style={styles.deepLinkErrorBanner}
+            testID="billing-demo-reset-error-banner"
           >
-            <Text style={styles.deepLinkResolvedText}>{resetBannerText}</Text>
+            <ShieldAlert size={18} color="#B91C1C" />
+            <View style={styles.deepLinkErrorCol}>
+              <Text style={styles.deepLinkErrorTitle}>Demo Reset Failed</Text>
+              <Text style={styles.deepLinkErrorBody}>{resetErrorText}</Text>
+            </View>
           </View>
         ) : null}
         {(deepLinkResolution.status === 'not_found' &&
@@ -905,6 +935,7 @@ export default function BillingScreen() {
         <BillingAIAssistantModal
           visible={showAiModal}
           roleScope={roleScope}
+          activeUserId={activePreset.id}
           focusedInvoice={focusedAiInvoice}
           invoices={roleInvoices}
           onClose={() => setShowAiModal(false)}
@@ -917,6 +948,33 @@ export default function BillingScreen() {
             }
           }}
         />
+      ) : null}
+
+      {/* Floating Auto-Dismissing Demo Reset Toast (Non-Layout-Shifting) */}
+      {resetToastText ? (
+        <View
+          style={[
+            styles.resetFloatingToast,
+            isMobile && styles.resetFloatingToastMobile,
+          ]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          testID="billing-demo-reset-toast"
+        >
+          <CheckCircle2 size={16} color="#047857" />
+          <Text style={styles.resetFloatingToastText} numberOfLines={2}>
+            {resetToastText}
+          </Text>
+          <Pressable
+            style={styles.resetFloatingToastCloseBtn}
+            onPress={dismissResetToast}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss reset notification"
+            testID="billing-demo-reset-toast-dismiss"
+          >
+            <X size={14} color="#065F46" />
+          </Pressable>
+        </View>
       ) : null}
 
       {showSettingsModal ? (
@@ -1199,5 +1257,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#3730A3',
+  },
+  resetFloatingToast: {
+    position: 'absolute',
+    top: 108,
+    alignSelf: 'center',
+    maxWidth: 560,
+    width: '92%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#6EE7B7',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    zIndex: 60,
+  },
+  resetFloatingToastMobile: {
+    top: 68,
+    width: '94%',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  resetFloatingToastText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
+    lineHeight: 17,
+  },
+  resetFloatingToastCloseBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -14,6 +14,8 @@ import {
   Link2,
   Unlink,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { shadows } from '../../src/lib/shadow';
 import { supabase } from '../../src/lib/supabase';
@@ -30,6 +32,7 @@ export interface PayPalConnectCardProps {
   roleScope: BillingRoleScope;
   userId?: string;
   connection?: PayPalAccountConnectionSummary | null;
+  defaultExpanded?: boolean;
   onConnectionChanged?: (next: PayPalAccountConnectionSummary) => void;
   onOpenSettings?: () => void;
 }
@@ -48,6 +51,7 @@ export default function PayPalConnectCard({
   roleScope,
   userId: propUserId,
   connection: propConnection,
+  defaultExpanded = false,
   onConnectionChanged,
   onOpenSettings,
 }: PayPalConnectCardProps) {
@@ -60,6 +64,7 @@ export default function PayPalConnectCard({
 
   const [loading] = useState(false);
   const [acting, setActing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(Boolean(defaultExpanded));
   const [conn, setConn] = useState<ConnectionRecord | null>(() => {
     const pre =
       propConnection ?? getPreloadedPayPalConnection(roleScope, effectiveUserId);
@@ -304,71 +309,118 @@ export default function PayPalConnectCard({
       ? 'SANDBOX AUTHENTICATED'
       : 'DEMO PROFILE AVAILABLE';
 
+  // When disconnected or explicitly expanded, show full details and action buttons.
+  const showFullDetails = !isConnected || isExpanded;
+
   return (
-    <View style={styles.card} testID="paypal-connect-card">
+    <View
+      style={[styles.card, !showFullDetails && styles.cardCollapsed]}
+      testID="paypal-connect-card"
+    >
       <View style={styles.topRow}>
         <View style={styles.brandRow}>
-          <View style={[styles.iconBadge, isOAuthAuthenticated && styles.iconBadgeConnected]}>
-            <CreditCard size={20} color={isOAuthAuthenticated ? '#047857' : '#003087'} />
+          <View
+            style={[
+              styles.iconBadge,
+              !showFullDetails && styles.iconBadgeCompact,
+              isOAuthAuthenticated && styles.iconBadgeConnected,
+            ]}
+          >
+            <CreditCard
+              size={showFullDetails ? 20 : 18}
+              color={isOAuthAuthenticated ? '#047857' : '#003087'}
+            />
           </View>
           <View style={styles.titleCol}>
             <Text style={styles.title}>
               {isDoctor ? 'PayPal Merchant Sandbox' : 'PayPal Customer Sandbox'}
             </Text>
-            <Text style={styles.subtitle}>
-              {isDoctor
-                ? 'Provider Sandbox Merchant Connection & Settlement'
-                : 'Customer Sandbox Checkout & Receipt Verification'}
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {!showFullDetails && isConnected
+                ? `${conn?.paypal_email_masked || 'Verified Sandbox Account'} • Sensitive-Data Firewall Active`
+                : isDoctor
+                  ? 'Provider Sandbox Merchant Connection & Settlement'
+                  : 'Customer Sandbox Checkout & Receipt Verification'}
             </Text>
           </View>
         </View>
 
-        <View
-          style={[styles.statusBadge, isOAuthAuthenticated && styles.statusBadgeConnected]}
-          testID="paypal-connect-status-badge"
-        >
-          <Text
-            style={[styles.statusBadgeText, isOAuthAuthenticated && styles.statusBadgeTextConnected]}
+        <View style={styles.topRightRow}>
+          <View
+            style={[styles.statusBadge, isOAuthAuthenticated && styles.statusBadgeConnected]}
+            testID="paypal-connect-status-badge"
           >
-            {badgeLabel}
-          </Text>
+            <Text
+              style={[styles.statusBadgeText, isOAuthAuthenticated && styles.statusBadgeTextConnected]}
+            >
+              {badgeLabel}
+            </Text>
+          </View>
+
+          {isConnected ? (
+            <Pressable
+              style={styles.toggleDetailsBtn}
+              onPress={() => setIsExpanded((prev) => !prev)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isExpanded }}
+              accessibilityLabel={
+                isExpanded
+                  ? 'Hide PayPal Sandbox connection details'
+                  : 'View PayPal Sandbox connection details'
+              }
+              testID="paypal-connect-toggle-details-btn"
+            >
+              <Text style={styles.toggleDetailsBtnText}>
+                {isExpanded ? 'Hide Details' : 'View Details'}
+              </Text>
+              {isExpanded ? (
+                <ChevronUp size={14} color="#334155" />
+              ) : (
+                <ChevronDown size={14} color="#334155" />
+              )}
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
-      <Text style={styles.description}>
-        {isOAuthAuthenticated
-          ? `Authenticated with PayPal Sandbox OAuth 2.0 (${conn?.paypal_email_masked || 'Verified Sandbox Account'} • ID: ${conn?.paypal_payer_id || 'SANDBOX'}). Account Linked — all invoice orders, captures, and refunds are logged to the immutable ledger.`
-          : isDemoProfileOnly
-            ? `Demo Profile Available (${conn?.paypal_email_masked || 'Demo Account'} • ID: ${conn?.paypal_payer_id || 'DEMO'}). Sandbox Configuration Missing — fictional profile available for demonstration, not OAuth authenticated.`
-            : isDoctor
-              ? 'Connect your PayPal Developer Sandbox merchant profile to issue invoices, capture customer payments, and process full or partial refunds.'
-              : 'Connect your PayPal Developer Sandbox buyer account or launch PayPal Sandbox checkout directly from any open statement.'}
-      </Text>
-
-      {isConnected ? (
-        <View
-          style={styles.connectedAccountBox}
-          testID="paypal-connected-account-summary"
-        >
-          <CheckCircle2 size={15} color={isOAuthAuthenticated ? '#047857' : '#B45309'} />
-          <Text style={styles.connectedAccountText}>
-            {isOAuthAuthenticated ? 'Account Linked' : 'Demo Profile Available'}:{' '}
-            {conn?.paypal_email_masked || 'sb-***@sandbox.paypal.com'} •{' '}
-            {isDoctor ? 'Merchant ID' : 'Payer ID'}:{' '}
-            {conn?.paypal_payer_id || 'PAYPAL-SANDBOX'} •{' '}
+      {showFullDetails ? (
+        <>
+          <Text style={styles.description}>
             {isOAuthAuthenticated
-              ? 'PayPal OAuth 2.0 Authenticated'
-              : 'Sandbox Configuration Missing'}
+              ? `Authenticated with PayPal Sandbox OAuth 2.0 (${conn?.paypal_email_masked || 'Verified Sandbox Account'} • ID: ${conn?.paypal_payer_id || 'SANDBOX'}). Account Linked — all invoice orders, captures, and refunds are logged to the immutable ledger.`
+              : isDemoProfileOnly
+                ? `Demo Profile Available (${conn?.paypal_email_masked || 'Demo Account'} • ID: ${conn?.paypal_payer_id || 'DEMO'}). Sandbox Configuration Missing — fictional profile available for demonstration, not OAuth authenticated.`
+                : isDoctor
+                  ? 'Connect your PayPal Developer Sandbox merchant profile to issue invoices, capture customer payments, and process full or partial refunds.'
+                  : 'Connect your PayPal Developer Sandbox buyer account or launch PayPal Sandbox checkout directly from any open statement.'}
           </Text>
-        </View>
-      ) : null}
 
-      <View style={styles.guardrailStrip}>
-        <ShieldCheck size={15} color="#047857" />
-        <Text style={styles.guardrailText}>
-          Sensitive-Data Firewall Active: Only invoice numbers, service codes & USD totals reach PayPal
-        </Text>
-      </View>
+          {isConnected ? (
+            <View
+              style={styles.connectedAccountBox}
+              testID="paypal-connected-account-summary"
+            >
+              <CheckCircle2 size={15} color={isOAuthAuthenticated ? '#047857' : '#B45309'} />
+              <Text style={styles.connectedAccountText}>
+                {isOAuthAuthenticated ? 'Account Linked' : 'Demo Profile Available'}:{' '}
+                {conn?.paypal_email_masked || 'sb-***@sandbox.paypal.com'} •{' '}
+                {isDoctor ? 'Merchant ID' : 'Payer ID'}:{' '}
+                {conn?.paypal_payer_id || 'PAYPAL-SANDBOX'} •{' '}
+                {isOAuthAuthenticated
+                  ? 'PayPal OAuth 2.0 Authenticated'
+                  : 'Sandbox Configuration Missing'}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.guardrailStrip}>
+            <ShieldCheck size={15} color="#047857" />
+            <Text style={styles.guardrailText}>
+              Sensitive-Data Firewall Active: Only invoice numbers, service codes & USD totals reach PayPal
+            </Text>
+          </View>
+        </>
+      ) : null}
 
       {errorMsg ? (
         <View style={styles.errorBanner} testID="paypal-connect-error">
@@ -432,55 +484,57 @@ export default function PayPalConnectCard({
         </View>
       ) : null}
 
-      <View style={styles.actionRow}>
-        {isConnected ? (
-          <Pressable
-            style={styles.disconnectButton}
-            onPress={handleDisconnect}
-            disabled={acting}
-            accessibilityRole="button"
-            accessibilityLabel="Disconnect PayPal Sandbox"
-            testID="paypal-disconnect-cta-btn"
-          >
-            {acting ? (
-              <ActivityIndicator size="small" color="#B91C1C" />
-            ) : (
-              <>
-                <Unlink size={14} color="#B91C1C" />
-                <Text style={styles.disconnectButtonText}>
-                  Disconnect PayPal Sandbox
-                </Text>
-              </>
-            )}
-          </Pressable>
-        ) : (
-          <Pressable
-            style={styles.connectButton}
-            onPress={() => setShowConnectForm((prev) => !prev)}
-            disabled={acting || loading}
-            accessibilityRole="button"
-            accessibilityLabel="Connect PayPal Sandbox"
-            testID="paypal-connect-cta-btn"
-          >
-            <Link2 size={15} color="#FFFFFF" />
-            <Text style={styles.connectButtonText}>Connect PayPal Sandbox</Text>
-          </Pressable>
-        )}
+      {showFullDetails ? (
+        <View style={styles.actionRow}>
+          {isConnected ? (
+            <Pressable
+              style={styles.disconnectButton}
+              onPress={handleDisconnect}
+              disabled={acting}
+              accessibilityRole="button"
+              accessibilityLabel="Disconnect PayPal Sandbox"
+              testID="paypal-disconnect-cta-btn"
+            >
+              {acting ? (
+                <ActivityIndicator size="small" color="#B91C1C" />
+              ) : (
+                <>
+                  <Unlink size={14} color="#B91C1C" />
+                  <Text style={styles.disconnectButtonText}>
+                    Disconnect PayPal Sandbox
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          ) : (
+            <Pressable
+              style={styles.connectButton}
+              onPress={() => setShowConnectForm((prev) => !prev)}
+              disabled={acting || loading}
+              accessibilityRole="button"
+              accessibilityLabel="Connect PayPal Sandbox"
+              testID="paypal-connect-cta-btn"
+            >
+              <Link2 size={15} color="#FFFFFF" />
+              <Text style={styles.connectButtonText}>Connect PayPal Sandbox</Text>
+            </Pressable>
+          )}
 
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={() => {
-            void loadStatus();
-            if (onOpenSettings) onOpenSettings();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Open AI Guardrails and Settings"
-          testID="paypal-connect-settings-btn"
-        >
-          <RefreshCw size={13} color="#374151" />
-          <Text style={styles.secondaryButtonText}>Guardrails & Audit</Text>
-        </Pressable>
-      </View>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => {
+              void loadStatus();
+              if (onOpenSettings) onOpenSettings();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Open AI Guardrails and Settings"
+            testID="paypal-connect-settings-btn"
+          >
+            <RefreshCw size={13} color="#374151" />
+            <Text style={styles.secondaryButtonText}>Guardrails & Audit</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -494,17 +548,45 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     ...shadows.sm,
   },
+  cardCollapsed: {
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: 10,
+  },
+  topRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  toggleDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  toggleDetailsBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    minWidth: 190,
   },
   iconBadge: {
     width: 42,
@@ -515,6 +597,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#BFDBFE',
+  },
+  iconBadgeCompact: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
   },
   iconBadgeConnected: {
     backgroundColor: '#ECFDF5',

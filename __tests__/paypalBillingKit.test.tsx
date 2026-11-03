@@ -64,6 +64,10 @@ import {
 import {
   clearBillingAIClientCacheForTests,
   sendBillingAIMessage,
+  loadBillingAIHistory,
+  clearBillingAIConversation,
+  invalidateSessionBillingAIConversations,
+  buildBillingAIConversationScopeKey,
   setBillingAIMinProcessingMsForTests,
   getBillingAIMinProcessingMs,
 } from '../src/billing/api/billingAIClient';
@@ -485,6 +489,13 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     );
 
     expect(getByText('DEMO PROFILE AVAILABLE')).toBeTruthy();
+    expect(getByTestId('paypal-connect-toggle-details-btn')).toBeTruthy();
+    expect(getByText('View Details')).toBeTruthy();
+    expect(queryByTestId('paypal-connected-account-summary')).toBeNull();
+
+    // Expand details via View Details toggle
+    fireEvent.press(getByTestId('paypal-connect-toggle-details-btn'));
+    expect(getByText('Hide Details')).toBeTruthy();
     expect(getByTestId('paypal-connected-account-summary')).toBeTruthy();
 
     // 3. Sandbox Authenticated + Account Linked state (backed by real PayPal OAuth 2.0)
@@ -510,6 +521,11 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     expect(getByTestId('paypal-disconnect-cta-btn')).toBeTruthy();
     expect(queryByTestId('paypal-connect-form')).toBeNull();
     expect(queryByTestId('paypal-connect-cta-btn')).toBeNull();
+
+    // Collapse back via Hide Details toggle
+    fireEvent.press(getByTestId('paypal-connect-toggle-details-btn'));
+    expect(getByText('View Details')).toBeTruthy();
+    expect(queryByTestId('paypal-connected-account-summary')).toBeNull();
   });
 
   it('Section 9 Regression: Jordan Taylor #PPB-INV-2026-1004 failed payment statement opens cleanly and retries without "Invoice not found."', async () => {
@@ -1277,5 +1293,172 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
       expect(getByTestId('billing-notifications-error-banner')).toBeTruthy();
       expect(getByText(/Statement Unavailable/i)).toBeTruthy();
     });
+  });
+
+  it('Issues #7–#13: Simplified Payment Button Labels, Billing AI Grounded Question Answering ("hello", "why did it fail?", "when?", "how much?", "can I try again?"), and Strict Invoice/Account Conversation Isolation', async () => {
+    clearBillingAIClientCacheForTests();
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+    const inv1002 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1002')!;
+    const inv1003 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1003')!;
+    const inv1004 = allInvoices.find((i) => i.invoiceNumber === 'PPB-INV-2026-1004')!;
+
+    // 1. Issue #7: Simplified button labels on Statement Details modal
+    const { getByText: getDetailText } = render(
+      <BillingInvoiceDetailModal
+        visible={true}
+        invoice={inv1002}
+        roleScope="patient"
+        onClose={jest.fn()}
+        onUpdated={jest.fn()}
+        onAskAI={jest.fn()}
+      />
+    );
+    expect(getDetailText('Pay with Sandbox Card')).toBeTruthy();
+    expect(getDetailText('Simulate Settlement')).toBeTruthy();
+    expect(getDetailText('Pay with PayPal')).toBeTruthy();
+
+    // 2. Issue #9: Greeting on focused overdue invoice #PPB-INV-2026-1002 responds conversationally (not an unprompted summary dump)
+    const helloTurn = await sendBillingAIMessage({
+      message: 'hello',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(helloTurn.reply.content).toMatch(/Hello/i);
+    expect(helloTurn.reply.content).toContain('PPB-INV-2026-1002');
+    expect(helloTurn.reply.content).toMatch(/Ask me anything|How can I help/i);
+
+    // 3. Issue #9: "why did it fail?" on OVERDUE #PPB-INV-2026-1002 explains 0 failed payment attempts (due date passed, not a failed payment)
+    const whyFailOn1002 = await sendBillingAIMessage({
+      message: 'why did it fail?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(whyFailOn1002.reply.content).toMatch(/zero \(0\) failed payment attempts|0 failed payment attempts/i);
+    expect(whyFailOn1002.reply.content).toMatch(/OVERDUE/i);
+    expect(whyFailOn1002.reply.content).not.toContain('Jordan Taylor');
+
+    // 4. Issue #9: Contextual follow-ups ("when?", "how much?", "can I try again?") on #PPB-INV-2026-1002
+    const whenTurn = await sendBillingAIMessage({
+      message: 'when?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(whenTurn.reply.content).toContain('PPB-INV-2026-1002');
+    expect(whenTurn.reply.content).toMatch(/Oct 15, 2026/);
+
+    const howMuchTurn = await sendBillingAIMessage({
+      message: 'how much?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(howMuchTurn.reply.content).toContain('$75.00');
+
+    const retryTurn = await sendBillingAIMessage({
+      message: 'can I try again?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(retryTurn.reply.content).toMatch(/Pay with PayPal/i);
+
+    // 5. Issue #9: "why did it fail?" on Jordan Taylor's FAILED #PPB-INV-2026-1004 reports the actual recorded failure
+    const whyFailOn1004 = await sendBillingAIMessage({
+      message: 'why did it fail?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      focusedInvoiceId: inv1004.id,
+    });
+    expect(whyFailOn1004.reply.content).toContain('PPB-INV-2026-1004');
+    expect(whyFailOn1004.reply.content).toMatch(/DEMO-ORD-DECLINED-1004|declined/i);
+
+    // 6. Issue #10: Invoice & Account Conversation Isolation
+    const history1002Before = await loadBillingAIHistory(
+      'patient',
+      inv1002.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1002Before.messages.length).toBeGreaterThanOrEqual(10); // 5 user + 5 assistant turns
+
+    // Open #PPB-INV-2026-1003 for Alex Rivera -> starts completely clean with 0 messages from 1002
+    const history1003Initial = await loadBillingAIHistory(
+      'patient',
+      inv1003.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1003Initial.messages).toHaveLength(0);
+
+    await sendBillingAIMessage({
+      message: 'Was this statement paid?',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1003.id,
+    });
+
+    const history1003After = await loadBillingAIHistory(
+      'patient',
+      inv1003.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1003After.messages).toHaveLength(2);
+    expect(history1003After.messages[1].content).toContain('PPB-INV-2026-1003');
+    expect(history1003After.messages.some((m) => m.content === 'why did it fail?')).toBe(false);
+
+    // Return to #PPB-INV-2026-1002 -> restores 1002's conversation intact without 1003's messages
+    const history1002Restored = await loadBillingAIHistory(
+      'patient',
+      inv1002.id,
+      DEMO_USER_IDS.alex_rivera
+    );
+    expect(history1002Restored.messages.length).toBe(history1002Before.messages.length);
+    expect(history1002Restored.messages.some((m) => m.content === 'why did it fail?')).toBe(true);
+    expect(history1002Restored.messages.some((m) => m.content === 'Was this statement paid?')).toBe(false);
+
+    // Clear only 1003's conversation via New Chat -> 1002 remains intact
+    await clearBillingAIConversation({
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1003.id,
+    });
+    expect(
+      (await loadBillingAIHistory('patient', inv1003.id, DEMO_USER_IDS.alex_rivera)).messages
+    ).toHaveLength(0);
+    expect(
+      (await loadBillingAIHistory('patient', inv1002.id, DEMO_USER_IDS.alex_rivera)).messages.length
+    ).toBe(history1002Before.messages.length);
+
+    // Reset Demo invalidates all session-scoped conversations
+    invalidateSessionBillingAIConversations();
+    expect(
+      (await loadBillingAIHistory('patient', inv1002.id, DEMO_USER_IDS.alex_rivera)).messages
+    ).toHaveLength(0);
+    expect(
+      (await loadBillingAIHistory('patient', inv1004.id, DEMO_USER_IDS.jordan_taylor)).messages
+    ).toHaveLength(0);
+
+    // Verify scope key includes session + role + user + invoice
+    const keyA = buildBillingAIConversationScopeKey({
+      demoSessionId: 'sess-1',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1002.id,
+    });
+    const keyB = buildBillingAIConversationScopeKey({
+      demoSessionId: 'sess-1',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      focusedInvoiceId: inv1003.id,
+    });
+    const keyC = buildBillingAIConversationScopeKey({
+      demoSessionId: 'sess-1',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      focusedInvoiceId: inv1002.id,
+    });
+    expect(keyA).not.toBe(keyB);
+    expect(keyA).not.toBe(keyC);
   });
 });

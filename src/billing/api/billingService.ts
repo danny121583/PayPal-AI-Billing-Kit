@@ -21,6 +21,12 @@ export const DEMO_USER_IDS = {
   jordan_taylor: '11111111-1111-4111-8111-111111111103',
 } as const;
 
+export function getActiveDemoUserId(roleScope: BillingRoleScope): string {
+  return roleScope === 'doctor'
+    ? DEMO_USER_IDS.sarah_jenkins
+    : DEMO_USER_IDS.alex_rivera;
+}
+
 const ALL_DEMO_USER_IDS = [
   DEMO_USER_IDS.sarah_jenkins,
   DEMO_USER_IDS.alex_rivera,

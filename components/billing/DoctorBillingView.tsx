@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Platform,
   View,
   Text,
   StyleSheet,
   Pressable,
   TextInput,
+  type ViewStyle,
 } from 'react-native';
 import {
   Sparkles,
@@ -65,6 +67,7 @@ export default function DoctorBillingView({
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all');
   const [activeMetricModal, setActiveMetricModal] =
     useState<BillingMetricKind | null>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const metrics = useMemo(
     () => computeDoctorSummaryMetrics(invoices),
@@ -78,24 +81,6 @@ export default function DoctorBillingView({
 
   return (
     <View style={styles.container} testID="doctor-billing-view">
-      {/* Active Search Filter Pill (when filtered outside the search modal) */}
-      {!searchVisible && searchQuery.trim().length > 0 ? (
-        <View style={styles.searchCard} testID="doctor-billing-search-active-pill">
-          <Search size={16} color="#EA580C" />
-          <Text style={[styles.searchInput, { fontWeight: '600' }]}>
-            Filtered by: "{searchQuery.trim()}"
-          </Text>
-          <Pressable
-            onPress={() => onChangeSearchQuery('')}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search query"
-            testID="doctor-billing-clear-inline-search-btn"
-          >
-            <X size={18} color="#64748B" />
-          </Pressable>
-        </View>
-      ) : null}
-
       {/* PayPal Merchant Sandbox Connection Card */}
       <PayPalConnectCard roleScope="doctor" onOpenSettings={onOpenSettings} />
 
@@ -203,6 +188,46 @@ export default function DoctorBillingView({
         </Pressable>
       </View>
 
+      {/* Inline Search Bar + Filter Pills */}
+      <View
+        style={[
+          styles.searchCard,
+          isSearchFocused && styles.searchCardFocused,
+        ]}
+        testID="doctor-billing-inline-search-card"
+      >
+        <Search size={17} color={isSearchFocused ? '#EA580C' : '#64748B'} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search invoice #, customer, service code, or amount..."
+          placeholderTextColor="#94A3B8"
+          value={searchQuery}
+          onChangeText={onChangeSearchQuery}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          accessibilityLabel="Filter provider billing statements"
+          testID={
+            searchVisible
+              ? 'doctor-billing-inline-search-input'
+              : 'doctor-billing-search-input'
+          }
+        />
+        {searchQuery.length > 0 ? (
+          <Pressable
+            style={styles.searchClearBtn}
+            onPress={() => onChangeSearchQuery('')}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search query"
+            testID="doctor-billing-clear-inline-search-btn"
+          >
+            <X size={16} color="#475569" />
+          </Pressable>
+        ) : null}
+      </View>
+
       {/* Filter Pills */}
       <View style={styles.filterRow} testID="doctor-billing-filters">
         {FILTER_OPTIONS.map((opt) => {
@@ -288,19 +313,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
+    minHeight: 46,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
     gap: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
     ...shadows.xs,
+  },
+  searchCardFocused: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFFFF',
+    ...(Platform.OS === 'web'
+      ? ({ boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.16)' } as unknown as ViewStyle)
+      : {}),
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#111827',
-    paddingVertical: 0,
+    color: '#0F172A',
+    paddingVertical: 2,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as unknown as ViewStyle)
+      : {}),
+  },
+  searchClearBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickActionRow: {
     flexDirection: 'row',

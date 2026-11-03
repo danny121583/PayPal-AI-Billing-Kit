@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type ViewStyle,
 } from 'react-native';
 import {
   AlertTriangle,
@@ -78,6 +80,7 @@ export function BillingGlobalSearchModal({
   const [selectedCategory, setSelectedCategory] =
     useState<BillingSearchCategory>('all');
   const [simulatedError, setSimulatedError] = useState<string | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(true);
 
   useEffect(() => {
     if (visible) {
@@ -201,6 +204,7 @@ export function BillingGlobalSearchModal({
       onClose={handleCloseModal}
       title="Search Billing Records"
       subtitle={`Scoped to ${activeAccountLabel} • Invoices, Customers, Transactions & Refunds`}
+      desktopMaxWidth={600}
       testID="billing-global-search-modal"
       closeTestID="billing-global-search-close-btn"
       closeAccessibilityLabel="Close billing search"
@@ -240,8 +244,14 @@ export function BillingGlobalSearchModal({
       </View>
 
       {/* Search Input Bar */}
-      <View style={styles.searchInputContainer} testID="billing-global-search-box">
-        <Search size={18} color="#EA580C" />
+      <View
+        style={[
+          styles.searchInputContainer,
+          isInputFocused && styles.searchInputContainerFocused,
+        ]}
+        testID="billing-global-search-box"
+      >
+        <Search size={18} color={isInputFocused ? '#EA580C' : '#64748B'} />
         <TextInput
           ref={inputRef}
           style={styles.searchInput}
@@ -256,6 +266,8 @@ export function BillingGlobalSearchModal({
             if (simulatedError) setSimulatedError(null);
             onChangeSearchQuery(text);
           }}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => setIsInputFocused(false)}
           autoFocus
           autoCapitalize="none"
           autoCorrect={false}
@@ -542,17 +554,33 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#FB923C',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    minHeight: 46,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     marginBottom: 10,
+  },
+  searchInputContainerFocused: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFFFF',
+    ...(Platform.OS === 'web'
+      ? ({ boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.18)' } as unknown as ViewStyle)
+      : {}),
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
     color: '#0F172A',
     paddingVertical: 4,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as unknown as ViewStyle)
+      : {}),
   },
   clearBtn: {
     width: 28,

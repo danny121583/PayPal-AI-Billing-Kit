@@ -61,6 +61,7 @@ export function ChatComposer({
   sendAccessibilityLabel = 'Send message',
 }: ChatComposerProps) {
   const [composerHeight, setComposerHeight] = useState(COMPOSER_MIN_HEIGHT);
+  const [isFocused, setIsFocused] = useState(false);
 
   const isSendable =
     typeof canSend === 'boolean'
@@ -117,26 +118,36 @@ export function ChatComposer({
         containerStyle,
       ]}
     >
-      <TextInput
-        testID={testID}
-        accessibilityLabel={accessibilityLabel}
+      <View
         style={[
-          styles.input,
-          { height: Math.max(COMPOSER_MIN_HEIGHT, composerHeight) },
+          styles.inputPillWrapper,
+          isFocused && styles.inputPillWrapperFocused,
           disabled && styles.inputDisabled,
         ]}
-        placeholder={placeholder}
-        placeholderTextColor="#9CA3AF"
-        value={value}
-        onChangeText={onChangeText}
-        onContentSizeChange={handleContentSizeChange}
-        onKeyPress={handleKeyPress}
-        multiline
-        maxLength={maxLength}
-        editable={!sending && !disabled}
-        textAlignVertical="center"
-        blurOnSubmit={false}
-      />
+        testID={`${testID}-pill-wrapper`}
+      >
+        <TextInput
+          testID={testID}
+          accessibilityLabel={accessibilityLabel}
+          style={[
+            styles.input,
+            { height: Math.max(COMPOSER_MIN_HEIGHT - 2, composerHeight) },
+          ]}
+          placeholder={placeholder}
+          placeholderTextColor="#94A3B8"
+          value={value}
+          onChangeText={onChangeText}
+          onContentSizeChange={handleContentSizeChange}
+          onKeyPress={handleKeyPress}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          multiline
+          maxLength={maxLength}
+          editable={!sending && !disabled}
+          textAlignVertical="center"
+          blurOnSubmit={false}
+        />
+      </View>
 
       <Pressable
         testID={sendTestID}
@@ -160,43 +171,65 @@ export function ChatComposer({
 const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingTop: 10,
     backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E7EB',
-    gap: 8,
+    gap: 10,
   },
-  input: {
+  inputPillWrapper: {
     flex: 1,
     minHeight: COMPOSER_MIN_HEIGHT,
-    maxHeight: COMPOSER_MAX_HEIGHT,
-    backgroundColor: '#F3F4F6',
+    maxHeight: COMPOSER_MAX_HEIGHT + 4,
+    backgroundColor: '#F8FAFC',
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 12 : 9,
-    paddingBottom: Platform.OS === 'ios' ? 12 : 9,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+  },
+  inputPillWrapperFocused: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F59E0B',
+    ...(Platform.OS === 'web'
+      ? ({ boxShadow: '0 0 0 3px rgba(245, 158, 11, 0.16)' } as unknown as ViewStyle)
+      : {}),
+  },
+  input: {
+    width: '100%',
+    minHeight: COMPOSER_MIN_HEIGHT - 2,
+    maxHeight: COMPOSER_MAX_HEIGHT,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingTop: Platform.OS === 'ios' ? 11 : 10,
+    paddingBottom: Platform.OS === 'ios' ? 11 : 10,
     fontSize: 15,
-    color: '#1F2937',
-    ...(Platform.OS === 'web' ? ({ overflowY: 'auto' } as const) : {}),
+    color: '#0F172A',
+    ...(Platform.OS === 'web'
+      ? ({
+          overflowY: 'auto',
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as unknown as ViewStyle)
+      : {}),
   },
   inputDisabled: {
     opacity: 0.6,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#F59E0B',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
+    flexShrink: 0,
     ...shadow({ color: '#EA580C', opacity: 0.25, radius: 6, y: 2, elevation: 2 }),
   },
   sendButtonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#CBD5E1',
   },
 });
 

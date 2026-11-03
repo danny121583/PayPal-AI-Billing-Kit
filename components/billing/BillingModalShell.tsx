@@ -26,6 +26,7 @@ export interface BillingModalShellProps {
   children?: React.ReactNode;
   scroll?: boolean;
   size?: 'tall' | 'auto';
+  desktopMaxWidth?: number;
   testID?: string;
   closeTestID?: string;
   closeAccessibilityLabel?: string;
@@ -88,6 +89,7 @@ export function BillingModalShell({
   children,
   scroll = true,
   size = 'tall',
+  desktopMaxWidth = 560,
   testID,
   closeTestID,
   closeAccessibilityLabel,
@@ -97,6 +99,7 @@ export function BillingModalShell({
   const keyboardPadding = useKeyboardOverlapPadding(cardRef);
   const { width: windowWidth } = useWindowDimensions();
   const isCompactMobile = windowWidth > 0 && windowWidth < 480;
+  const isDesktopViewport = windowWidth >= 768;
 
   const handleBackdrop = useCallback(() => {
     Keyboard.dismiss();
@@ -119,6 +122,7 @@ export function BillingModalShell({
           ref={cardRef}
           style={[
             styles.modalContainer,
+            isDesktopViewport && { maxWidth: desktopMaxWidth },
             isCompactMobile && styles.modalContainerMobile,
             size === 'tall'
               ? isCompactMobile
@@ -214,7 +218,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   modalContainer: {
-    maxWidth: 460,
+    maxWidth: 520,
     width: '100%',
     padding: 20,
     borderRadius: 24,
@@ -226,27 +230,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   sizeTall: {
-    height: '78%',
-    maxHeight: 640,
-    minHeight: 440,
+    height: '82%',
+    maxHeight: 720,
+    minHeight: 460,
   },
   sizeTallMobile: {
-    height: '86%',
-    maxHeight: 740,
+    height: '88%',
+    maxHeight: 760,
     minHeight: 420,
   },
   sizeAuto: {
     maxHeight: '85%',
   },
   header: {
-    marginBottom: 12,
+    marginBottom: 8,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     flexShrink: 0,
   },
   headerMobile: {
-    marginBottom: 8,
+    marginBottom: 6,
     paddingBottom: 8,
   },
   headerTitleContainer: {
@@ -297,11 +301,15 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   bodyContent: {
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   footer: {
     flexShrink: 0,
-    paddingTop: 10,
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
 });
 

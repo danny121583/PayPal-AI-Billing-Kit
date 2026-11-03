@@ -610,8 +610,8 @@ export default function BillingInvoiceDetailModal({
       footerActions.push({
         label:
           invoice.status === 'failed'
-            ? 'Retry with PayPal Sandbox'
-            : 'Pay with PayPal Sandbox',
+            ? 'Retry with PayPal'
+            : 'Pay with PayPal',
         onPress: handlePayWithPayPal,
         variant: 'primary',
         loading: busyAction === 'create_order',
@@ -627,6 +627,7 @@ export default function BillingInvoiceDetailModal({
       onClose={onClose}
       title="Statement Details"
       subtitle={`#${invoice.invoiceNumber} • ${invoice.status.toUpperCase()}`}
+      desktopMaxWidth={620}
       testID="billing-invoice-detail-modal"
       closeTestID="billing-detail-close-btn"
       closeAccessibilityLabel="Close invoice details"
@@ -997,29 +998,31 @@ export default function BillingInvoiceDetailModal({
           </Text>
           <View style={styles.providerButtonsRow}>
             <Pressable
-              style={[billingModalStyles.primaryButton, { alignSelf: 'flex-start' }]}
+              style={[billingModalStyles.primaryButton, styles.settlementOptionBtn]}
               onPress={() => void handlePayWithSandboxCard()}
               disabled={Boolean(busyAction)}
               accessibilityRole="button"
+              accessibilityLabel="Pay with Sandbox Card"
               testID="billing-detail-sandbox-card-btn"
             >
-              <Text style={billingModalStyles.primaryButtonText}>
+              <Text style={billingModalStyles.primaryButtonText} numberOfLines={1}>
                 {busyAction === 'pay_with_sandbox_card'
                   ? 'Capturing Sandbox Card...'
-                  : 'Pay with PayPal Sandbox Card (VISA Test Card)'}
+                  : 'Pay with Sandbox Card'}
               </Text>
             </Pressable>
             <Pressable
-              style={[billingModalStyles.secondaryButton, { alignSelf: 'flex-start' }]}
+              style={[billingModalStyles.secondaryButton, styles.settlementOptionBtn, styles.settlementSecondaryBtn]}
               onPress={handleSimulateDemoSettlement}
               disabled={Boolean(busyAction)}
               accessibilityRole="button"
+              accessibilityLabel="Simulate Settlement"
               testID="billing-detail-simulate-demo-settlement-btn"
             >
-              <Text style={billingModalStyles.secondaryButtonText}>
+              <Text style={billingModalStyles.secondaryButtonText} numberOfLines={1}>
                 {busyAction === 'simulate_demo_settlement'
                   ? 'Simulating Settlement...'
-                  : 'Simulate Demo Settlement (Sample Record)'}
+                  : 'Simulate Settlement'}
               </Text>
             </Pressable>
           </View>
@@ -1454,7 +1457,21 @@ const styles = StyleSheet.create({
   providerButtonsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
+    alignItems: 'stretch',
+  },
+  settlementOptionBtn: {
+    flex: 1,
+    minWidth: 180,
+    minHeight: 46,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  settlementSecondaryBtn: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
   },
   providerBtnFlex: {
     flex: 1,
