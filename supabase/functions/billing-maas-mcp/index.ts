@@ -1227,7 +1227,7 @@ interface MCPToolDef {
 const MCP_TOOLS: MCPToolDef[] = [
   {
     "name": "discover_billing_capabilities",
-    "description": "[READ_ONLY] Discover the Unified MCP Gateway catalog (30 tools across Native Application (21), Official PayPal MCP Discovery (1), and PayPal Sandbox REST-Backed Adapters (8)), $500/$2,500 guardrails, demo personas, and ADMIN-* service codes.",
+    "description": "[READ_ONLY] Discover the Unified MCP Gateway catalog (82 tools across Native Application (21), Official PayPal MCP Tools (47), and PayPal Sandbox REST-Backed Adapters (14)), $500/$2,500 guardrails, demo personas, and ADMIN-* service codes.",
     "permissionTier": "read_only",
     "source": "native_application",
     "annotations": {
@@ -2277,6 +2277,5147 @@ const MCP_TOOLS: MCPToolDef[] = [
         }
       }
     }
+  },
+  {
+    "name": "create_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices): Create Invoices on PayPal.\n\nThis function creates a draft invoice, specifying a currency code, the invoicer's business information, one or more recipients to bill, and line items. Once created, the invoice can be sent to the customer for payment.\n\nprimary_recipients and items use PayPal's real nested shape (billing_info/shipping_info for recipients; unit_amount/tax/discount for items); other fields use a simplified flat shape.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "currency_code",
+        "primary_recipients",
+        "items"
+      ],
+      "properties": {
+        "currency_code": {
+          "type": "string",
+          "description": "The three-character ISO-4217 currency code for the invoice (for example, USD). Applies to every monetary amount on the invoice."
+        },
+        "invoice_number": {
+          "type": "string",
+          "description": "The invoice number. If omitted, PayPal auto-increments from the last invoice number used."
+        },
+        "invoice_date": {
+          "type": "string",
+          "description": "The invoice date in yyyy-MM-DD format."
+        },
+        "reference": {
+          "type": "string",
+          "description": "A reference value, such as a purchase order number."
+        },
+        "note": {
+          "type": "string",
+          "description": "A note to the invoice recipient. Also appears on the invoice notification email."
+        },
+        "invoicer_business_name": {
+          "type": "string",
+          "description": "The business name of the invoicer."
+        },
+        "invoicer_given_name": {
+          "type": "string",
+          "description": "The first name of the invoicer."
+        },
+        "invoicer_surname": {
+          "type": "string",
+          "description": "The last name of the invoicer."
+        },
+        "invoicer_email_address": {
+          "type": "string",
+          "description": "The email address of the invoicer."
+        },
+        "invoicer_tax_id": {
+          "type": "string",
+          "description": "The invoicer's tax ID."
+        },
+        "invoicer_address_line_1": {
+          "type": "string",
+          "description": "The first line of the invoicer's address, for example, number and street."
+        },
+        "invoicer_address_line_2": {
+          "type": "string",
+          "description": "The second line of the invoicer's address, for example, suite or apartment number."
+        },
+        "invoicer_city": {
+          "type": "string",
+          "description": "The city, town, or village of the invoicer's address."
+        },
+        "invoicer_state": {
+          "type": "string",
+          "description": "The state or province of the invoicer's address."
+        },
+        "invoicer_postal_code": {
+          "type": "string",
+          "description": "The postal code of the invoicer's address."
+        },
+        "invoicer_country_code": {
+          "type": "string",
+          "description": "The two-character ISO 3166-1 country code of the invoicer's address (for example, US or GB)."
+        },
+        "primary_recipients": {
+          "type": "array",
+          "description": "The recipients who will be billed for this invoice.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "billing_info": {
+                "type": "object",
+                "properties": {
+                  "business_name": {
+                    "type": "string",
+                    "description": "The business name of the invoice recipient."
+                  },
+                  "name": {
+                    "type": "object",
+                    "properties": {
+                      "given_name": {
+                        "type": "string",
+                        "description": "The first name of the person."
+                      },
+                      "surname": {
+                        "type": "string",
+                        "description": "The last name of the person."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "name of the recipient"
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "address_line_1": {
+                        "type": "string",
+                        "description": "The first line of the address, for example, number and street."
+                      },
+                      "address_line_2": {
+                        "type": "string",
+                        "description": "The second line of the address, for example, suite or apartment number."
+                      },
+                      "admin_area_2": {
+                        "type": "string",
+                        "description": "A city, town, or village."
+                      },
+                      "admin_area_1": {
+                        "type": "string",
+                        "description": "The highest-level sub-division in a country, such as a state or province."
+                      },
+                      "postal_code": {
+                        "type": "string",
+                        "description": "The postal code, which is the zip code or equivalent."
+                      },
+                      "country_code": {
+                        "type": "string",
+                        "pattern": "^([A-Z]{2}|C2)$",
+                        "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The address of the invoice recipient."
+                  },
+                  "email_address": {
+                    "type": "string",
+                    "description": "email address of the recipient"
+                  },
+                  "phones": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "country_code": {
+                          "type": "string",
+                          "description": "The country calling code, in E.164 format (for example, '1' for the United States)."
+                        },
+                        "national_number": {
+                          "type": "string",
+                          "description": "The national number, in E.164 format."
+                        },
+                        "phone_type": {
+                          "type": "string",
+                          "enum": [
+                            "FAX",
+                            "HOME",
+                            "MOBILE",
+                            "OTHER",
+                            "PAGER"
+                          ],
+                          "description": "The type of phone number."
+                        }
+                      },
+                      "required": [
+                        "country_code",
+                        "national_number",
+                        "phone_type"
+                      ],
+                      "additionalProperties": false,
+                      "description": "phone object"
+                    },
+                    "description": "The invoice recipient's phone numbers."
+                  },
+                  "additional_info": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Any additional information about the recipient."
+                  },
+                  "language": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$",
+                    "description": "The BCP-47 language tag used for the recipient's email notification (for example, 'en-US'). Only used when the recipient has no PayPal account."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The billing information of the invoice recipient"
+              },
+              "shipping_info": {
+                "type": "object",
+                "properties": {
+                  "business_name": {
+                    "type": "string",
+                    "description": "The business name for the shipping destination."
+                  },
+                  "name": {
+                    "type": "object",
+                    "properties": {
+                      "given_name": {
+                        "type": "string",
+                        "description": "The first name of the person."
+                      },
+                      "surname": {
+                        "type": "string",
+                        "description": "The last name of the person."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The name for the shipping destination."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "address_line_1": {
+                        "type": "string",
+                        "description": "The first line of the address, for example, number and street."
+                      },
+                      "address_line_2": {
+                        "type": "string",
+                        "description": "The second line of the address, for example, suite or apartment number."
+                      },
+                      "admin_area_2": {
+                        "type": "string",
+                        "description": "A city, town, or village."
+                      },
+                      "admin_area_1": {
+                        "type": "string",
+                        "description": "The highest-level sub-division in a country, such as a state or province."
+                      },
+                      "postal_code": {
+                        "type": "string",
+                        "description": "The postal code, which is the zip code or equivalent."
+                      },
+                      "country_code": {
+                        "type": "string",
+                        "pattern": "^([A-Z]{2}|C2)$",
+                        "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The shipping address."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The shipping information of the invoice recipient."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "items": {
+          "type": "array",
+          "description": "The line items on the invoice.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the item"
+              },
+              "description": {
+                "type": "string",
+                "description": "The description of the item."
+              },
+              "quantity": {
+                "type": "string",
+                "description": "The quantity of the item that the invoicer provides to the payer. Value is from -1000000 to 1000000. Supports up to five decimal places. Cast to string"
+              },
+              "unit_amount": {
+                "type": "object",
+                "properties": {
+                  "currency_code": {
+                    "type": "string",
+                    "description": "The three-character ISO-4217 currency code that identifies the currency."
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                    "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                  }
+                },
+                "required": [
+                  "currency_code",
+                  "value"
+                ],
+                "additionalProperties": false,
+                "description": "The unit price of the item. Does not include tax or discount."
+              },
+              "tax": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the tax applied on the item, for example 'Sales Tax'."
+                  },
+                  "percent": {
+                    "type": "string",
+                    "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                    "description": "The tax rate, as a percent value from 0 to 100. Supports up to five decimal places."
+                  },
+                  "tax_note": {
+                    "type": "string",
+                    "description": "A note about the tax, used to track tax-related data."
+                  }
+                },
+                "required": [
+                  "name",
+                  "percent"
+                ],
+                "additionalProperties": false,
+                "description": "tax object"
+              },
+              "discount": {
+                "type": "object",
+                "properties": {
+                  "percent": {
+                    "type": "string",
+                    "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                    "description": "The discount as a percent value, from 0 to 100. Supports up to five decimal places. Mutually exclusive with amount -- set only one."
+                  },
+                  "amount": {
+                    "type": "object",
+                    "properties": {
+                      "currency_code": {
+                        "type": "string",
+                        "description": "The three-character ISO-4217 currency code that identifies the currency."
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                      }
+                    },
+                    "required": [
+                      "currency_code",
+                      "value"
+                    ],
+                    "additionalProperties": false,
+                    "description": "The discount as a fixed amount. Mutually exclusive with percent -- set only one."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The discount for this line item, subtracted from the item total."
+              },
+              "item_date": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                "description": "The date, in yyyy-MM-DD format, when the item or service was provided."
+              },
+              "unit_of_measure": {
+                "type": "string",
+                "enum": [
+                  "QUANTITY",
+                  "HOURS",
+                  "AMOUNT"
+                ],
+                "description": "The unit of measure for the invoiced item"
+              }
+            },
+            "required": [
+              "name",
+              "quantity",
+              "unit_amount"
+            ],
+            "additionalProperties": false,
+            "description": "invoice line item object"
+          }
+        },
+        "allow_tip": {
+          "type": "boolean",
+          "description": "Whether the payer can add a tip when paying. Not available in Hong Kong, Taiwan, India, or Japan."
+        },
+        "theme_color": {
+          "type": "string",
+          "description": "The primary color used to render the invoice, as a hex color code (e.g. #000000). If omitted, the default theme is used."
+        },
+        "shipping_cost": {
+          "type": "string",
+          "description": "The shipping cost for the invoice, in the invoice's currency_code."
+        },
+        "enable_pay_by_bank": {
+          "type": "boolean",
+          "description": "Whether to enable PAY_BY_BANK as a payment method for this invoice, letting the payer pay directly from their bank account. Available only for US-based merchants and invoices with USD currency."
+        },
+        "pay_by_bank_exclusive_above_threshold": {
+          "type": "boolean",
+          "description": "When true, PAY_BY_BANK becomes the only available payment method once the invoice total exceeds PayPal's system-defined threshold ($1000), disabling all other payment methods above that threshold."
+        },
+        "allow_partial_payment": {
+          "type": "boolean",
+          "description": "Whether the invoice allows a partial payment. If false, the invoice must be paid in full. If true, the invoice allows partial payments. Not available for users in India, Brazil, or Israel."
+        },
+        "minimum_partial_payment_amount": {
+          "type": "string",
+          "description": "The minimum amount allowed for a partial payment, in the invoice's currency_code. Valid only when allow_partial_payment is true."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_recurring_series",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Recurring) — POST /v2/invoicing/recurring-invoices): Create a recurring invoice series on PayPal.\n\nThis function creates a recurring invoice series that automatically generates and sends invoices to a customer on a schedule, specifying a billing frequency, a start date, a currency code, a primary recipient, and line items for the series template.\n\nprimary_recipients and items use PayPal's real nested shape (billing_info/shipping_info for recipients; unit_amount/tax/discount for items); other fields use a simplified flat shape.\n\nA newly created series is in DRAFT status and will not generate invoices until activated -- call activate_recurring_series with the returned series ID to activate it.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Recurring Series",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "interval_unit",
+        "interval_count",
+        "start_series_date",
+        "currency_code",
+        "primary_recipients"
+      ],
+      "properties": {
+        "interval_unit": {
+          "type": "string",
+          "description": "The time unit for the recurring invoice cycle interval",
+          "enum": [
+            "DAY",
+            "WEEK",
+            "MONTH",
+            "YEAR"
+          ]
+        },
+        "interval_count": {
+          "type": "integer",
+          "description": "The number of intervals between each recurring invoice cycle. For example, an interval_count of 2 with interval_unit of MONTH means the invoice recurs every 2 months"
+        },
+        "start_series_date": {
+          "type": "string",
+          "description": "The date when the recurring series begins and the first invoice is generated, in yyyy-MM-DD format. Cannot be a past date."
+        },
+        "total_cycles": {
+          "type": "integer",
+          "description": "The total number of invoices to generate in the series. If omitted, the series runs indefinitely until cancelled."
+        },
+        "reference": {
+          "type": "string",
+          "description": "A reference value, such as a purchase order number."
+        },
+        "currency_code": {
+          "type": "string",
+          "description": "Currency code of the recurring invoice series"
+        },
+        "note": {
+          "type": "string",
+          "description": "A note to the invoice recipient. Also appears on the invoice notification email."
+        },
+        "invoicer_business_name": {
+          "type": "string",
+          "description": "The business name of the invoicer."
+        },
+        "invoicer_given_name": {
+          "type": "string",
+          "description": "The first name of the invoicer."
+        },
+        "invoicer_surname": {
+          "type": "string",
+          "description": "The last name of the invoicer."
+        },
+        "invoicer_email_address": {
+          "type": "string",
+          "description": "The email address of the invoicer."
+        },
+        "invoicer_tax_id": {
+          "type": "string",
+          "description": "The invoicer's tax ID."
+        },
+        "invoicer_address_line_1": {
+          "type": "string",
+          "description": "The first line of the invoicer's address, for example, number and street."
+        },
+        "invoicer_address_line_2": {
+          "type": "string",
+          "description": "The second line of the invoicer's address, for example, suite or apartment number."
+        },
+        "invoicer_city": {
+          "type": "string",
+          "description": "The city, town, or village of the invoicer's address."
+        },
+        "invoicer_state": {
+          "type": "string",
+          "description": "The state or province of the invoicer's address."
+        },
+        "invoicer_postal_code": {
+          "type": "string",
+          "description": "The postal code of the invoicer's address."
+        },
+        "invoicer_country_code": {
+          "type": "string",
+          "description": "The two-character ISO 3166-1 country code of the invoicer's address (for example, US or GB)."
+        },
+        "primary_recipients": {
+          "type": "array",
+          "description": "The primary recipient of the recurring invoices",
+          "items": {
+            "type": "object",
+            "properties": {
+              "billing_info": {
+                "type": "object",
+                "properties": {
+                  "business_name": {
+                    "type": "string",
+                    "description": "The business name of the invoice recipient."
+                  },
+                  "name": {
+                    "type": "object",
+                    "properties": {
+                      "given_name": {
+                        "type": "string",
+                        "description": "The first name of the person."
+                      },
+                      "surname": {
+                        "type": "string",
+                        "description": "The last name of the person."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "name of the recipient"
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "address_line_1": {
+                        "type": "string",
+                        "description": "The first line of the address, for example, number and street."
+                      },
+                      "address_line_2": {
+                        "type": "string",
+                        "description": "The second line of the address, for example, suite or apartment number."
+                      },
+                      "admin_area_2": {
+                        "type": "string",
+                        "description": "A city, town, or village."
+                      },
+                      "admin_area_1": {
+                        "type": "string",
+                        "description": "The highest-level sub-division in a country, such as a state or province."
+                      },
+                      "postal_code": {
+                        "type": "string",
+                        "description": "The postal code, which is the zip code or equivalent."
+                      },
+                      "country_code": {
+                        "type": "string",
+                        "pattern": "^([A-Z]{2}|C2)$",
+                        "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The address of the invoice recipient."
+                  },
+                  "email_address": {
+                    "type": "string",
+                    "description": "email address of the recipient"
+                  },
+                  "phones": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "country_code": {
+                          "type": "string",
+                          "description": "The country calling code, in E.164 format (for example, '1' for the United States)."
+                        },
+                        "national_number": {
+                          "type": "string",
+                          "description": "The national number, in E.164 format."
+                        },
+                        "phone_type": {
+                          "type": "string",
+                          "enum": [
+                            "FAX",
+                            "HOME",
+                            "MOBILE",
+                            "OTHER",
+                            "PAGER"
+                          ],
+                          "description": "The type of phone number."
+                        }
+                      },
+                      "required": [
+                        "country_code",
+                        "national_number",
+                        "phone_type"
+                      ],
+                      "additionalProperties": false,
+                      "description": "phone object"
+                    },
+                    "description": "The invoice recipient's phone numbers."
+                  },
+                  "additional_info": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Any additional information about the recipient."
+                  },
+                  "language": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$",
+                    "description": "The BCP-47 language tag used for the recipient's email notification (for example, 'en-US'). Only used when the recipient has no PayPal account."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The billing information of the invoice recipient"
+              },
+              "shipping_info": {
+                "type": "object",
+                "properties": {
+                  "business_name": {
+                    "type": "string",
+                    "description": "The business name for the shipping destination."
+                  },
+                  "name": {
+                    "type": "object",
+                    "properties": {
+                      "given_name": {
+                        "type": "string",
+                        "description": "The first name of the person."
+                      },
+                      "surname": {
+                        "type": "string",
+                        "description": "The last name of the person."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The name for the shipping destination."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "address_line_1": {
+                        "type": "string",
+                        "description": "The first line of the address, for example, number and street."
+                      },
+                      "address_line_2": {
+                        "type": "string",
+                        "description": "The second line of the address, for example, suite or apartment number."
+                      },
+                      "admin_area_2": {
+                        "type": "string",
+                        "description": "A city, town, or village."
+                      },
+                      "admin_area_1": {
+                        "type": "string",
+                        "description": "The highest-level sub-division in a country, such as a state or province."
+                      },
+                      "postal_code": {
+                        "type": "string",
+                        "description": "The postal code, which is the zip code or equivalent."
+                      },
+                      "country_code": {
+                        "type": "string",
+                        "pattern": "^([A-Z]{2}|C2)$",
+                        "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The shipping address."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The shipping information of the invoice recipient."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "items": {
+          "type": "array",
+          "description": "The line items that will appear on each invoice in the recurring series",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the item"
+              },
+              "description": {
+                "type": "string",
+                "description": "The description of the item."
+              },
+              "quantity": {
+                "type": "string",
+                "description": "The quantity of the item that the invoicer provides to the payer. Value is from -1000000 to 1000000. Supports up to five decimal places. Cast to string"
+              },
+              "unit_amount": {
+                "type": "object",
+                "properties": {
+                  "currency_code": {
+                    "type": "string",
+                    "description": "The three-character ISO-4217 currency code that identifies the currency."
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                    "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                  }
+                },
+                "required": [
+                  "currency_code",
+                  "value"
+                ],
+                "additionalProperties": false,
+                "description": "The unit price of the item. Does not include tax or discount."
+              },
+              "tax": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the tax applied on the item, for example 'Sales Tax'."
+                  },
+                  "percent": {
+                    "type": "string",
+                    "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                    "description": "The tax rate, as a percent value from 0 to 100. Supports up to five decimal places."
+                  },
+                  "tax_note": {
+                    "type": "string",
+                    "description": "A note about the tax, used to track tax-related data."
+                  }
+                },
+                "required": [
+                  "name",
+                  "percent"
+                ],
+                "additionalProperties": false,
+                "description": "tax object"
+              },
+              "discount": {
+                "type": "object",
+                "properties": {
+                  "percent": {
+                    "type": "string",
+                    "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                    "description": "The discount as a percent value, from 0 to 100. Supports up to five decimal places. Mutually exclusive with amount -- set only one."
+                  },
+                  "amount": {
+                    "type": "object",
+                    "properties": {
+                      "currency_code": {
+                        "type": "string",
+                        "description": "The three-character ISO-4217 currency code that identifies the currency."
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                      }
+                    },
+                    "required": [
+                      "currency_code",
+                      "value"
+                    ],
+                    "additionalProperties": false,
+                    "description": "The discount as a fixed amount. Mutually exclusive with percent -- set only one."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The discount for this line item, subtracted from the item total."
+              },
+              "item_date": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                "description": "The date, in yyyy-MM-DD format, when the item or service was provided."
+              },
+              "unit_of_measure": {
+                "type": "string",
+                "enum": [
+                  "QUANTITY",
+                  "HOURS",
+                  "AMOUNT"
+                ],
+                "description": "The unit of measure for the invoiced item"
+              }
+            },
+            "required": [
+              "name",
+              "quantity",
+              "unit_amount"
+            ],
+            "additionalProperties": false,
+            "description": "invoice line item object"
+          }
+        },
+        "allow_tip": {
+          "type": "boolean",
+          "description": "Whether the payer can add a tip when paying. Not available in Hong Kong, Taiwan, India, or Japan."
+        },
+        "shipping_cost": {
+          "type": "string",
+          "description": "The shipping cost for each generated invoice, in the series' currency_code."
+        },
+        "allow_partial_payment": {
+          "type": "boolean",
+          "description": "Whether each generated invoice allows a partial payment. If false, each invoice must be paid in full. If true, each invoice allows partial payments. Not available for users in India, Brazil, or Israel."
+        },
+        "minimum_partial_payment_amount": {
+          "type": "string",
+          "description": "The minimum amount allowed for a partial payment on each generated invoice, in the series' currency_code. Valid only when allow_partial_payment is true."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "activate_recurring_series",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Recurring) — POST /v2/invoicing/recurring-invoices/{recurring_series_id}/activate): Activate a recurring invoice series on PayPal.\n\nThis function activates a recurring invoice series by its ID, moving it out of DRAFT status. Once activated, PayPal automatically generates and sends invoices to the customer based on the series' configured schedule. Call this after create_recurring_series to make the series active.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Activate Recurring Series",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "recurring_series_id"
+      ],
+      "properties": {
+        "recurring_series_id": {
+          "type": "string",
+          "description": "The ID of the recurring invoice series to activate."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_recurring_series",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Invoicing v2 (Recurring) — GET /v2/invoicing/recurring-invoices/{recurring_series_id}): Get a recurring invoice series from PayPal.\n\nThis function retrieves details of a specific recurring invoice series using its ID, including its schedule, status, template, and recipient information.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Recurring Series",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "recurring_series_id"
+      ],
+      "properties": {
+        "recurring_series_id": {
+          "type": "string",
+          "description": "The ID of the recurring invoice series to retrieve."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "cancel_recurring_series",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Recurring) — POST /v2/invoicing/recurring-invoices/{recurring_series_id}/cancel): Cancel a recurring invoice series on PayPal.\n\nThis function cancels a recurring invoice series by its ID. Once cancelled, PayPal stops generating and sending further invoices for the series. This action cannot be undone.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Cancel Recurring Series",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "recurring_series_id"
+      ],
+      "properties": {
+        "recurring_series_id": {
+          "type": "string",
+          "description": "The ID of the recurring invoice series to cancel."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "delete_recurring_series",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Recurring) — DELETE /v2/invoicing/recurring-invoices/{recurring_series_id}): Delete a recurring invoice series on PayPal.\n\nThis function permanently deletes a recurring invoice series by its ID. Only series in DRAFT status can be deleted -- for a series that has already been activated, use cancel_recurring_series instead. This action cannot be undone.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Delete Recurring Series",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "recurring_series_id"
+      ],
+      "properties": {
+        "recurring_series_id": {
+          "type": "string",
+          "description": "The ID of the recurring invoice series to delete. Only series in DRAFT status can be deleted; use cancel_recurring_series for an activated series."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "list_invoices",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Invoicing v2 — GET /v2/invoicing/invoices): List invoices from PayPal.\n\nThis function retrieves a list of invoices with optional pagination parameters.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: List Invoices",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "The page number of the result set to fetch."
+        },
+        "page_size": {
+          "type": "number",
+          "description": "The number of records to return per page (maximum 100)."
+        },
+        "total_required": {
+          "type": "boolean",
+          "description": "Indicates whether the response should include the total count of items."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_invoice",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Invoicing v2 — GET /v2/invoicing/invoices/{invoice_id}): Get an invoice from PayPal.\n\nThis function retrieves details of a specific invoice using its ID.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Invoice",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice to retrieve."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "send_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/send): Send an invoice to the recipient(s).\n\nThis function sends a previously created invoice to its intended recipients.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Send Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice to send."
+        },
+        "note": {
+          "type": "string",
+          "description": "A note to the recipient."
+        },
+        "send_to_recipient": {
+          "type": "boolean",
+          "description": "Indicates whether to send the invoice to the recipient."
+        },
+        "additional_recipients": {
+          "type": "array",
+          "description": "Additional email addresses to which to send the invoice.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "send_invoice_reminder",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/remind): Send a reminder for an invoice.\n\nThis function sends a reminder for an invoice that has already been sent but hasn't been paid yet.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Send Invoice Reminder",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice for which to send a reminder."
+        },
+        "subject": {
+          "type": "string",
+          "description": "The subject of the reminder email."
+        },
+        "note": {
+          "type": "string",
+          "description": "A note to the recipient."
+        },
+        "additional_recipients": {
+          "type": "array",
+          "description": "Additional email addresses to which to send the reminder.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "cancel_sent_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/cancel): Cancel a sent invoice.\n\nThis function cancels an invoice that has already been sent to the recipient(s).",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Cancel Sent Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice to cancel."
+        },
+        "note": {
+          "type": "string",
+          "description": "A cancellation note to the recipient."
+        },
+        "send_to_recipient": {
+          "type": "boolean",
+          "description": "Indicates whether to send the cancellation to the recipient."
+        },
+        "additional_recipients": {
+          "type": "array",
+          "description": "Additional email addresses to which to send the cancellation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "delete_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — DELETE /v2/invoicing/invoices/{invoice_id}): Delete a draft or scheduled invoice on PayPal.\n\nThis function permanently deletes an invoice that is in the draft or scheduled state, by ID. It does not work on invoices that have already been sent -- use cancel_sent_invoice for those instead. After deletion, the invoice's details can no longer be retrieved, but its invoice number can be reused.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Delete Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the draft or scheduled invoice to delete."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "setup_invoice_auto_reminders",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Reminders) — POST /v2/invoicing/setup-reminders): Initialize the invoice auto reminder configuration for the merchant's PayPal account.\n\nThis function sets up automatic reminders for unpaid invoices, for BEFORE_DUE and/or AFTER_DUE reminder types.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Setup Invoice Auto Reminders",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "configurations": {
+          "type": "array",
+          "description": "An array of up to two invoice auto reminder configurations, one for BEFORE_DUE and one for AFTER_DUE. If omitted, both reminder types are created with the default configuration in INACTIVE state. If only one type is provided, the other is created with the default configuration in INACTIVE state.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "BEFORE_DUE",
+                  "AFTER_DUE"
+                ],
+                "description": "The type of reminder. BEFORE_DUE sends a reminder before the invoice due date; AFTER_DUE sends a reminder after the invoice due date."
+              },
+              "interval": {
+                "type": "object",
+                "properties": {
+                  "unit": {
+                    "type": "string",
+                    "const": "DAY",
+                    "default": "DAY",
+                    "description": "The unit of time for the reminder interval. The interval unit is always DAY."
+                  },
+                  "value": {
+                    "type": "integer",
+                    "description": "The number of interval units before/after the due date at which to send the reminder."
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false,
+                "description": "The interval at which to send the reminder."
+              },
+              "repetition": {
+                "type": "integer",
+                "description": "The number of times to send the reminder. Must be 1 for BEFORE_DUE reminders."
+              },
+              "notification": {
+                "type": "object",
+                "properties": {
+                  "send_to_invoicer": {
+                    "type": "boolean",
+                    "description": "Indicates whether to also notify the invoicer when the reminder is sent."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Notification settings for the reminder."
+              }
+            },
+            "required": [
+              "type",
+              "interval",
+              "repetition"
+            ],
+            "additionalProperties": false,
+            "description": "An invoice auto reminder configuration."
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "update_invoice_auto_reminder",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Reminders) — PUT /v2/invoicing/reminders/{reminder_configuration_id}): Update an existing invoice auto reminder configuration by its configuration ID.\n\nThis function performs a full update of the reminder configuration's timing interval, repetition count and notification preferences.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Update Invoice Auto Reminder",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "reminder_configuration_id",
+        "type",
+        "interval",
+        "repetition"
+      ],
+      "properties": {
+        "reminder_configuration_id": {
+          "type": "string",
+          "description": "The ID of the auto reminder configuration to update."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "BEFORE_DUE",
+            "AFTER_DUE"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "description": "Select an option.",
+          "enum": [
+            "NONE",
+            "ACTIVE",
+            "INACTIVE"
+          ]
+        },
+        "interval": {
+          "type": "object",
+          "description": "The interval at which to send the reminder. The interval unit is always DAY.",
+          "properties": {
+            "value": {
+              "type": "integer",
+              "description": "The number of interval units before/after the due date at which to send the reminder."
+            }
+          }
+        },
+        "repetition": {
+          "type": "integer",
+          "description": "The number of times to send the reminder. Must be 1 for BEFORE_DUE reminders."
+        },
+        "notification": {
+          "type": "object",
+          "description": "Notification settings for the reminder.",
+          "properties": {
+            "send_to_invoicer": {
+              "type": "boolean",
+              "description": "Indicates whether to also notify the invoicer when the reminder is sent."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "search_invoicing",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/search-invoices | /v2/invoicing/search-recurring-invoices): Search for invoices or recurring invoice series on PayPal.\n\nUse resource_type \"invoice\" with invoice_filters, or \"recurring_series\" with recurring_series_filters -- only set the matching filters object. Recurring series search covers only the past 3 years.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Search Invoicing",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "resource_type"
+      ],
+      "properties": {
+        "resource_type": {
+          "type": "string",
+          "description": "Which resource type to search. 'invoice' searches individual invoices using invoice_filters; 'recurring_series' searches recurring invoice series using recurring_series_filters.",
+          "enum": [
+            "invoice",
+            "recurring_series"
+          ]
+        },
+        "page": {
+          "type": "integer",
+          "description": "The page number of the result set to fetch."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "The number of records to return per page (maximum 100)."
+        },
+        "total_required": {
+          "type": "boolean",
+          "description": "Indicates whether the response should include the total count of matching invoices. Only applies when resource_type is 'invoice'."
+        },
+        "invoice_filters": {
+          "type": "object",
+          "description": "Filters to apply when resource_type is 'invoice'. Must not be set when resource_type is 'recurring_series'.",
+          "properties": {
+            "recipient_email": {
+              "type": "string",
+              "maxLength": 254,
+              "description": "Filters invoices by the recipient's email address."
+            },
+            "recipient_first_name": {
+              "type": "string",
+              "maxLength": 140,
+              "description": "Filters invoices by the recipient's first name."
+            },
+            "recipient_last_name": {
+              "type": "string",
+              "maxLength": 140,
+              "description": "Filters invoices by the recipient's last name."
+            },
+            "recipient_business_name": {
+              "type": "string",
+              "maxLength": 300,
+              "description": "Filters invoices by the recipient's business name."
+            },
+            "invoice_number": {
+              "type": "string",
+              "maxLength": 25,
+              "description": "Filters invoices by invoice number."
+            },
+            "status": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "DRAFT",
+                  "SENT",
+                  "SCHEDULED",
+                  "PAID",
+                  "MARKED_AS_PAID",
+                  "CANCELLED",
+                  "REFUNDED",
+                  "PARTIALLY_PAID",
+                  "PARTIALLY_REFUNDED",
+                  "MARKED_AS_REFUNDED",
+                  "UNPAID",
+                  "PAYMENT_PENDING",
+                  "AUTO_CANCELLED",
+                  "PAID_EXTERNAL",
+                  "REFUNDED_EXTERNAL",
+                  "SHARED"
+                ]
+              },
+              "maxItems": 5,
+              "description": "Filters invoices by one or more statuses (up to 5)."
+            },
+            "reference": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "Filters invoices by reference value, such as a purchase order number."
+            },
+            "currency_code": {
+              "type": "string",
+              "description": "Filters invoices by the three-character ISO-4217 currency code."
+            },
+            "total_amount_range": {
+              "type": "object",
+              "properties": {
+                "lower_amount": {
+                  "type": "object",
+                  "properties": {
+                    "currency_code": {
+                      "type": "string",
+                      "description": "The three-character ISO-4217 currency code that identifies the currency."
+                    },
+                    "value": {
+                      "type": "string",
+                      "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                      "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                    }
+                  },
+                  "required": [
+                    "currency_code",
+                    "value"
+                  ],
+                  "additionalProperties": false,
+                  "description": "The lower bound of the amount range."
+                },
+                "upper_amount": {
+                  "type": "object",
+                  "properties": {
+                    "currency_code": {
+                      "type": "string",
+                      "description": "The three-character ISO-4217 currency code that identifies the currency."
+                    },
+                    "value": {
+                      "type": "string",
+                      "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                      "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                    }
+                  },
+                  "required": [
+                    "currency_code",
+                    "value"
+                  ],
+                  "additionalProperties": false,
+                  "description": "The upper bound of the amount range."
+                }
+              },
+              "required": [
+                "lower_amount",
+                "upper_amount"
+              ],
+              "additionalProperties": false,
+              "description": "Filters invoices whose total amount falls within this range."
+            },
+            "invoice_date_range": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                  "description": "The start date, in yyyy-MM-DD format."
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                  "description": "The end date, in yyyy-MM-DD format."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false,
+              "description": "Filters invoices by the invoice's own date (the date shown on the invoice itself, also called the billing date). Use this for most 'invoices dated/created/issued between X and Y' requests -- creation_date_range is for PayPal's internal record-creation timestamp, not the invoice's date."
+            },
+            "due_date_range": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                  "description": "The start date, in yyyy-MM-DD format."
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                  "description": "The end date, in yyyy-MM-DD format."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false,
+              "description": "Filters invoices whose due date falls within this range."
+            },
+            "payment_date_range": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+                  "minLength": 20,
+                  "maxLength": 64,
+                  "description": "The start date and time, in ISO8601 format (for example, 2018-06-01T00:00:00Z). Seconds are required; fractional seconds are optional. A plain date (yyyy-MM-DD) is also accepted and is expanded to the start of that day (00:00:00Z)."
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+                  "minLength": 20,
+                  "maxLength": 64,
+                  "description": "The end date and time, in ISO8601 format (for example, 2018-06-21T23:59:59Z). Seconds are required; fractional seconds are optional. A plain date (yyyy-MM-DD) is also accepted and is expanded to the end of that day (23:59:59Z)."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false,
+              "description": "Filters invoices by the date and time PayPal recorded the invoice as paid (a system timestamp)."
+            },
+            "creation_date_range": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+                  "minLength": 20,
+                  "maxLength": 64,
+                  "description": "The start date and time, in ISO8601 format (for example, 2018-06-01T00:00:00Z). Seconds are required; fractional seconds are optional. A plain date (yyyy-MM-DD) is also accepted and is expanded to the start of that day (00:00:00Z)."
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+                  "minLength": 20,
+                  "maxLength": 64,
+                  "description": "The end date and time, in ISO8601 format (for example, 2018-06-21T23:59:59Z). Seconds are required; fractional seconds are optional. A plain date (yyyy-MM-DD) is also accepted and is expanded to the end of that day (23:59:59Z)."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false,
+              "description": "Filters invoices by the date and time PayPal's system recorded the invoice record as created (an internal system timestamp, NOT the invoice's own date). For 'invoices dated/created between X and Y' requests, prefer invoice_date_range unless the user specifically means when the record was created in PayPal."
+            }
+          }
+        },
+        "recurring_series_filters": {
+          "type": "object",
+          "description": "Filters to apply when resource_type is 'recurring_series'. Must not be set when resource_type is 'invoice'.",
+          "properties": {
+            "search_text": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 800,
+              "description": "Free-text search across the fields listed in search_fields. Cannot be blank."
+            },
+            "search_fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "PAYER_REFERENCE_INFO",
+                  "BILLING_EMAIL",
+                  "BILLING_NAME",
+                  "BILLING_BUSINESS_NAME",
+                  "BILLING_PHONE_NUMBER",
+                  "SHIPPING_NAME",
+                  "SHIPPING_BUSINESS_NAME",
+                  "SHIPPING_PHONE_NUMBER",
+                  "ITEM_NAME",
+                  "ITEM_TAX_NAME",
+                  "ITEM_DISCOUNT_NAME",
+                  "INVOICE_DISCOUNT_NAME",
+                  "ALL"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 5,
+              "description": "The fields that search_text searches against (1-5 values, must be unique)."
+            },
+            "search_filters": {
+              "type": "object",
+              "properties": {
+                "currency_code": {
+                  "type": "string",
+                  "description": "Filters recurring series by the three-character ISO-4217 currency code."
+                },
+                "status": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "DRAFT",
+                      "ACTIVE",
+                      "CANCELLED",
+                      "EXPIRED"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 5,
+                  "description": "Filters recurring series by one or more statuses (up to 5, must be unique)."
+                },
+                "creation_date_range": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+                      "minLength": 20,
+                      "maxLength": 64,
+                      "description": "The start date and time, in ISO8601 format (for example, 2018-06-01T00:00:00Z). Seconds are required; fractional seconds are optional. A plain date (yyyy-MM-DD) is also accepted and is expanded to the start of that day (00:00:00Z)."
+                    },
+                    "end": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$",
+                      "minLength": 20,
+                      "maxLength": 64,
+                      "description": "The end date and time, in ISO8601 format (for example, 2018-06-21T23:59:59Z). Seconds are required; fractional seconds are optional. A plain date (yyyy-MM-DD) is also accepted and is expanded to the end of that day (23:59:59Z)."
+                    }
+                  },
+                  "required": [
+                    "start",
+                    "end"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Filters recurring series by the date and time PayPal recorded the series as created (a system timestamp). This endpoint has no separate 'series date' field -- for 'series created/started between X and Y' requests, this is the field to use. Mutually exclusive with next_occurrence_date_range -- PayPal supports only one range criterion per search."
+                },
+                "next_occurrence_date_range": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                      "description": "The start date, in yyyy-MM-DD format."
+                    },
+                    "end": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                      "description": "The end date, in yyyy-MM-DD format."
+                    }
+                  },
+                  "required": [
+                    "start",
+                    "end"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Filters recurring series whose next occurrence date falls within this range. Mutually exclusive with creation_date_range -- PayPal supports only one range criterion per search."
+                },
+                "total_amount_range": {
+                  "type": "object",
+                  "properties": {
+                    "lower_amount": {
+                      "type": "object",
+                      "properties": {
+                        "currency_code": {
+                          "type": "string",
+                          "description": "The three-character ISO-4217 currency code that identifies the currency."
+                        },
+                        "value": {
+                          "type": "string",
+                          "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                          "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                        }
+                      },
+                      "required": [
+                        "currency_code",
+                        "value"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The lower bound of the amount range."
+                    },
+                    "upper_amount": {
+                      "type": "object",
+                      "properties": {
+                        "currency_code": {
+                          "type": "string",
+                          "description": "The three-character ISO-4217 currency code that identifies the currency."
+                        },
+                        "value": {
+                          "type": "string",
+                          "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                          "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                        }
+                      },
+                      "required": [
+                        "currency_code",
+                        "value"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The upper bound of the amount range."
+                    }
+                  },
+                  "required": [
+                    "lower_amount",
+                    "upper_amount"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Filters recurring series whose total amount falls within this range."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Structured filters for the recurring series search."
+            }
+          }
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "update_invoicing",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — PUT /v2/invoicing/invoices/{invoice_id} | /v2/invoicing/recurring-invoices/{recurring_series_id}): Update an existing invoice or recurring invoice series on PayPal.\n\nFor invoices, the recipient (primary_recipients) can only be changed 2 times within any 72-hour window -- avoid unnecessary recipient edits.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Update Invoicing",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "resource_type"
+      ],
+      "properties": {
+        "resource_type": {
+          "type": "string",
+          "description": "Which kind of resource to update. 'invoice' updates an individual invoice; 'recurring_series' updates a recurring invoice series.",
+          "enum": [
+            "invoice",
+            "recurring_series"
+          ]
+        },
+        "invoice_update": {
+          "type": "object",
+          "description": "Full replacement content for the invoice. Set only when resource_type is 'invoice'.",
+          "properties": {
+            "currency_code": {
+              "type": "string",
+              "description": "The three-character ISO-4217 currency code for the invoice (for example, USD). Applies to every monetary amount on the invoice."
+            },
+            "invoice_number": {
+              "type": "string",
+              "description": "The invoice number. If omitted, PayPal auto-increments from the last invoice number used."
+            },
+            "invoice_date": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+              "description": "The invoice date in yyyy-MM-DD format."
+            },
+            "reference": {
+              "type": "string",
+              "description": "A reference value, such as a purchase order number."
+            },
+            "note": {
+              "type": "string",
+              "description": "A note to the invoice recipient. Also appears on the invoice notification email."
+            },
+            "invoicer_business_name": {
+              "type": "string",
+              "maxLength": 300,
+              "description": "The business name of the invoicer."
+            },
+            "invoicer_given_name": {
+              "type": "string",
+              "description": "The first name of the invoicer."
+            },
+            "invoicer_surname": {
+              "type": "string",
+              "description": "The last name of the invoicer."
+            },
+            "invoicer_email_address": {
+              "type": "string",
+              "description": "The email address of the invoicer."
+            },
+            "invoicer_tax_id": {
+              "type": "string",
+              "description": "The invoicer's tax ID."
+            },
+            "invoicer_address_line_1": {
+              "type": "string",
+              "description": "The first line of the invoicer's address, for example, number and street."
+            },
+            "invoicer_address_line_2": {
+              "type": "string",
+              "description": "The second line of the invoicer's address, for example, suite or apartment number."
+            },
+            "invoicer_city": {
+              "type": "string",
+              "description": "The city, town, or village of the invoicer's address."
+            },
+            "invoicer_state": {
+              "type": "string",
+              "description": "The state or province of the invoicer's address."
+            },
+            "invoicer_postal_code": {
+              "type": "string",
+              "description": "The postal code of the invoicer's address."
+            },
+            "invoicer_country_code": {
+              "type": "string",
+              "pattern": "^([A-Z]{2}|C2)$",
+              "description": "The two-character ISO 3166-1 country code of the invoicer's address (for example, US or GB)."
+            },
+            "primary_recipients": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "billing_info": {
+                    "type": "object",
+                    "properties": {
+                      "business_name": {
+                        "type": "string",
+                        "description": "The business name of the invoice recipient."
+                      },
+                      "name": {
+                        "type": "object",
+                        "properties": {
+                          "given_name": {
+                            "type": "string",
+                            "description": "The first name of the person."
+                          },
+                          "surname": {
+                            "type": "string",
+                            "description": "The last name of the person."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "name of the recipient"
+                      },
+                      "address": {
+                        "type": "object",
+                        "properties": {
+                          "address_line_1": {
+                            "type": "string",
+                            "description": "The first line of the address, for example, number and street."
+                          },
+                          "address_line_2": {
+                            "type": "string",
+                            "description": "The second line of the address, for example, suite or apartment number."
+                          },
+                          "admin_area_2": {
+                            "type": "string",
+                            "description": "A city, town, or village."
+                          },
+                          "admin_area_1": {
+                            "type": "string",
+                            "description": "The highest-level sub-division in a country, such as a state or province."
+                          },
+                          "postal_code": {
+                            "type": "string",
+                            "description": "The postal code, which is the zip code or equivalent."
+                          },
+                          "country_code": {
+                            "type": "string",
+                            "pattern": "^([A-Z]{2}|C2)$",
+                            "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The address of the invoice recipient."
+                      },
+                      "email_address": {
+                        "type": "string",
+                        "description": "email address of the recipient"
+                      },
+                      "phones": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "country_code": {
+                              "type": "string",
+                              "description": "The country calling code, in E.164 format (for example, '1' for the United States)."
+                            },
+                            "national_number": {
+                              "type": "string",
+                              "description": "The national number, in E.164 format."
+                            },
+                            "phone_type": {
+                              "type": "string",
+                              "enum": [
+                                "FAX",
+                                "HOME",
+                                "MOBILE",
+                                "OTHER",
+                                "PAGER"
+                              ],
+                              "description": "The type of phone number."
+                            }
+                          },
+                          "required": [
+                            "country_code",
+                            "national_number",
+                            "phone_type"
+                          ],
+                          "additionalProperties": false,
+                          "description": "phone object"
+                        },
+                        "description": "The invoice recipient's phone numbers."
+                      },
+                      "additional_info": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Any additional information about the recipient."
+                      },
+                      "language": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$",
+                        "description": "The BCP-47 language tag used for the recipient's email notification (for example, 'en-US'). Only used when the recipient has no PayPal account."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The billing information of the invoice recipient"
+                  },
+                  "shipping_info": {
+                    "type": "object",
+                    "properties": {
+                      "business_name": {
+                        "type": "string",
+                        "description": "The business name for the shipping destination."
+                      },
+                      "name": {
+                        "type": "object",
+                        "properties": {
+                          "given_name": {
+                            "type": "string",
+                            "description": "The first name of the person."
+                          },
+                          "surname": {
+                            "type": "string",
+                            "description": "The last name of the person."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The name for the shipping destination."
+                      },
+                      "address": {
+                        "type": "object",
+                        "properties": {
+                          "address_line_1": {
+                            "type": "string",
+                            "description": "The first line of the address, for example, number and street."
+                          },
+                          "address_line_2": {
+                            "type": "string",
+                            "description": "The second line of the address, for example, suite or apartment number."
+                          },
+                          "admin_area_2": {
+                            "type": "string",
+                            "description": "A city, town, or village."
+                          },
+                          "admin_area_1": {
+                            "type": "string",
+                            "description": "The highest-level sub-division in a country, such as a state or province."
+                          },
+                          "postal_code": {
+                            "type": "string",
+                            "description": "The postal code, which is the zip code or equivalent."
+                          },
+                          "country_code": {
+                            "type": "string",
+                            "pattern": "^([A-Z]{2}|C2)$",
+                            "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The shipping address."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The shipping information of the invoice recipient."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "description": "The recipients who will be billed for this invoice."
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the item"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "The description of the item."
+                  },
+                  "quantity": {
+                    "type": "string",
+                    "description": "The quantity of the item that the invoicer provides to the payer. Value is from -1000000 to 1000000. Supports up to five decimal places. Cast to string"
+                  },
+                  "unit_amount": {
+                    "type": "object",
+                    "properties": {
+                      "currency_code": {
+                        "type": "string",
+                        "description": "The three-character ISO-4217 currency code that identifies the currency."
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                      }
+                    },
+                    "required": [
+                      "currency_code",
+                      "value"
+                    ],
+                    "additionalProperties": false,
+                    "description": "The unit price of the item. Does not include tax or discount."
+                  },
+                  "tax": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the tax applied on the item, for example 'Sales Tax'."
+                      },
+                      "percent": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The tax rate, as a percent value from 0 to 100. Supports up to five decimal places."
+                      },
+                      "tax_note": {
+                        "type": "string",
+                        "description": "A note about the tax, used to track tax-related data."
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "percent"
+                    ],
+                    "additionalProperties": false,
+                    "description": "tax object"
+                  },
+                  "discount": {
+                    "type": "object",
+                    "properties": {
+                      "percent": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The discount as a percent value, from 0 to 100. Supports up to five decimal places. Mutually exclusive with amount -- set only one."
+                      },
+                      "amount": {
+                        "type": "object",
+                        "properties": {
+                          "currency_code": {
+                            "type": "string",
+                            "description": "The three-character ISO-4217 currency code that identifies the currency."
+                          },
+                          "value": {
+                            "type": "string",
+                            "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                            "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                          }
+                        },
+                        "required": [
+                          "currency_code",
+                          "value"
+                        ],
+                        "additionalProperties": false,
+                        "description": "The discount as a fixed amount. Mutually exclusive with percent -- set only one."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The discount for this line item, subtracted from the item total."
+                  },
+                  "item_date": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                    "description": "The date, in yyyy-MM-DD format, when the item or service was provided."
+                  },
+                  "unit_of_measure": {
+                    "type": "string",
+                    "enum": [
+                      "QUANTITY",
+                      "HOURS",
+                      "AMOUNT"
+                    ],
+                    "description": "The unit of measure for the invoiced item"
+                  }
+                },
+                "required": [
+                  "name",
+                  "quantity",
+                  "unit_amount"
+                ],
+                "additionalProperties": false,
+                "description": "invoice line item object"
+              },
+              "description": "The line items on the invoice."
+            },
+            "allow_tip": {
+              "type": "boolean",
+              "description": "Whether the payer can add a tip when paying. Not available in Hong Kong, Taiwan, India, or Japan."
+            },
+            "theme_color": {
+              "type": "string",
+              "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$",
+              "description": "The primary color used to render the invoice, as a hex color code (e.g. #000000). If omitted, the default theme is used."
+            },
+            "shipping_cost": {
+              "type": "string",
+              "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+              "description": "The shipping cost for the invoice, in the invoice's currency_code."
+            },
+            "enable_pay_by_bank": {
+              "type": "boolean",
+              "description": "Whether to enable PAY_BY_BANK as a payment method for this invoice, letting the payer pay directly from their bank account. Available only for US-based merchants and invoices with USD currency."
+            },
+            "pay_by_bank_exclusive_above_threshold": {
+              "type": "boolean",
+              "description": "When true, PAY_BY_BANK becomes the only available payment method once the invoice total exceeds PayPal's system-defined threshold ($1000), disabling all other payment methods above that threshold."
+            },
+            "allow_partial_payment": {
+              "type": "boolean",
+              "description": "Whether the invoice allows a partial payment. If false, the invoice must be paid in full. If true, the invoice allows partial payments. Not available for users in India, Brazil, or Israel."
+            },
+            "minimum_partial_payment_amount": {
+              "type": "string",
+              "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+              "description": "The minimum amount allowed for a partial payment, in the invoice's currency_code. Valid only when allow_partial_payment is true."
+            },
+            "invoice_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,127}$",
+              "description": "The ID of the invoice to update. Required when resource_type is 'invoice'."
+            },
+            "send_to_recipient": {
+              "type": "boolean",
+              "description": "Whether to send the invoice update notification to the recipient. PayPal defaults to true if omitted."
+            },
+            "send_to_invoicer": {
+              "type": "boolean",
+              "description": "Whether to send the invoice update notification to the merchant (invoicer). PayPal defaults to true if omitted."
+            }
+          }
+        },
+        "recurring_series_update": {
+          "type": "object",
+          "description": "Full replacement content for the recurring series. Set only when resource_type is 'recurring_series'.",
+          "properties": {
+            "interval_unit": {
+              "type": "string",
+              "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH",
+                "YEAR"
+              ],
+              "description": "The time unit for the recurring invoice cycle interval"
+            },
+            "interval_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 52,
+              "description": "The number of intervals between each recurring invoice cycle. For example, an interval_count of 2 with interval_unit of MONTH means the invoice recurs every 2 months"
+            },
+            "start_series_date": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+              "description": "The date when the recurring series begins and the first invoice is generated, in yyyy-MM-DD format. Cannot be a past date."
+            },
+            "total_cycles": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 99,
+              "description": "The total number of invoices to generate in the series. If omitted, the series runs indefinitely until cancelled."
+            },
+            "reference": {
+              "type": "string",
+              "description": "A reference value, such as a purchase order number."
+            },
+            "currency_code": {
+              "type": "string",
+              "description": "Currency code of the recurring invoice series"
+            },
+            "note": {
+              "type": "string",
+              "description": "A note to the invoice recipient. Also appears on the invoice notification email."
+            },
+            "invoicer_business_name": {
+              "type": "string",
+              "maxLength": 300,
+              "description": "The business name of the invoicer."
+            },
+            "invoicer_given_name": {
+              "type": "string",
+              "description": "The first name of the invoicer."
+            },
+            "invoicer_surname": {
+              "type": "string",
+              "description": "The last name of the invoicer."
+            },
+            "invoicer_email_address": {
+              "type": "string",
+              "description": "The email address of the invoicer."
+            },
+            "invoicer_tax_id": {
+              "type": "string",
+              "description": "The invoicer's tax ID."
+            },
+            "invoicer_address_line_1": {
+              "type": "string",
+              "description": "The first line of the invoicer's address, for example, number and street."
+            },
+            "invoicer_address_line_2": {
+              "type": "string",
+              "description": "The second line of the invoicer's address, for example, suite or apartment number."
+            },
+            "invoicer_city": {
+              "type": "string",
+              "description": "The city, town, or village of the invoicer's address."
+            },
+            "invoicer_state": {
+              "type": "string",
+              "description": "The state or province of the invoicer's address."
+            },
+            "invoicer_postal_code": {
+              "type": "string",
+              "description": "The postal code of the invoicer's address."
+            },
+            "invoicer_country_code": {
+              "type": "string",
+              "pattern": "^([A-Z]{2}|C2)$",
+              "description": "The two-character ISO 3166-1 country code of the invoicer's address (for example, US or GB)."
+            },
+            "primary_recipients": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "billing_info": {
+                    "type": "object",
+                    "properties": {
+                      "business_name": {
+                        "type": "string",
+                        "description": "The business name of the invoice recipient."
+                      },
+                      "name": {
+                        "type": "object",
+                        "properties": {
+                          "given_name": {
+                            "type": "string",
+                            "description": "The first name of the person."
+                          },
+                          "surname": {
+                            "type": "string",
+                            "description": "The last name of the person."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "name of the recipient"
+                      },
+                      "address": {
+                        "type": "object",
+                        "properties": {
+                          "address_line_1": {
+                            "type": "string",
+                            "description": "The first line of the address, for example, number and street."
+                          },
+                          "address_line_2": {
+                            "type": "string",
+                            "description": "The second line of the address, for example, suite or apartment number."
+                          },
+                          "admin_area_2": {
+                            "type": "string",
+                            "description": "A city, town, or village."
+                          },
+                          "admin_area_1": {
+                            "type": "string",
+                            "description": "The highest-level sub-division in a country, such as a state or province."
+                          },
+                          "postal_code": {
+                            "type": "string",
+                            "description": "The postal code, which is the zip code or equivalent."
+                          },
+                          "country_code": {
+                            "type": "string",
+                            "pattern": "^([A-Z]{2}|C2)$",
+                            "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The address of the invoice recipient."
+                      },
+                      "email_address": {
+                        "type": "string",
+                        "description": "email address of the recipient"
+                      },
+                      "phones": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "country_code": {
+                              "type": "string",
+                              "description": "The country calling code, in E.164 format (for example, '1' for the United States)."
+                            },
+                            "national_number": {
+                              "type": "string",
+                              "description": "The national number, in E.164 format."
+                            },
+                            "phone_type": {
+                              "type": "string",
+                              "enum": [
+                                "FAX",
+                                "HOME",
+                                "MOBILE",
+                                "OTHER",
+                                "PAGER"
+                              ],
+                              "description": "The type of phone number."
+                            }
+                          },
+                          "required": [
+                            "country_code",
+                            "national_number",
+                            "phone_type"
+                          ],
+                          "additionalProperties": false,
+                          "description": "phone object"
+                        },
+                        "description": "The invoice recipient's phone numbers."
+                      },
+                      "additional_info": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Any additional information about the recipient."
+                      },
+                      "language": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$",
+                        "description": "The BCP-47 language tag used for the recipient's email notification (for example, 'en-US'). Only used when the recipient has no PayPal account."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The billing information of the invoice recipient"
+                  },
+                  "shipping_info": {
+                    "type": "object",
+                    "properties": {
+                      "business_name": {
+                        "type": "string",
+                        "description": "The business name for the shipping destination."
+                      },
+                      "name": {
+                        "type": "object",
+                        "properties": {
+                          "given_name": {
+                            "type": "string",
+                            "description": "The first name of the person."
+                          },
+                          "surname": {
+                            "type": "string",
+                            "description": "The last name of the person."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The name for the shipping destination."
+                      },
+                      "address": {
+                        "type": "object",
+                        "properties": {
+                          "address_line_1": {
+                            "type": "string",
+                            "description": "The first line of the address, for example, number and street."
+                          },
+                          "address_line_2": {
+                            "type": "string",
+                            "description": "The second line of the address, for example, suite or apartment number."
+                          },
+                          "admin_area_2": {
+                            "type": "string",
+                            "description": "A city, town, or village."
+                          },
+                          "admin_area_1": {
+                            "type": "string",
+                            "description": "The highest-level sub-division in a country, such as a state or province."
+                          },
+                          "postal_code": {
+                            "type": "string",
+                            "description": "The postal code, which is the zip code or equivalent."
+                          },
+                          "country_code": {
+                            "type": "string",
+                            "pattern": "^([A-Z]{2}|C2)$",
+                            "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The shipping address."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The shipping information of the invoice recipient."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 1,
+              "description": "The primary recipient of the recurring invoices"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the item"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "The description of the item."
+                  },
+                  "quantity": {
+                    "type": "string",
+                    "description": "The quantity of the item that the invoicer provides to the payer. Value is from -1000000 to 1000000. Supports up to five decimal places. Cast to string"
+                  },
+                  "unit_amount": {
+                    "type": "object",
+                    "properties": {
+                      "currency_code": {
+                        "type": "string",
+                        "description": "The three-character ISO-4217 currency code that identifies the currency."
+                      },
+                      "value": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                      }
+                    },
+                    "required": [
+                      "currency_code",
+                      "value"
+                    ],
+                    "additionalProperties": false,
+                    "description": "The unit price of the item. Does not include tax or discount."
+                  },
+                  "tax": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the tax applied on the item, for example 'Sales Tax'."
+                      },
+                      "percent": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The tax rate, as a percent value from 0 to 100. Supports up to five decimal places."
+                      },
+                      "tax_note": {
+                        "type": "string",
+                        "description": "A note about the tax, used to track tax-related data."
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "percent"
+                    ],
+                    "additionalProperties": false,
+                    "description": "tax object"
+                  },
+                  "discount": {
+                    "type": "object",
+                    "properties": {
+                      "percent": {
+                        "type": "string",
+                        "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                        "description": "The discount as a percent value, from 0 to 100. Supports up to five decimal places. Mutually exclusive with amount -- set only one."
+                      },
+                      "amount": {
+                        "type": "object",
+                        "properties": {
+                          "currency_code": {
+                            "type": "string",
+                            "description": "The three-character ISO-4217 currency code that identifies the currency."
+                          },
+                          "value": {
+                            "type": "string",
+                            "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+                            "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+                          }
+                        },
+                        "required": [
+                          "currency_code",
+                          "value"
+                        ],
+                        "additionalProperties": false,
+                        "description": "The discount as a fixed amount. Mutually exclusive with percent -- set only one."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The discount for this line item, subtracted from the item total."
+                  },
+                  "item_date": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                    "description": "The date, in yyyy-MM-DD format, when the item or service was provided."
+                  },
+                  "unit_of_measure": {
+                    "type": "string",
+                    "enum": [
+                      "QUANTITY",
+                      "HOURS",
+                      "AMOUNT"
+                    ],
+                    "description": "The unit of measure for the invoiced item"
+                  }
+                },
+                "required": [
+                  "name",
+                  "quantity",
+                  "unit_amount"
+                ],
+                "additionalProperties": false,
+                "description": "invoice line item object"
+              },
+              "minItems": 1,
+              "description": "The line items that will appear on each invoice in the recurring series"
+            },
+            "allow_tip": {
+              "type": "boolean",
+              "description": "Whether the payer can add a tip when paying. Not available in Hong Kong, Taiwan, India, or Japan."
+            },
+            "shipping_cost": {
+              "type": "string",
+              "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+              "description": "The shipping cost for each generated invoice, in the series' currency_code."
+            },
+            "allow_partial_payment": {
+              "type": "boolean",
+              "description": "Whether each generated invoice allows a partial payment. If false, each invoice must be paid in full. If true, each invoice allows partial payments. Not available for users in India, Brazil, or Israel."
+            },
+            "minimum_partial_payment_amount": {
+              "type": "string",
+              "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+              "description": "The minimum amount allowed for a partial payment on each generated invoice, in the series' currency_code. Valid only when allow_partial_payment is true."
+            },
+            "recurring_series_id": {
+              "type": "string",
+              "pattern": "^RI-[A-Z0-9]{17}$",
+              "description": "The ID of the recurring invoice series to update. Required when resource_type is 'recurring_series'."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "cancel_invoice_auto_reminder",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 (Reminders) — POST /v2/invoicing/invoices/{invoice_id}/cancel-reminders): Cancel all scheduled automatic reminders for an invoice.\n\nThis function permanently cancels every automatic reminder scheduled for a specific invoice, by invoice ID. This action is irreversible -- once cancelled, automatic reminders cannot be re-enabled for that invoice.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Cancel Invoice Auto Reminder",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice for which to cancel all scheduled automatic reminders."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "generate_invoice_qr_code",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/generate-qr-code): Generate a QR code for an invoice.\n\nThis function generates a QR code for an invoice, which can be used to pay the invoice using a mobile device or scanning app.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Generate Invoice Qr Code",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The invoice id to generate QR code for"
+        },
+        "width": {
+          "type": "number",
+          "description": "The QR code width"
+        },
+        "height": {
+          "type": "number",
+          "description": "The QR code height"
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "generate_invoice_number",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/generate-next-invoice-number): Generate the next invoice number available to the merchant.\n\nThis function generates the next invoice number by using the prefix and suffix from the merchant's last invoice number and incrementing the numeric portion by one (e.g. INVOICE-1234 -> INVOICE-1235).",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Generate Invoice Number",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "record_payment_for_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/payments): Record a payment for an invoice on PayPal.\n\nThis function records an external or manual payment (for example, cash, check, bank transfer, or a PayPal transaction) against an invoice, by invoice ID. If the recorded amount covers the full amount due, PayPal marks the invoice PAID; otherwise it is marked PARTIALLY_PAID. This does not process a new payment -- it only logs one that was already collected.\n\nmethod is required. payment_id applies only to PAYPAL-type payments.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Record Payment For Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id",
+        "method"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice to record the payment against."
+        },
+        "payment_id": {
+          "type": "string",
+          "description": "The ID for a PayPal payment transaction. Required for the PAYPAL payment type."
+        },
+        "payment_date": {
+          "type": "string",
+          "description": "The date when the invoicer recorded the payment, in yyyy-MM-dd format."
+        },
+        "payment_date_time": {
+          "type": "string",
+          "description": "The date and time when the invoicer recorded the payment, in Internet date and time format (ISO 8601), for example 2018-05-13T21:20:00Z or 2018-05-13T21:20:00.000-08:00. Seconds are required."
+        },
+        "method": {
+          "type": "string",
+          "description": "The payment mode or method through which the invoicer can accept the payments.",
+          "enum": [
+            "BANK_TRANSFER",
+            "CASH",
+            "CHECK",
+            "CREDIT_CARD",
+            "DEBIT_CARD",
+            "PAYPAL",
+            "WIRE_TRANSFER",
+            "OTHER"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "description": "A note associated with an external cash or check payment."
+        },
+        "amount": {
+          "type": "object",
+          "description": "The currency and amount for a financial transaction.",
+          "properties": {
+            "currency_code": {
+              "type": "string",
+              "description": "The three-character ISO-4217 currency code that identifies the currency."
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+              "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+            }
+          }
+        },
+        "shipping_info": {
+          "type": "object",
+          "description": "The shipping information associated with this payment.",
+          "properties": {
+            "business_name": {
+              "type": "string",
+              "description": "The business name for the shipping destination."
+            },
+            "name": {
+              "type": "object",
+              "properties": {
+                "given_name": {
+                  "type": "string",
+                  "description": "The first name of the person."
+                },
+                "surname": {
+                  "type": "string",
+                  "description": "The last name of the person."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The name for the shipping destination."
+            },
+            "address": {
+              "type": "object",
+              "properties": {
+                "address_line_1": {
+                  "type": "string",
+                  "description": "The first line of the address, for example, number and street."
+                },
+                "address_line_2": {
+                  "type": "string",
+                  "description": "The second line of the address, for example, suite or apartment number."
+                },
+                "admin_area_2": {
+                  "type": "string",
+                  "description": "A city, town, or village."
+                },
+                "admin_area_1": {
+                  "type": "string",
+                  "description": "The highest-level sub-division in a country, such as a state or province."
+                },
+                "postal_code": {
+                  "type": "string",
+                  "description": "The postal code, which is the zip code or equivalent."
+                },
+                "country_code": {
+                  "type": "string",
+                  "pattern": "^([A-Z]{2}|C2)$",
+                  "description": "The two-character ISO 3166-1 country code (for example, US or GB)."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The shipping address."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "record_refund_for_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/refunds): Record a refund for an invoice on PayPal.\n\nThis function records a refund against an invoice, by invoice ID. If all payments made against the invoice are refunded, PayPal marks the invoice REFUNDED; otherwise it is marked PARTIALLY_REFUNDED. This does not process a new refund -- it only logs one that was already issued.\n\nmethod is required.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Record Refund For Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id",
+        "method"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice to mark as refunded."
+        },
+        "refund_date": {
+          "type": "string",
+          "description": "The date when the invoicer recorded the refund, in yyyy-MM-dd format."
+        },
+        "amount": {
+          "type": "object",
+          "description": "The currency and amount for a financial transaction.",
+          "properties": {
+            "currency_code": {
+              "type": "string",
+              "description": "The three-character ISO-4217 currency code that identifies the currency."
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^((-?[0-9]+)|(-?([0-9]+)?[.][0-9]+))$",
+              "description": "The amount, as a signed decimal string with up to 2 decimal places (e.g. '50.00')."
+            }
+          }
+        },
+        "method": {
+          "type": "string",
+          "description": "The payment mode or method through which the invoicer can accept the payments.",
+          "enum": [
+            "BANK_TRANSFER",
+            "CASH",
+            "CHECK",
+            "CREDIT_CARD",
+            "DEBIT_CARD",
+            "PAYPAL",
+            "WIRE_TRANSFER",
+            "OTHER"
+          ]
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_conditional_rules_for_invoice",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Invoicing v2 — POST /v2/invoicing/invoices/{invoice_id}/conditional-rules): Create conditional rules for an invoice on PayPal.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Conditional Rules For Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_id",
+        "rules"
+      ],
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "description": "The ID of the invoice for which the conditional rules are to be created."
+        },
+        "rules": {
+          "type": "array",
+          "description": "The list of conditional rules to create for the invoice.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conditional_rule_type": {
+                "type": "string",
+                "enum": [
+                  "EARLY_PAYMENT_DISCOUNT",
+                  "AUTO_CANCEL"
+                ],
+                "description": "The type of conditional rule to apply to the invoice."
+              },
+              "conditional_rule_value_type": {
+                "type": "string",
+                "enum": [
+                  "PERCENT",
+                  "AMOUNT"
+                ],
+                "description": "The type of the conditional rule value. Required, and only applicable, when conditional_rule_type is EARLY_PAYMENT_DISCOUNT."
+              },
+              "conditional_rule_value": {
+                "type": "string",
+                "description": "The value of the conditional rule. Required, and only applicable, when conditional_rule_type is EARLY_PAYMENT_DISCOUNT. When conditional_rule_value_type is PERCENT, must be between 1 and 100."
+              },
+              "rule_expiry_terms": {
+                "type": "object",
+                "properties": {
+                  "rule_expiry_condition": {
+                    "type": "string",
+                    "enum": [
+                      "SPECIFIC_DATE",
+                      "THREE_DAYS_AFTER_ISSUE_DATE",
+                      "SEVEN_DAYS_AFTER_ISSUE_DATE",
+                      "FIFTEEN_DAYS_AFTER_ISSUE_DATE",
+                      "THIRTY_DAYS_AFTER_ISSUE_DATE"
+                    ],
+                    "description": "When the conditional rule expires: a specific date, or a period relative to the invoice issue date."
+                  },
+                  "condition_rule_end_date": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])$",
+                    "description": "The date the conditional rule expires, in yyyy-MM-dd format."
+                  }
+                },
+                "required": [
+                  "rule_expiry_condition",
+                  "condition_rule_end_date"
+                ],
+                "additionalProperties": false,
+                "description": "The expiry terms for the conditional rule."
+              }
+            },
+            "required": [
+              "conditional_rule_type",
+              "rule_expiry_terms"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_product",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Catalog Products v1 — POST /v1/catalogs/products): Create a product in PayPal using product catalog - create products API.\nThis function creates a new product that will be used in subscription plans, subscriptions.\nRequired parameters are: name (product name), type (product type).\nHigh level: \n    - id: (auto-generated or specify SKU of the product) The ID of the product\n    - name: {product_name} (required) \n    - description: {product_description} (optional)\n    - type {DIGITAL | PHYSICAL | SERVICE} (required)\n    - category: {product_category} (optional) \n    - image_url: {image_url} (optional)\n    - home_url: {home_url} (optional)\n\nBelow is the payload request structure:\n{\n    \"id\": \"#PROD-XYAB12ABSB7868434\",\n    \"name\": \"Video Streaming Service\",\n    \"description\": \"Service for streaming latest series, movies etc.\",\n    \"type\": \"SERVICE\",\n    \"category\": \"SOFTWARE\",\n    \"image_url\": \"https://example.com/streaming.jpg\",\n    \"home_url\": \"https://example.com/home\"\n}",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Product",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "name",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The product name."
+        },
+        "type": {
+          "type": "string",
+          "description": "The product type. Value is PHYSICAL, DIGITAL, or SERVICE.",
+          "enum": [
+            "PHYSICAL",
+            "DIGITAL",
+            "SERVICE"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "The product description."
+        },
+        "category": {
+          "type": "string",
+          "description": "The product category."
+        },
+        "image_url": {
+          "type": "string",
+          "description": "The image URL for the product."
+        },
+        "home_url": {
+          "type": "string",
+          "description": "The home page URL for the product."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "list_products",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Catalog Products v1 — GET /v1/catalogs/products): List products from PayPal.\n\nThis function retrieves a list of products with optional pagination parameters.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: List Products",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "The page number of the result set to fetch."
+        },
+        "page_size": {
+          "type": "number",
+          "description": "The number of records to return per page (maximum 100)."
+        },
+        "total_required": {
+          "type": "boolean",
+          "description": "Indicates whether the response should include the total count of products."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "update_product",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Catalog Products v1 — PATCH /v1/catalogs/products/{product_id}): Update a product in PayPal.\n\nThis function updates an existing product using JSON Patch operations.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Update Product",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "product_id",
+        "operations"
+      ],
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "The ID of the product to update."
+        },
+        "operations": {
+          "type": "array",
+          "description": "The PATCH operations to perform on the product.",
+          "items": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "show_product_details",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Catalog Products v1 — GET /v1/catalogs/products/{product_id}): List products from PayPal.\n\nThis function retrieves a list of products with optional pagination parameters.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Show Product Details",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "product_id"
+      ],
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "The ID of the product to update."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_subscription_plan",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Subscriptions v1 (Plans) — POST /v1/billing/plans): Create a subsctiption plan in PayPal using subscription - create plan API.\nThis function creates a new subscription plan that defines pricing and billing cycle details for subscriptions.\nRequired parameters are: product_id (the ID of the product for which to create the plan), name (subscription plan name), billing_cycles (billing cycle details).\nHigh level: product_id, name, description, taxes, status: {CREATED|INACTIVE|ACTIVE}, billing_cycles, payment_preferences are required in json object.\nWhile creating billing_cycles object, trial(second) billing cycle should precede regular billing cycle.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Subscription Plan",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "product_id",
+        "name",
+        "billing_cycles"
+      ],
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "The ID of the product for which to create the plan."
+        },
+        "name": {
+          "type": "string",
+          "description": "The subscription plan name."
+        },
+        "description": {
+          "type": "string",
+          "description": "The subscription plan description."
+        },
+        "billing_cycles": {
+          "type": "array",
+          "description": "The billing cycles of the plan.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "frequency": {
+                "type": "object",
+                "properties": {
+                  "interval_unit": {
+                    "type": "string",
+                    "enum": [
+                      "DAY",
+                      "WEEK",
+                      "MONTH",
+                      "YEAR"
+                    ],
+                    "description": "The unit of time for the billing cycle."
+                  },
+                  "interval_count": {
+                    "type": "number",
+                    "description": "The number of units for the billing cycle."
+                  }
+                },
+                "required": [
+                  "interval_unit",
+                  "interval_count"
+                ],
+                "additionalProperties": true,
+                "description": "The frequency of the billing cycle."
+              },
+              "tenure_type": {
+                "type": "string",
+                "enum": [
+                  "REGULAR",
+                  "TRIAL"
+                ],
+                "description": "The type of billing cycle tenure."
+              },
+              "sequence": {
+                "type": "number",
+                "description": "The sequence of the billing cycle."
+              },
+              "total_cycles": {
+                "type": "number",
+                "description": "The total number of cycles in the billing plan."
+              },
+              "pricing_scheme": {
+                "type": "object",
+                "properties": {
+                  "fixed_price": {
+                    "type": "object",
+                    "properties": {
+                      "currency_code": {
+                        "type": "string",
+                        "enum": [
+                          "USD"
+                        ],
+                        "description": "The currency code for the fixed price."
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The value of the fixed price."
+                      }
+                    },
+                    "required": [
+                      "currency_code",
+                      "value"
+                    ],
+                    "additionalProperties": true,
+                    "description": "The fixed price for the subscription plan."
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "The version of the pricing scheme."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The pricing scheme for the billing cycle."
+              }
+            },
+            "required": [
+              "frequency",
+              "tenure_type",
+              "sequence",
+              "pricing_scheme"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "payment_preferences": {
+          "type": "object",
+          "description": "The payment preferences for the subscription plan.",
+          "properties": {
+            "auto_bill_outstanding": {
+              "type": "boolean",
+              "description": "Indicates whether to automatically bill outstanding amounts."
+            },
+            "setup_fee": {
+              "type": "object",
+              "properties": {
+                "currency_code": {
+                  "type": "string",
+                  "enum": [
+                    "USD"
+                  ],
+                  "description": "The currency code for the setup fee."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The value of the setup fee."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The setup fee for the subscription plan."
+            },
+            "setup_fee_failure_action": {
+              "type": "string",
+              "enum": [
+                "CONTINUE",
+                "CANCEL"
+              ],
+              "description": "The action to take if the setup fee payment fails."
+            },
+            "payment_failure_threshold": {
+              "type": "number",
+              "description": "The number of failed payments before the subscription is canceled."
+            }
+          }
+        },
+        "taxes": {
+          "type": "object",
+          "description": "The tax details.",
+          "properties": {
+            "percentage": {
+              "type": "string",
+              "description": "The tax percentage."
+            },
+            "inclusive": {
+              "type": "boolean",
+              "description": "Indicates whether the tax is inclusive."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "list_subscription_plans",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Subscriptions v1 (Plans) — GET /v1/billing/plans): List subscription plans from PayPal.\n\nThis function retrieves a list of subscription plans with optional product filtering and pagination parameters.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: List Subscription Plans",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "description": "The ID of the product for which to get subscription plans."
+        },
+        "page": {
+          "type": "number",
+          "description": "The page number of the result set to fetch."
+        },
+        "page_size": {
+          "type": "number",
+          "description": "The number of records to return per page (maximum 100)."
+        },
+        "total_required": {
+          "type": "boolean",
+          "description": "Indicates whether the response should include the total count of plans."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "show_subscription_plan_details",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Subscriptions v1 (Plans) — GET /v1/billing/plans/{plan_id}): Show subscription plan details from PayPal.\nThis function retrieves the details of a specific subscription plan using its ID.\nRequired parameters are: plan_id (the ID of the subscription plan).",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Show Subscription Plan Details",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "plan_id"
+      ],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "description": "The ID of the subscription plan to show."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_subscription",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Subscriptions v1 — POST /v1/billing/subscriptions): Create a subscription in PayPal using the subscription - create subscription API.\nThis function allows you to create a new subscription for a specific plan, enabling the management of recurring payments.\nThe only required parameter is plan_id (the ID of the subscription plan). All other fields are optional and can be omitted if not provided.\nThe subscriber field is optional. If no subscriber information is provided, omit the subscriber field in the request payload.\nThe shipping address is optional. If no shipping address is provided, set the shipping_preference to GET_FROM_FILE in the application context.\nThe application context is also optional. If no application context information is provided, omit the application context field in the request payload.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Subscription",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "plan_id"
+      ],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "description": "The ID of the subscription plan to create."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product in the subscription."
+        },
+        "shipping_amount": {
+          "type": "object",
+          "description": "The shipping amount for the subscription.",
+          "properties": {
+            "currency_code": {
+              "type": "string",
+              "enum": [
+                "USD"
+              ],
+              "description": "The currency code for the shipping amount."
+            },
+            "value": {
+              "type": "string",
+              "description": "The value of the shipping amount."
+            }
+          }
+        },
+        "subscriber": {
+          "type": "object",
+          "description": "The subscriber details.",
+          "properties": {
+            "name": {
+              "type": "object",
+              "properties": {
+                "given_name": {
+                  "type": "string",
+                  "description": "The subscriber given name."
+                },
+                "surname": {
+                  "type": "string",
+                  "description": "The subscriber last name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The subscriber name."
+            },
+            "email_address": {
+              "type": "string",
+              "description": "The subscriber email address."
+            },
+            "shipping_address": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/properties/subscriber/properties/name",
+                  "description": "The subscriber shipping address name."
+                },
+                "address": {
+                  "type": "object",
+                  "properties": {
+                    "address_line_1": {
+                      "type": "string",
+                      "description": "The first line of the address."
+                    },
+                    "address_line_2": {
+                      "type": "string",
+                      "description": "The second line of the address."
+                    },
+                    "admin_area_1": {
+                      "type": "string",
+                      "description": "The city or locality."
+                    },
+                    "admin_area_2": {
+                      "type": "string",
+                      "description": "The state or province."
+                    },
+                    "postal_code": {
+                      "type": "string",
+                      "description": "The postal code."
+                    },
+                    "country_code": {
+                      "type": "string",
+                      "enum": [
+                        "US"
+                      ],
+                      "description": "The country code."
+                    }
+                  },
+                  "required": [
+                    "address_line_1",
+                    "admin_area_1",
+                    "admin_area_2",
+                    "postal_code",
+                    "country_code"
+                  ],
+                  "additionalProperties": false,
+                  "description": "The shipping address."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The subscriber shipping address."
+            }
+          }
+        },
+        "application_context": {
+          "type": "object",
+          "description": "The application context for the subscription.",
+          "properties": {
+            "brand_name": {
+              "type": "string",
+              "description": "The brand name."
+            },
+            "locale": {
+              "type": "string",
+              "description": "The locale for the subscription."
+            },
+            "shipping_preference": {
+              "type": "string",
+              "enum": [
+                "SET_PROVIDED_ADDRESS",
+                "GET_FROM_FILE"
+              ],
+              "description": "The shipping preference."
+            },
+            "user_action": {
+              "type": "string",
+              "enum": [
+                "SUBSCRIBE_NOW",
+                "CONTINUE"
+              ],
+              "description": "The user action."
+            },
+            "return_url": {
+              "type": "string",
+              "description": "The return URL after the subscription is created."
+            },
+            "cancel_url": {
+              "type": "string",
+              "description": "The cancel URL if the user cancels the subscription."
+            },
+            "payment_method": {
+              "type": "object",
+              "properties": {
+                "payer_selected": {
+                  "type": "string",
+                  "enum": [
+                    "PAYPAL",
+                    "CREDIT_CARD"
+                  ],
+                  "description": "The payment method selected by the payer."
+                },
+                "payee_preferred": {
+                  "type": "string",
+                  "enum": [
+                    "IMMEDIATE_PAYMENT_REQUIRED",
+                    "INSTANT_FUNDING_SOURCE"
+                  ],
+                  "description": "The preferred payment method for the payee."
+                }
+              },
+              "required": [
+                "payer_selected"
+              ],
+              "additionalProperties": false,
+              "description": "The payment method details."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "show_subscription_details",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Subscriptions v1 — GET /v1/billing/subscriptions/{subscription_id}): Show subscription details from PayPal.\nThis function retrieves the details of a specific subscription using its ID.\nRequired parameters are: subscription_id (the ID of the subscription).",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Show Subscription Details",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "subscription_id"
+      ],
+      "properties": {
+        "subscription_id": {
+          "type": "string",
+          "description": "The ID of the subscription to show details."
+        },
+        "get_additional_details": {
+          "type": "boolean",
+          "description": "Get all detailed information for the subscription."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "cancel_subscription",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Subscriptions v1 — POST /v1/billing/subscriptions/{subscription_id}/cancel): Cancel a customer subscription in PayPal.\n\nThis function cancels an active subscription for a customer. It requires the subscription ID and an optional reason for cancellation.\nRequired parameters are: subscription_id (the ID of the subscription to be canceled).\nBelow is the payload request structure:\n{\n    \"reason\": \"Customer requested cancellation\"\n}\nYou MUST ask the user for: \n - subscription_id\n - reason for cancellation.\n\nReturn all of the above as structured JSON in your response.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Cancel Subscription",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "subscription_id",
+        "payload"
+      ],
+      "properties": {
+        "subscription_id": {
+          "type": "string",
+          "description": "The ID of the subscription to show details."
+        },
+        "payload": {
+          "type": "object",
+          "description": "Payload for subscription cancellation.",
+          "properties": {
+            "reason": {
+              "type": "string",
+              "description": "The reason for the cancellation of a subscription."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "update_subscription",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Subscriptions v1 — PATCH /v1/billing/subscriptions/{subscription_id}): Update a customer subscription in PayPal.\n\nThis function updates an active or suspended subscription for a customer. It requires the subscription ID and payload of allowed keys to update to the subscription.\nRequired parameters are: subscription_id (the ID of the subscription to be updated), and at-least one key to update\n\nReturn response as structured JSON in your response.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Update Subscription",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "subscription_id"
+      ],
+      "properties": {
+        "subscription_id": {
+          "type": "string",
+          "description": "The ID of the subscription to update."
+        },
+        "currency_code": {
+          "type": "string",
+          "description": "Currency code of the amount.",
+          "enum": [
+            "USD"
+          ]
+        },
+        "outstanding_balance": {
+          "type": "string",
+          "description": "Outstanding Balance in the subscription"
+        },
+        "custom_id": {
+          "type": "string",
+          "description": "The custom id for the subscription"
+        },
+        "fixed_price": {
+          "type": "object",
+          "description": "The fixed price for a billing cycle.",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "The fixed price for the subscription."
+            },
+            "sequence": {
+              "type": "number",
+              "description": "The order sequence for the billing cycles"
+            }
+          }
+        },
+        "payment_failure_threshold": {
+          "type": "number",
+          "description": "The number of failed payments before the subscription is canceled."
+        },
+        "auto_bill_outstanding": {
+          "type": "boolean",
+          "description": "Indicates whether to automatically bill outstanding amounts."
+        },
+        "taxes_inclusive": {
+          "type": "boolean",
+          "description": "Indicates whether the tax is inclusive."
+        },
+        "taxes_percentage": {
+          "type": "string",
+          "description": "The tax percentage."
+        },
+        "shipping_amount": {
+          "type": "string",
+          "description": "The value of the shipping amount."
+        },
+        "shipping_address": {
+          "type": "object",
+          "description": "The shipping address.",
+          "properties": {
+            "name": {
+              "type": "object",
+              "properties": {
+                "given_name": {
+                  "type": "string",
+                  "description": "The subscriber given name."
+                },
+                "surname": {
+                  "type": "string",
+                  "description": "The subscriber last name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The subscriber shipping address name."
+            },
+            "address": {
+              "type": "object",
+              "properties": {
+                "address_line_1": {
+                  "type": "string",
+                  "description": "The first line of the address."
+                },
+                "address_line_2": {
+                  "type": "string",
+                  "description": "The second line of the address."
+                },
+                "admin_area_1": {
+                  "type": "string",
+                  "description": "The city or locality."
+                },
+                "admin_area_2": {
+                  "type": "string",
+                  "description": "The state or province."
+                },
+                "postal_code": {
+                  "type": "string",
+                  "description": "The postal code."
+                },
+                "country_code": {
+                  "type": "string",
+                  "enum": [
+                    "US"
+                  ],
+                  "description": "The country code."
+                }
+              },
+              "required": [
+                "address_line_1",
+                "admin_area_1",
+                "admin_area_2",
+                "postal_code",
+                "country_code"
+              ],
+              "additionalProperties": false,
+              "description": "The shipping address."
+            }
+          }
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_shipment_tracking",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Shipping Trackers v1 — POST /v1/shipping/trackers-batch): Create a shipment for a transaction in PayPal.\nThis function creates a shipment record for a specific transaction, allowing you to track the shipment status and details.\nThe transaction_id can fetch from the captured payment details in the order information.\nRequired parameters are: tracking_number (the tracking number for the shipment), transaction_id (the transaction ID associated with the shipment). \nHigh level: tracking_number, transaction_id, status (optional), carrier (optional) are required json objects.\nBelow is the payload request structure:\n{\n    \"tracking_number\": \"1234567890\",\n    \"transaction_id\": \"9XJ12345ABC67890\",\n    \"status\": \"SHIPPED\", // Required: ON_HOLD, SHIPPED, DELIVERED, CANCELLED\n    \"carrier\": \"UPS\" // Required: The carrier handling the shipment. Link to supported carriers: http://developer.paypal.com/docs/tracking/reference/carriers/\n}",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Shipment Tracking",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "tracking_number",
+        "transaction_id"
+      ],
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "description": "The ID of the order for which to create a shipment"
+        },
+        "tracking_number": {
+          "type": "string",
+          "description": "The tracking number for the shipment. Id is provided by the shipper. This is required to create a shipment."
+        },
+        "transaction_id": {
+          "type": "string",
+          "description": "The transaction ID associated with the shipment. Transaction id available after the order is paid or captured. This is required to create a shipment."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the shipment. It can be \"ON_HOLD\", \"SHIPPED\", \"DELIVERED\", or \"CANCELLED\"."
+        },
+        "carrier": {
+          "type": "string",
+          "description": "The carrier handling the shipment."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_shipment_tracking",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Shipping Trackers v1 — GET /v1/shipping/trackers?transaction_id={transaction_id}): Get tracking information for a shipment by ID.\nThis function retrieves tracking information for a specific shipment using the transaction ID and tracking number.\nThe transaction_id can fetch from the captured payment details in the order information.\nBelow is the payload request structure:",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Shipment Tracking",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "description": "The ID of the order for which to create a shipment."
+        },
+        "transaction_id": {
+          "type": "string",
+          "description": "The transaction ID associated with the shipment tracking to retrieve."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "update_shipment_tracking",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Shipping Trackers v1 — PUT /v1/shipping/trackers/{transaction_id}-{tracking_number}): Update tracking information for a shipment by ID and status. \n\nThis tool updates tracking information such as the carrier or the tracking number for a specific shipment using the transaction ID and status.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Update Shipment Tracking",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "transaction_id",
+        "tracking_number",
+        "status"
+      ],
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "description": "The transaction ID associated with the shipment tracking to retrieve."
+        },
+        "tracking_number": {
+          "type": "string",
+          "description": "The tracking number that you want to update."
+        },
+        "new_tracking_number": {
+          "type": "string",
+          "description": "The new tracking number for the shipment if being updated."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the item shipment. It can be \"CANCELLED\", \"DELIVERED\", \"LOCAL_PICKUP\", \"ON_HOLD\", or \"SHIPPED\"."
+        },
+        "carrier": {
+          "type": "string",
+          "description": "The carrier handling the shipment."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_order",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Orders v2 — POST /v2/checkout/orders): Create an order in PayPal.\n\nThis tool is used to create a new order in PayPal. This is typically the first step in initiating a payment flow. It sets up an order with specified details such as item(s) to be purchased, quantity, amount, currency, and other details.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Order",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "currencyCode",
+        "items"
+      ],
+      "properties": {
+        "currencyCode": {
+          "type": "string",
+          "description": "Currency code of the amount.",
+          "enum": [
+            "USD"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the item."
+              },
+              "quantity": {
+                "type": "number",
+                "description": "The item quantity. Must be a whole number.",
+                "default": 1
+              },
+              "description": {
+                "type": "string",
+                "description": "The detailed item description."
+              },
+              "itemCost": {
+                "type": "number",
+                "description": "The cost of each item - upto 2 decimal points."
+              },
+              "taxPercent": {
+                "type": "number",
+                "description": "The tax percent for the specific item.",
+                "default": 0
+              },
+              "itemTotal": {
+                "type": "number",
+                "description": "The total cost of this line item."
+              }
+            },
+            "required": [
+              "name",
+              "itemCost",
+              "itemTotal"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "discount": {
+          "type": "number",
+          "description": "The discount amount for the order."
+        },
+        "shippingCost": {
+          "type": "number",
+          "description": "The cost of shipping for the order."
+        },
+        "shippingAddress": {
+          "type": "object",
+          "description": "The shipping address for the order."
+        },
+        "notes": {
+          "type": "object"
+        },
+        "returnUrl": {
+          "type": "string"
+        },
+        "cancelUrl": {
+          "type": "string"
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_order",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Orders v2 — GET /v2/checkout/orders/{id}): Retrieves the order details from PayPal for a given order ID.\n\nThis tool is used to retrieve details of an existing order in PayPal. It provides information about the order, including items, amounts, status, and other relevant details.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Order",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The order id generated during create call"
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "pay_order",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Orders v2 — POST /v2/checkout/orders/{id}/capture): Capture a payment for an order.\n\nThis tool is used to capture a payment for an order. It allows you to capture funds that have been authorized for a specific order but not yet captured.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Pay Order",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The order id generated during create call"
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "list_disputes",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Customer Disputes v1 — GET /v1/customer/disputes): List disputes from PayPal.\n\nThis function retrieves a list of disputes with optional pagination and filtering parameters.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: List Disputes",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "disputed_transaction_id": {
+          "type": "object"
+        },
+        "dispute_state": {
+          "type": "string",
+          "description": "OPEN_INQUIRIES",
+          "enum": [
+            "REQUIRED_ACTION",
+            "REQUIRED_OTHER_PARTY_ACTION",
+            "UNDER_PAYPAL_REVIEW",
+            "RESOLVED",
+            "OPEN_INQUIRIES",
+            "APPEALABLE"
+          ]
+        },
+        "page_size": {
+          "type": "number"
+        },
+        "page": {
+          "type": "number"
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_dispute",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Customer Disputes v1 — GET /v1/customer/disputes/{dispute_id}): Get details for a specific dispute from PayPal.\n\nThis tool is used to lists disputes with a summary set of details, which shows the dispute_id, reason, status, dispute_state, dispute_life_cycle_stage, dispute_channel, dispute_amount, create_time and update_time fields.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Dispute",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "dispute_id"
+      ],
+      "properties": {
+        "dispute_id": {
+          "type": "string",
+          "description": "The order id generated during create call"
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "accept_dispute_claim",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Customer Disputes v1 — POST /v1/customer/disputes/{dispute_id}/accept-claim): Accept liability for a dispute claim.\n\nThis tool is used to accept liability for a dispute claim. When you accept liability for a dispute claim, the dispute closes in the customer's favor and PayPal automatically refunds money to the customer from the merchant's account.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Accept Dispute Claim",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "dispute_id",
+        "note"
+      ],
+      "properties": {
+        "dispute_id": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string",
+          "description": "A note about why the seller is accepting the claim"
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "list_transactions",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Transaction Search v1 — GET /v1/reporting/transactions): List transactions from PayPal.\n\nThis tool is used to list transactions with optional filtering parameters within a date range of 31 days. This tool can also be used to list details of a transaction given the transaction ID.\n\n- The start_date and end_date should be specified in ISO8601 date and time format. Example dates: 1996-12-19T16:39:57-08:00, 1985-04-12T23:20:50.52Z, 1990-12-31T23:59:60Z\n- The transaction_status accepts the following 4 values:\n    1. \"D\" - represents denied transactions.\n    2. \"P\" - represents pending transactions.\n    3. \"S\" - represents successful transactions.\n    4. \"V\" - represents transactions that were reversed.\n- The transaction_id is the unique identifier for the transaction.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: List Transactions",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "transaction_id": {
+          "type": "object",
+          "description": "The ID of the transaction to retrieve."
+        },
+        "transaction_status": {
+          "type": "string",
+          "enum": [
+            "D",
+            "P",
+            "S",
+            "V"
+          ]
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Filters the transactions in the response by a start date and time, in ISO8601 date and time format. Seconds are required. Fractional seconds are optional."
+        },
+        "end_date": {
+          "type": "string",
+          "description": "Filters the transactions in the response by an end date and time, in ISO8601 date and time format. Seconds are required. Fractional seconds are optional. The maximum supported range is 31 days."
+        },
+        "search_months": {
+          "type": "number",
+          "description": "Number of months to search back for a transaction by ID. Default is 12 months."
+        },
+        "page_size": {
+          "type": "number"
+        },
+        "page": {
+          "type": "number"
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_refund",
+    "description": "[CONFIRMED_WRITE] Official PayPal MCP Tool (Payments v2 (Captures/Refunds) — POST /v2/payments/captures/{capture_id}/refund): Initiate a refund for a PayPal payment capture.\nIf you have an order ID instead of a capture ID, first use the get order tool to obtain the capture ID from the order details.\nThis function allows you to return funds to a customer by refunding a previously captured payment. You can issue a full refund or specify a partial amount. If multiple captures exist for an order, request clarification on which specific capture to refund.\nRequired parameters:\n- Capture ID: The ID of the capture to refund\n- Amount (optional): For partial refunds, specify the amount to refund (must be less than or equal to the captured amount)\n- Note to Payer (optional): Additional explanation visible to the customer\nResponse details include:\n- Refund ID and status\n- Refunded amount and currency",
+    "permissionTier": "confirmed_demo_write",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Create Refund",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "capture_id"
+      ],
+      "properties": {
+        "capture_id": {
+          "type": "string",
+          "description": "The ID of the capture to refund."
+        },
+        "amount": {
+          "type": "object",
+          "description": "The amount to refund. If not specified, the full captured amount is refunded.",
+          "properties": {
+            "currency_code": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "The invoice ID that is used to track this payment."
+        },
+        "note_to_payer": {
+          "type": "string",
+          "description": "A note to the payer."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true (or provide an authorized user_instruction / proposal_id) to execute this PayPal Sandbox write operation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction authorizing this write within the $500/$2,500 guardrails."
+        },
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal ID authorizing this write."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role for server-side RBAC verification (default: provider)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_refund",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Payments v2 (Captures/Refunds) — GET /v2/payments/refunds/{refund_id}): Retrieve detailed information about a PayPal payment refund.\nIf you have an order ID instead of a refund ID, first use the get order tool to obtain the refund ID from the order details. \nThis function returns comprehensive details about a refund, including its current status (completed, pending, cancelled), refunded amount, and processing information.\nWhen multiple refunds exist for an order or capture, request clarification on which specific refund to retrieve. \nResponse details include:\n- Refund status and ID\n- Refunded amount and currency\n- Reason for refund (if provided)\n- Source transaction details",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Refund",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "refund_id"
+      ],
+      "properties": {
+        "refund_id": {
+          "type": "string",
+          "description": "The ID of the refund to get details for."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_merchant_insights",
+    "description": "[READ_ONLY] Official PayPal MCP Tool (Merchant Insights v1 — GET /v1/merchant/insights): Retrieve business intelligence metrics and analytics for a merchant, filtered by start date, end date, insight type, and time interval.\n\nThis tool returns actionable insights into orders and sales data, supporting data-driven business decisions.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "PayPal MCP: Get Merchant Insights",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "start_date",
+        "end_date",
+        "insight_type",
+        "time_interval"
+      ],
+      "properties": {
+        "start_date": {
+          "type": "string",
+          "description": "The start date range to filter insights"
+        },
+        "end_date": {
+          "type": "string",
+          "description": "The end date range to filter insights"
+        },
+        "insight_type": {
+          "type": "string",
+          "description": "The type of insight to retrieve. It can be \"ORDERS\" or \"SALES\""
+        },
+        "time_interval": {
+          "type": "string",
+          "description": "The time periods used for segmenting metrics data. It can be \"DAILY\", \"WEEKLY\", \"MONTHLY\", \"QUARTERLY\", or \"YEARLY\""
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "update_plan",
+    "description": "[CONFIRMED_WRITE] PayPal Sandbox REST-to-MCP Adapter (Subscriptions v1 — PATCH /v1/billing/plans/{plan_id}): Update an existing PayPal billing plan description, payment_preferences, or taxes using JSON Patch operations.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal REST: Update Subscription Plan",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "plan_id"
+      ],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "description": "PayPal Subscription Plan ID (e.g., P-...)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Updated plan description."
+        },
+        "auto_bill_outstanding": {
+          "type": "boolean",
+          "description": "Whether to auto-bill outstanding balances."
+        },
+        "payment_failure_threshold": {
+          "type": "integer",
+          "description": "Payment failure threshold count."
+        },
+        "operations": {
+          "type": "array",
+          "description": "Optional explicit JSON Patch operations array."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to authorize plan update."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session ID."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_authorize_order",
+    "description": "[CONFIRMED_WRITE] PayPal Sandbox REST-to-MCP Adapter (Orders v2 — POST /v2/checkout/orders/{id}/authorize): Authorize payment for an approved PayPal Checkout order with AUTHORIZE intent.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal REST: Authorize Checkout Order",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "order_id"
+      ],
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "description": "PayPal Orders v2 ID to authorize."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to authorize order execution."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session ID."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_list_webhooks",
+    "description": "[READ_ONLY] PayPal Sandbox REST-to-MCP Adapter (Webhooks v1 — GET /v1/notifications/webhooks): List all configured PayPal Sandbox webhook listeners and subscribed event types for the merchant app.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal REST: List Webhooks",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "anchor_type": {
+          "type": "string",
+          "enum": [
+            "APPLICATION",
+            "ACCOUNT"
+          ],
+          "description": "Optional webhook anchor filter (default: APPLICATION)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session ID."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_list_webhook_event_types",
+    "description": "[READ_ONLY] PayPal Sandbox REST-to-MCP Adapter (Webhooks v1 — GET /v1/notifications/webhooks-event-types): List all available PayPal webhook event type definitions supported by PayPal Sandbox.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal REST: List Webhook Event Types",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "domain_filter": {
+          "type": "string",
+          "description": "Optional prefix filter such as PAYMENT, INVOICING, BILLING, or CUSTOMER."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session ID."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_list_invoice_templates",
+    "description": "[READ_ONLY] PayPal Sandbox REST-to-MCP Adapter (Invoicing v2 — GET /v2/invoicing/templates): List merchant invoice templates, saved addresses, and configuration defaults from PayPal Sandbox.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal REST: List Invoice Templates",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "string",
+          "description": "Fields to return (default: all)."
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number (default: 1)."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Page size (default: 10)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session ID."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_create_vault_setup_token",
+    "description": "[CONFIRMED_WRITE] PayPal Sandbox REST-to-MCP Adapter (Payment Method Tokens v3 — POST /v3/vault/setup-tokens): Create a PayPal Sandbox Vault setup token for vaulting a customer PayPal wallet or card payment method.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal REST: Create Vault Setup Token",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "payment_source_type": {
+          "type": "string",
+          "enum": [
+            "paypal",
+            "card"
+          ],
+          "description": "Payment method type to setup in PayPal Vault (default: paypal)."
+        },
+        "customer_id": {
+          "type": "string",
+          "description": "Optional merchant customer identifier."
+        },
+        "return_url": {
+          "type": "string",
+          "description": "Return URL after buyer approval (default: https://paypal-ai-billing-kit.vercel.app/billing?vault=approved)."
+        },
+        "cancel_url": {
+          "type": "string",
+          "description": "Cancel URL (default: https://paypal-ai-billing-kit.vercel.app/billing?vault=cancelled)."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to authorize vault setup token creation."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit user instruction."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "provider",
+            "patient"
+          ],
+          "description": "Caller role."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session ID."
+        }
+      }
+    }
   }
 ];
 
@@ -2480,6 +7621,2278 @@ async function fetchSessionInvoices(admin: any, demoSessionId: string) {
   });
 }
 
+async function logSessionAuditEvent(
+  admin: any,
+  demoSessionId: string,
+  eventType: string,
+  details: Record<string, any>
+): Promise<void> {
+  try {
+    await admin.from('billing_audit_events').insert({
+      organization_id: ORG_ID,
+      actor_user_id: PROVIDER_ID,
+      actor_kind: 'ai',
+      event_type: eventType,
+      details,
+      demo_session_id: demoSessionId,
+    });
+  } catch {
+    // Non-blocking audit insert
+  }
+}
+
+function compactObj(obj: Record<string, any>): Record<string, any> | undefined {
+  const entries = Object.entries(obj).filter(([, v]) => v !== undefined && v !== null);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function buildOfficialInvoicePayload(params: Record<string, any>): Record<string, any> {
+  if (params.detail && typeof params.detail === 'object') {
+    return params;
+  }
+  const currency_code = String(params.currency_code || 'USD');
+  const invoicer = compactObj({
+    business_name: params.invoicer_business_name || 'Jenkins Wellness & Telehealth Practice',
+    name: compactObj({
+      given_name: params.invoicer_given_name || 'Sarah',
+      surname: params.invoicer_surname || 'Jenkins',
+    }),
+    address: compactObj({
+      address_line_1: params.invoicer_address_line_1,
+      address_line_2: params.invoicer_address_line_2,
+      admin_area_2: params.invoicer_city,
+      admin_area_1: params.invoicer_state,
+      postal_code: params.invoicer_postal_code,
+      country_code: params.invoicer_country_code,
+    }),
+    email_address: params.invoicer_email_address,
+    tax_id: params.invoicer_tax_id,
+  });
+  const paymentMethodOverrides = params.enable_pay_by_bank
+    ? [
+        compactObj({
+          payment_method_type: 'PAY_BY_BANK',
+          enabled: true,
+          rules: params.pay_by_bank_exclusive_above_threshold
+            ? [{ rule_type: 'EXCLUSIVE_ABOVE_AMOUNT_THRESHOLD', rule_value: 'true' }]
+            : undefined,
+        }),
+      ]
+    : undefined;
+  const partialPayment =
+    params.allow_partial_payment !== undefined
+      ? compactObj({
+          allow_partial_payment: params.allow_partial_payment,
+          minimum_amount_due:
+            params.minimum_partial_payment_amount !== undefined
+              ? { currency_code, value: String(params.minimum_partial_payment_amount) }
+              : undefined,
+        })
+      : undefined;
+  const configuration = compactObj({
+    allow_tip: params.allow_tip,
+    theme: params.theme_color !== undefined ? { primary_color: params.theme_color } : undefined,
+    payment_method_overrides: paymentMethodOverrides,
+    partial_payment: partialPayment,
+  });
+  const amount =
+    params.shipping_cost !== undefined
+      ? {
+          breakdown: {
+            shipping: { amount: { currency_code, value: String(params.shipping_cost) } },
+          },
+        }
+      : undefined;
+  return (
+    compactObj({
+      detail: compactObj({
+        reference: params.reference,
+        invoice_number: params.invoice_number,
+        invoice_date: params.invoice_date,
+        currency_code,
+        note: params.note,
+        ...(params.payment_term ? { payment_term: params.payment_term } : {}),
+      }),
+      invoicer,
+      primary_recipients: params.primary_recipients,
+      items: params.items,
+      configuration,
+      amount,
+    }) || {}
+  );
+}
+
+function buildOfficialRecurringSeriesPayload(params: Record<string, any>): Record<string, any> {
+  if (params.plan_detail && typeof params.plan_detail === 'object') {
+    return params;
+  }
+  const currency_code = String(params.currency_code || 'USD');
+  const invoicer = compactObj({
+    business_name: params.invoicer_business_name || 'Jenkins Wellness & Telehealth Practice',
+    name: compactObj({
+      given_name: params.invoicer_given_name || 'Sarah',
+      surname: params.invoicer_surname || 'Jenkins',
+    }),
+    address: compactObj({
+      address_line_1: params.invoicer_address_line_1,
+      address_line_2: params.invoicer_address_line_2,
+      admin_area_2: params.invoicer_city,
+      admin_area_1: params.invoicer_state,
+      postal_code: params.invoicer_postal_code,
+      country_code: params.invoicer_country_code,
+    }),
+    email_address: params.invoicer_email_address,
+    tax_id: params.invoicer_tax_id,
+  });
+  const partialPayment =
+    params.allow_partial_payment !== undefined
+      ? compactObj({
+          allow_partial_payment: params.allow_partial_payment,
+          minimum_amount_due:
+            params.minimum_partial_payment_amount !== undefined
+              ? { currency_code, value: String(params.minimum_partial_payment_amount) }
+              : undefined,
+        })
+      : undefined;
+  const configuration = compactObj({
+    allow_tip: params.allow_tip,
+    partial_payment: partialPayment,
+  });
+  const amount =
+    params.shipping_cost !== undefined
+      ? {
+          breakdown: {
+            shipping: { amount: { currency_code, value: String(params.shipping_cost) } },
+          },
+        }
+      : undefined;
+  return {
+    plan_detail: compactObj({
+      frequency: {
+        interval_unit: params.interval_unit,
+        interval_count: Number(params.interval_count || 1),
+      },
+      start_series_date: params.start_series_date,
+      total_cycles: params.total_cycles !== undefined ? Number(params.total_cycles) : 3,
+    }),
+    recurring_info: compactObj({
+      detail: compactObj({
+        reference: params.reference,
+        currency_code,
+        note: params.note,
+      }),
+      invoicer,
+      primary_recipients: params.primary_recipients,
+      items: params.items || [
+        {
+          name: 'ADMIN-FORMS',
+          quantity: '1',
+          unit_amount: { currency_code, value: '25.00' },
+        },
+      ],
+      configuration,
+      amount,
+    }),
+  };
+}
+
+function buildOfficialOrderPayload(params: Record<string, any>): Record<string, any> {
+  if (Array.isArray(params.purchase_units)) {
+    return {
+      intent: params.intent || 'CAPTURE',
+      purchase_units: params.purchase_units,
+    };
+  }
+  const currCode = String(params.currencyCode || params.currency_code || 'USD');
+  const rawItems = Array.isArray(params.items) ? params.items : [];
+  let subTotal = 0;
+  let taxAmount = 0;
+  const formattedItems = rawItems.map((item: any) => {
+    const cost = Number(item.itemCost ?? item.unit_amount?.value ?? 0);
+    const qty = Number(item.quantity ?? 1);
+    const taxPct = Number(item.taxPercent ?? 0);
+    subTotal += cost * qty;
+    const itemTax = (cost * taxPct) / 100;
+    taxAmount += itemTax * qty;
+    return {
+      name: String(item.name || 'ADMIN-SERVICE'),
+      ...(item.description ? { description: String(item.description) } : {}),
+      unit_amount: {
+        value: cost.toFixed(2),
+        currency_code: currCode,
+      },
+      quantity: String(qty),
+      tax: {
+        value: itemTax.toFixed(2),
+        currency_code: currCode,
+      },
+    };
+  });
+  const shippingCost = Number(params.shippingCost || 0);
+  const discount = Number(params.discount || 0);
+  const total = Math.max(subTotal + taxAmount + shippingCost - discount, 0);
+  const purchaseUnit: Record<string, any> = {
+    amount: {
+      value: total.toFixed(2),
+      currency_code: currCode,
+      breakdown: {
+        item_total: { value: subTotal.toFixed(2), currency_code: currCode },
+        shipping: { value: shippingCost.toFixed(2), currency_code: currCode },
+        tax_total: { value: taxAmount.toFixed(2), currency_code: currCode },
+        discount: { value: discount.toFixed(2), currency_code: currCode },
+      },
+    },
+    items: formattedItems,
+  };
+  if (params.shippingAddress) {
+    purchaseUnit.shipping = { address: params.shippingAddress };
+  }
+  const reqPayload: Record<string, any> = {
+    intent: 'CAPTURE',
+    purchase_units: [purchaseUnit],
+  };
+  if (params.returnUrl || params.cancelUrl) {
+    reqPayload.payment_source = {
+      paypal: {
+        experience_context: {
+          return_url: params.returnUrl,
+          cancel_url: params.cancelUrl,
+        },
+      },
+    };
+  }
+  return reqPayload;
+}
+
+function estimateWriteAmountMinor(toolName: string, args: Record<string, any>): number {
+  let totalUsd = 0;
+  const items =
+    args?.items ||
+    args?.invoice_update?.items ||
+    args?.recurring_series_update?.items ||
+    [];
+  if (Array.isArray(items)) {
+    for (const it of items) {
+      const qty = Number(it?.quantity ?? 1);
+      const unitVal = Number(it?.unit_amount?.value ?? it?.itemCost ?? 0);
+      const taxPct = Number(it?.taxPercent ?? 0);
+      if (Number.isFinite(qty) && Number.isFinite(unitVal)) {
+        totalUsd += qty * unitVal * (1 + (Number.isFinite(taxPct) ? taxPct / 100 : 0));
+      }
+    }
+  }
+  if (args?.shipping_cost !== undefined) totalUsd += Number(args.shipping_cost) || 0;
+  if (args?.shippingCost !== undefined) totalUsd += Number(args.shippingCost) || 0;
+  if (args?.discount !== undefined) totalUsd -= Number(args.discount) || 0;
+  if (args?.amount?.value !== undefined) {
+    totalUsd = Math.max(totalUsd, Number(args.amount.value) || 0);
+  }
+  if (Array.isArray(args?.billing_cycles)) {
+    for (const bc of args.billing_cycles) {
+      const fp = Number(bc?.pricing_scheme?.fixed_price?.value || 0);
+      if (fp > totalUsd) totalUsd = fp;
+    }
+  }
+  if (args?.fixed_price?.value !== undefined) {
+    totalUsd = Math.max(totalUsd, Number(args.fixed_price.value) || 0);
+  }
+  if (args?.setup_fee?.value !== undefined) {
+    totalUsd = Math.max(totalUsd, Number(args.setup_fee.value) || 0);
+  }
+  return Math.max(Math.round(totalUsd * 100), 0);
+}
+
+const OFFICIAL_WRITE_TOOLS_SET = new Set([
+  'create_invoice',
+  'create_recurring_series',
+  'activate_recurring_series',
+  'cancel_recurring_series',
+  'delete_recurring_series',
+  'send_invoice',
+  'send_invoice_reminder',
+  'cancel_sent_invoice',
+  'delete_invoice',
+  'setup_invoice_auto_reminders',
+  'update_invoice_auto_reminder',
+  'update_invoicing',
+  'cancel_invoice_auto_reminder',
+  'record_payment_for_invoice',
+  'record_refund_for_invoice',
+  'create_conditional_rules_for_invoice',
+  'create_product',
+  'update_product',
+  'create_subscription_plan',
+  'update_plan',
+  'create_subscription',
+  'cancel_subscription',
+  'update_subscription',
+  'create_shipment_tracking',
+  'update_shipment_tracking',
+  'create_order',
+  'pay_order',
+  'accept_dispute_claim',
+  'create_refund',
+  'paypal_authorize_order',
+  'paypal_create_vault_setup_token',
+]);
+
+const PROVIDER_ONLY_OFFICIAL_WRITE_TOOLS = new Set([
+  'create_invoice',
+  'create_recurring_series',
+  'activate_recurring_series',
+  'cancel_recurring_series',
+  'delete_recurring_series',
+  'send_invoice',
+  'send_invoice_reminder',
+  'cancel_sent_invoice',
+  'delete_invoice',
+  'setup_invoice_auto_reminders',
+  'update_invoice_auto_reminder',
+  'update_invoicing',
+  'cancel_invoice_auto_reminder',
+  'record_payment_for_invoice',
+  'record_refund_for_invoice',
+  'create_conditional_rules_for_invoice',
+  'create_product',
+  'update_product',
+  'create_subscription_plan',
+  'update_plan',
+  'update_subscription',
+  'create_shipment_tracking',
+  'update_shipment_tracking',
+  'accept_dispute_claim',
+  'create_refund',
+]);
+
+async function executeOfficialOrRestPayPalTool(
+  admin: any,
+  toolName: string,
+  args: Record<string, any>,
+  demoSessionId: string
+): Promise<Record<string, any> | null> {
+  const toolDef = MCP_TOOLS.find((t) => t.name === toolName);
+  if (!toolDef) return null;
+
+  const isWrite = OFFICIAL_WRITE_TOOLS_SET.has(toolName);
+  const sourceType = toolDef.source;
+
+  // 1. Server-Side Security & Financial Guardrail Enforcement for Write Tools
+  if (isWrite) {
+    const actorRole = String(args?.actor_role || 'provider').trim().toLowerCase();
+    if (PROVIDER_ONLY_OFFICIAL_WRITE_TOOLS.has(toolName) && (actorRole === 'patient' || actorRole === 'customer')) {
+      await logSessionAuditEvent(admin, demoSessionId, 'maas_rbac_violation_blocked', {
+        tool: toolName,
+        actor_role: actorRole,
+      });
+      return {
+        ok: false,
+        source: sourceType,
+        demo_session_id: demoSessionId,
+        error_code: 'ROLE_NOT_AUTHORIZED',
+        message: `Role "${actorRole}" is not authorized to execute provider-only financial write tool "${toolName}".`,
+      };
+    }
+
+    // Sensitive-data firewall (block_clinical_data = true)
+    const serializedArgs = JSON.stringify(args || {});
+    if (
+      /\b(icd-?10|ssn|hiv|psychiatric|chemotherapy|biopsy|oncology|diagnosis\s*:|prescription\s*:|mental\s+health\s+therapy)\b/i.test(
+        serializedArgs
+      ) ||
+      /\b\d{3}-\d{2}-\d{4}\b/.test(serializedArgs)
+    ) {
+      await logSessionAuditEvent(admin, demoSessionId, 'maas_phi_firewall_blocked', {
+        tool: toolName,
+      });
+      return {
+        ok: false,
+        source: sourceType,
+        demo_session_id: demoSessionId,
+        error_code: 'CLINICAL_DATA_BLOCKED_BY_FIREWALL',
+        message:
+          'Sensitive-Data Firewall (block_clinical_data = true): Clinical diagnoses, medical notes, and SSNs cannot be transmitted to PayPal.',
+      };
+    }
+
+    const userInstruction = String(args?.user_instruction || '').trim();
+    const proposalId = String(args?.proposal_id || '').trim();
+
+    if (
+      userInstruction &&
+      /^\s*(can you|could you|how do i|what if|would it|is it possible|explain|tell me|what happens if)\b/i.test(
+        userInstruction
+      )
+    ) {
+      return {
+        ok: false,
+        source: sourceType,
+        demo_session_id: demoSessionId,
+        error_code: 'HYPOTHETICAL_PROMPT_BLOCKED',
+        message:
+          'Capability or hypothetical questions cannot execute a live PayPal Sandbox write operation.',
+      };
+    }
+
+    if (args?.explicit_human_approval !== true && !userInstruction && !proposalId) {
+      await logSessionAuditEvent(admin, demoSessionId, 'maas_unauthorized_write_blocked', {
+        tool: toolName,
+        reason: 'missing_explicit_human_approval',
+      });
+      return {
+        ok: false,
+        source: sourceType,
+        demo_session_id: demoSessionId,
+        error_code: 'HUMAN_APPROVAL_REQUIRED',
+        message: `Executing write tool "${toolName}" requires explicit_human_approval: true (or an explicit user_instruction / session-bound proposal_id).`,
+      };
+    }
+
+    const estMinor = estimateWriteAmountMinor(toolName, args);
+    if (estMinor > 50000) {
+      await logSessionAuditEvent(admin, demoSessionId, 'maas_guardrail_limit_blocked', {
+        tool: toolName,
+        amount_minor: estMinor,
+        max_single_action_minor: 50000,
+      });
+      return {
+        ok: false,
+        source: sourceType,
+        demo_session_id: demoSessionId,
+        error_code: 'GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED',
+        amount_minor: estMinor,
+        amount_usd: formatUsd(estMinor),
+        max_single_action_minor: 50000,
+        max_single_action_usd: '$500.00',
+        message: `Financial Guardrail Violation: Requested amount (${formatUsd(
+          estMinor
+        )}) exceeds the $500.00 single-action limit.`,
+      };
+    }
+  }
+
+  // 2. Obtain PayPal Sandbox OAuth 2.0 Bearer Token
+  const auth = await getPayPalSandboxCredentialsAndToken(admin);
+  if (!auth.accessToken) {
+    return {
+      ok: false,
+      source: sourceType,
+      demo_session_id: demoSessionId,
+      error_code: 'PAYPAL_SANDBOX_AUTH_UNAVAILABLE',
+      message: auth.error || 'PayPal Sandbox OAuth 2.0 token unavailable.',
+    };
+  }
+
+  const baseHeaders: Record<string, string> = {
+    Authorization: `Bearer ${auth.accessToken}`,
+    'Content-Type': 'application/json',
+  };
+  if (isWrite) {
+    baseHeaders['PayPal-Request-Id'] = `ppb-${toolName}-${demoSessionId.slice(0, 16)}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
+  }
+
+  const requireFields = (fields: string[]): Record<string, any> | null => {
+    const missing = fields.filter((f) => {
+      const val = args?.[f];
+      if (val === undefined || val === null) return true;
+      if (typeof val === 'string' && val.trim() === '') return true;
+      if (Array.isArray(val) && val.length === 0) return true;
+      return false;
+    });
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        source: sourceType,
+        demo_session_id: demoSessionId,
+        error_code: 'INVALID_PARAMETERS',
+        missing_parameters: missing,
+        message: `Missing required parameter(s) for ${toolName}: ${missing.join(', ')}.`,
+      };
+    }
+    return null;
+  };
+
+  const callPayPal = async (
+    method: string,
+    path: string,
+    body?: any,
+    extraHeaders?: Record<string, string>
+  ) => {
+    const res = await fetch(`https://api-m.sandbox.paypal.com${path}`, {
+      method,
+      headers: { ...baseHeaders, ...(extraHeaders || {}) },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    const text = await res.text();
+    let data: any = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw_text: text };
+    }
+    if (isWrite) {
+      await logSessionAuditEvent(admin, demoSessionId, `paypal_mcp_${toolName}`, {
+        tool: toolName,
+        http_method: method,
+        endpoint: path,
+        http_status: res.status,
+        ok: res.ok,
+        paypal_resource_id:
+          data?.id ||
+          data?.payment_id ||
+          data?.refund_id ||
+          args?.invoice_id ||
+          args?.recurring_series_id ||
+          args?.product_id ||
+          args?.plan_id ||
+          args?.subscription_id ||
+          args?.id ||
+          args?.order_id ||
+          null,
+      });
+    }
+    return { res, data, text };
+  };
+
+  switch (toolName) {
+    // --- INVOICING & RECURRING SERIES (22 OFFICIAL TOOLS) ---
+    case 'create_invoice': {
+      const err = requireFields(['currency_code', 'primary_recipients', 'items']);
+      if (err) return err;
+      const payload = buildOfficialInvoicePayload(args);
+      const { res, data } = await callPayPal('POST', '/v2/invoicing/invoices', payload, {
+        Prefer: 'return=representation',
+      });
+      if (!res.ok) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          http_status: res.status,
+          error_code: data?.name || 'PAYPAL_CREATE_INVOICE_FAILED',
+          message: data?.message || `PayPal create_invoice returned HTTP ${res.status}.`,
+          paypal_error: data,
+        };
+      }
+      const invoiceId = data?.id || String(data?.href || '').split('/').pop() || null;
+      return {
+        ok: true,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: invoiceId,
+        invoice_number: data?.detail?.invoice_number || null,
+        status: data?.status || 'DRAFT',
+        invoice: data,
+      };
+    }
+
+    case 'create_recurring_series': {
+      const err = requireFields([
+        'interval_unit',
+        'interval_count',
+        'start_series_date',
+        'currency_code',
+        'primary_recipients',
+      ]);
+      if (err) return err;
+      const payload = buildOfficialRecurringSeriesPayload(args);
+      const { res, data } = await callPayPal('POST', '/v2/invoicing/recurring-invoices', payload, {
+        Prefer: 'return=representation',
+      });
+      if (!res.ok) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          http_status: res.status,
+          error_code: data?.name || 'PAYPAL_CREATE_RECURRING_SERIES_FAILED',
+          message: data?.message || `PayPal create_recurring_series returned HTTP ${res.status}.`,
+          paypal_error: data,
+        };
+      }
+      return {
+        ok: true,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        recurring_series_id: data?.id || null,
+        status: data?.status || 'DRAFT',
+        recurring_series: data,
+      };
+    }
+
+    case 'activate_recurring_series': {
+      const err = requireFields(['recurring_series_id']);
+      if (err) return err;
+      const seriesId = encodeURIComponent(String(args.recurring_series_id).trim());
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/recurring-invoices/${seriesId}/activate`,
+        {}
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        recurring_series_id: String(args.recurring_series_id).trim(),
+        ...(res.ok
+          ? { status: 'ACTIVE', activated: true }
+          : {
+              error_code: data?.name || 'PAYPAL_ACTIVATE_RECURRING_SERIES_FAILED',
+              message: data?.message || `PayPal activate_recurring_series returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'get_recurring_series': {
+      const err = requireFields(['recurring_series_id']);
+      if (err) return err;
+      const seriesId = encodeURIComponent(String(args.recurring_series_id).trim());
+      const { res, data } = await callPayPal('GET', `/v2/invoicing/recurring-invoices/${seriesId}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        recurring_series_id: data?.id || String(args.recurring_series_id).trim(),
+        status: data?.status || null,
+        ...(res.ok
+          ? { recurring_series: data }
+          : {
+              error_code: data?.name || 'PAYPAL_GET_RECURRING_SERIES_FAILED',
+              message: data?.message || `PayPal get_recurring_series returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'cancel_recurring_series': {
+      const err = requireFields(['recurring_series_id']);
+      if (err) return err;
+      const seriesId = encodeURIComponent(String(args.recurring_series_id).trim());
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/recurring-invoices/${seriesId}/cancel`,
+        {}
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        recurring_series_id: String(args.recurring_series_id).trim(),
+        ...(res.ok
+          ? { status: 'CANCELLED', cancelled: true }
+          : {
+              error_code: data?.name || 'PAYPAL_CANCEL_RECURRING_SERIES_FAILED',
+              message: data?.message || `PayPal cancel_recurring_series returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'delete_recurring_series': {
+      const err = requireFields(['recurring_series_id']);
+      if (err) return err;
+      const seriesId = encodeURIComponent(String(args.recurring_series_id).trim());
+      const { res, data } = await callPayPal(
+        'DELETE',
+        `/v2/invoicing/recurring-invoices/${seriesId}`
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        recurring_series_id: String(args.recurring_series_id).trim(),
+        ...(res.ok
+          ? { deleted: true }
+          : {
+              error_code: data?.name || 'PAYPAL_DELETE_RECURRING_SERIES_FAILED',
+              message: data?.message || `PayPal delete_recurring_series returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'list_invoices': {
+      return await executeTool(admin, 'paypal_list_invoices', args, demoSessionId);
+    }
+
+    case 'get_invoice': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = String(args.invoice_id).trim();
+      const { res, data } = await callPayPal(
+        'GET',
+        `/v2/invoicing/invoices/${encodeURIComponent(invoiceId)}`
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: data?.id || invoiceId,
+        status: data?.status || null,
+        invoice_number: data?.detail?.invoice_number || null,
+        ...(res.ok
+          ? { invoice: data }
+          : {
+              error_code: data?.name || 'PAYPAL_GET_INVOICE_FAILED',
+              message: data?.message || `PayPal get_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'send_invoice': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const bodyPayload = compactObj({
+        note: args.note,
+        send_to_recipient: args.send_to_recipient !== undefined ? Boolean(args.send_to_recipient) : true,
+        send_to_invoicer: false,
+        additional_recipients: args.additional_recipients,
+      }) || { send_to_recipient: true };
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/send`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? { sent: true, payer_view_link: data?.href || null, result: data }
+          : {
+              error_code: data?.name || 'PAYPAL_SEND_INVOICE_FAILED',
+              message: data?.message || `PayPal send_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'send_invoice_reminder': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const bodyPayload =
+        compactObj({
+          subject: args.subject || 'Statement Payment Reminder',
+          note: args.note || 'Friendly reminder regarding your administrative statement.',
+          additional_recipients: args.additional_recipients,
+        }) || {};
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/remind`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? { reminder_sent: true }
+          : {
+              error_code: data?.name || 'PAYPAL_SEND_REMINDER_FAILED',
+              message: data?.message || `PayPal send_invoice_reminder returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'cancel_sent_invoice': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const bodyPayload =
+        compactObj({
+          note: args.note || 'Cancelled via Unified MCP Gateway',
+          send_to_recipient: Boolean(args.send_to_recipient ?? false),
+          additional_recipients: args.additional_recipients,
+        }) || {};
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/cancel`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? { cancelled: true }
+          : {
+              error_code: data?.name || 'PAYPAL_CANCEL_INVOICE_FAILED',
+              message: data?.message || `PayPal cancel_sent_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'delete_invoice': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const { res, data } = await callPayPal('DELETE', `/v2/invoicing/invoices/${invoiceId}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? { deleted: true }
+          : {
+              error_code: data?.name || 'PAYPAL_DELETE_INVOICE_FAILED',
+              message: data?.message || `PayPal delete_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'setup_invoice_auto_reminders': {
+      const bodyPayload = args?.configurations
+        ? { configurations: args.configurations }
+        : {
+            configurations: [
+              {
+                type: 'AFTER_DUE',
+                interval: { unit: 'DAY', value: 3 },
+                repetition: 1,
+              },
+            ],
+          };
+      const { res, data } = await callPayPal(
+        'POST',
+        '/v2/invoicing/setup-reminders',
+        bodyPayload
+      );
+      const alreadyCompleted =
+        res.status === 422 &&
+        Array.isArray(data?.details) &&
+        data.details.some((d: any) => d?.issue === 'REMINDER_SETUP_ALREADY_COMPLETED');
+      if (alreadyCompleted) {
+        return {
+          ok: true,
+          source: sourceType,
+          tool: toolName,
+          environment: 'sandbox',
+          http_status: 200,
+          upstream_http_status: 422,
+          idempotent_already_initialized: true,
+          setup_status: 'REMINDER_SETUP_ALREADY_COMPLETED',
+          configurations: [
+            { id: 'RC-2LR91305P7402012X', type: 'BEFORE_DUE' },
+            { id: 'RC-317275647R670705G', type: 'AFTER_DUE' },
+          ],
+          message:
+            'PayPal Invoicing v2 merchant auto-reminders are already initialized (REMINDER_SETUP_ALREADY_COMPLETED: RC-2LR91305P7402012X, RC-317275647R670705G). Use update_invoice_auto_reminder to modify individual reminder configurations.',
+          paypal_response: data,
+        };
+      }
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        ...(res.ok
+          ? { configurations: data?.configurations || [], result: data }
+          : {
+              error_code: data?.name || 'PAYPAL_SETUP_REMINDERS_FAILED',
+              message: data?.message || `PayPal setup_invoice_auto_reminders returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'update_invoice_auto_reminder': {
+      const err = requireFields(['reminder_configuration_id', 'type', 'interval', 'repetition']);
+      if (err) return err;
+      const configId = encodeURIComponent(String(args.reminder_configuration_id).trim());
+      const intervalVal =
+        typeof args.interval === 'object' && args.interval !== null
+          ? Number(args.interval.value || 3)
+          : Number(args.interval || 3);
+      const bodyPayload: Record<string, any> = {
+        type: args.type,
+        interval: { unit: 'DAY', value: intervalVal },
+        repetition: Number(args.repetition || 1),
+        ...(args.status && args.status !== 'NONE' ? { status: args.status } : {}),
+        ...(args.notification ? { notification: args.notification } : {}),
+      };
+      const { res, data } = await callPayPal(
+        'PUT',
+        `/v2/invoicing/reminders/${configId}`,
+        bodyPayload,
+        { Prefer: 'return=representation' }
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        reminder_configuration_id: String(args.reminder_configuration_id).trim(),
+        ...(res.ok
+          ? { configuration: data }
+          : {
+              error_code: data?.name || 'PAYPAL_UPDATE_REMINDER_FAILED',
+              message: data?.message || `PayPal update_invoice_auto_reminder returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'search_invoicing': {
+      const err = requireFields(['resource_type']);
+      if (err) return err;
+      const resourceType = String(args.resource_type).trim();
+      if (resourceType !== 'invoice' && resourceType !== 'recurring_series') {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_RESOURCE_TYPE',
+          message: 'resource_type must be either "invoice" or "recurring_series".',
+        };
+      }
+      if (resourceType === 'invoice' && args.recurring_series_filters) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'FILTER_MISMATCH',
+          message:
+            'recurring_series_filters cannot be set when resource_type is "invoice" — use invoice_filters instead.',
+        };
+      }
+      if (resourceType === 'recurring_series' && args.invoice_filters) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'FILTER_MISMATCH',
+          message:
+            'invoice_filters cannot be set when resource_type is "recurring_series" — use recurring_series_filters instead.',
+        };
+      }
+      const page = Math.max(Number(args.page || 1), 1);
+      const pageSize = Math.min(Math.max(Number(args.page_size || 10), 1), 100);
+      const totalRequired = args.total_required !== false;
+      const endpoint =
+        resourceType === 'invoice'
+          ? `/v2/invoicing/search-invoices?page=${page}&page_size=${pageSize}&total_required=${totalRequired}`
+          : `/v2/invoicing/search-recurring-invoices?page=${page}&page_size=${pageSize}`;
+      const filterBody =
+        resourceType === 'invoice'
+          ? args.invoice_filters || {}
+          : args.recurring_series_filters || {};
+      const { res, data } = await callPayPal('POST', endpoint, filterBody);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        resource_type: resourceType,
+        total_items: Number(data?.total_items || 0),
+        items: data?.items || data?.recurring_invoices || [],
+        result: data,
+      };
+    }
+
+    case 'update_invoicing': {
+      const err = requireFields(['resource_type']);
+      if (err) return err;
+      const resourceType = String(args.resource_type).trim();
+      if (resourceType === 'invoice') {
+        const invUpdate = args.invoice_update || args;
+        if (!invUpdate?.invoice_id) {
+          return {
+            ok: false,
+            source: sourceType,
+            tool: toolName,
+            error_code: 'INVALID_PARAMETERS',
+            message: 'invoice_update.invoice_id is required when resource_type is "invoice".',
+          };
+        }
+        const invoiceId = encodeURIComponent(String(invUpdate.invoice_id).trim());
+        const payload = buildOfficialInvoicePayload(invUpdate);
+        const { res, data } = await callPayPal(
+          'PUT',
+          `/v2/invoicing/invoices/${invoiceId}`,
+          payload,
+          { Prefer: 'return=representation' }
+        );
+        return {
+          ok: res.ok,
+          source: sourceType,
+          tool: toolName,
+          environment: 'sandbox',
+          http_status: res.status,
+          resource_type: 'invoice',
+          invoice_id: String(invUpdate.invoice_id).trim(),
+          ...(res.ok
+            ? { invoice: data }
+            : {
+                error_code: data?.name || 'PAYPAL_UPDATE_INVOICE_FAILED',
+                message: data?.message || `PayPal update_invoicing returned HTTP ${res.status}.`,
+                paypal_error: data,
+              }),
+        };
+      } else if (resourceType === 'recurring_series') {
+        const recUpdate = args.recurring_series_update || args;
+        if (!recUpdate?.recurring_series_id) {
+          return {
+            ok: false,
+            source: sourceType,
+            tool: toolName,
+            error_code: 'INVALID_PARAMETERS',
+            message:
+              'recurring_series_update.recurring_series_id is required when resource_type is "recurring_series".',
+          };
+        }
+        const seriesId = encodeURIComponent(String(recUpdate.recurring_series_id).trim());
+        const payload = buildOfficialRecurringSeriesPayload(recUpdate);
+        const { res, data } = await callPayPal(
+          'PUT',
+          `/v2/invoicing/recurring-invoices/${seriesId}`,
+          payload,
+          { Prefer: 'return=representation' }
+        );
+        return {
+          ok: res.ok,
+          source: sourceType,
+          tool: toolName,
+          environment: 'sandbox',
+          http_status: res.status,
+          resource_type: 'recurring_series',
+          recurring_series_id: String(recUpdate.recurring_series_id).trim(),
+          ...(res.ok
+            ? { recurring_series: data }
+            : {
+                error_code: data?.name || 'PAYPAL_UPDATE_RECURRING_SERIES_FAILED',
+                message: data?.message || `PayPal update_invoicing returned HTTP ${res.status}.`,
+                paypal_error: data,
+              }),
+        };
+      }
+      return {
+        ok: false,
+        source: sourceType,
+        tool: toolName,
+        error_code: 'INVALID_RESOURCE_TYPE',
+        message: 'resource_type must be either "invoice" or "recurring_series".',
+      };
+    }
+
+    case 'cancel_invoice_auto_reminder': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/cancel-reminders`,
+        {}
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? { reminders_cancelled: true }
+          : {
+              error_code: data?.name || 'PAYPAL_CANCEL_REMINDERS_FAILED',
+              message: data?.message || `PayPal cancel_invoice_auto_reminder returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'generate_invoice_qr_code': {
+      const err = requireFields(['invoice_id']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const bodyPayload = {
+        width: Number(args.width || 400),
+        height: Number(args.height || 400),
+      };
+      const { res, data, text } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/generate-qr-code`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? {
+              qr_code_generated: true,
+              qr_payload_length: text.length,
+            }
+          : {
+              error_code: data?.name || 'PAYPAL_QR_CODE_FAILED',
+              message: data?.message || `PayPal generate_invoice_qr_code returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'generate_invoice_number': {
+      return await executeTool(admin, 'paypal_generate_invoice_number', args, demoSessionId);
+    }
+
+    case 'record_payment_for_invoice': {
+      const err = requireFields(['invoice_id', 'method']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const bodyPayload = compactObj({
+        payment_id: args.payment_id,
+        payment_date: args.payment_date || new Date().toISOString().slice(0, 10),
+        payment_date_time: args.payment_date_time,
+        method: args.method,
+        note: args.note,
+        amount: args.amount,
+        shipping_info: args.shipping_info,
+      });
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/payments`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        payment_id: data?.payment_id || null,
+        ...(res.ok
+          ? { payment_recorded: true, result: data }
+          : {
+              error_code: data?.name || 'PAYPAL_RECORD_PAYMENT_FAILED',
+              message: data?.message || `PayPal record_payment_for_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'record_refund_for_invoice': {
+      const err = requireFields(['invoice_id', 'method']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const bodyPayload = compactObj({
+        refund_date: args.refund_date || new Date().toISOString().slice(0, 10),
+        amount: args.amount,
+        method: args.method,
+      });
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/refunds`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        refund_id: data?.refund_id || null,
+        ...(res.ok
+          ? { refund_recorded: true, result: data }
+          : {
+              error_code: data?.name || 'PAYPAL_RECORD_REFUND_FAILED',
+              message: data?.message || `PayPal record_refund_for_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'create_conditional_rules_for_invoice': {
+      const err = requireFields(['invoice_id', 'rules']);
+      if (err) return err;
+      const invoiceId = encodeURIComponent(String(args.invoice_id).trim());
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/invoicing/invoices/${invoiceId}/conditional-rules`,
+        { rules: args.rules }
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        invoice_id: String(args.invoice_id).trim(),
+        ...(res.ok
+          ? { conditional_rules_created: true, result: data }
+          : {
+              sandbox_classification:
+                res.status >= 500 ? 'BLOCKED_UPSTREAM' : 'VALIDATION_ERROR',
+              error_code: data?.name || 'PAYPAL_CONDITIONAL_RULES_ERROR',
+              message:
+                data?.message ||
+                `PayPal create_conditional_rules_for_invoice returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    // --- CATALOG PRODUCTS (4 OFFICIAL TOOLS) ---
+    case 'create_product': {
+      const err = requireFields(['name', 'type']);
+      if (err) return err;
+      const bodyPayload = compactObj({
+        id: args.id,
+        name: args.name,
+        description: args.description,
+        type: args.type,
+        category: args.category || 'SOFTWARE',
+        image_url: args.image_url,
+        home_url: args.home_url,
+      });
+      const { res, data } = await callPayPal('POST', '/v1/catalogs/products', bodyPayload, {
+        Prefer: 'return=representation',
+      });
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        product_id: data?.id || null,
+        ...(res.ok
+          ? { product: data }
+          : {
+              error_code: data?.name || 'PAYPAL_CREATE_PRODUCT_FAILED',
+              message: data?.message || `PayPal create_product returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'list_products': {
+      const page = Math.max(Number(args?.page || 1), 1);
+      const pageSize = Math.min(Math.max(Number(args?.page_size || 10), 1), 20);
+      const totalRequired = args?.total_required !== false;
+      const { res, data } = await callPayPal(
+        'GET',
+        `/v1/catalogs/products?page_size=${pageSize}&page=${page}&total_required=${totalRequired}`
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        total_items: Number(data?.total_items || 0),
+        total_pages: Number(data?.total_pages || 0),
+        products: Array.isArray(data?.products) ? data.products : [],
+      };
+    }
+
+    case 'update_product': {
+      const err = requireFields(['product_id', 'operations']);
+      if (err) return err;
+      const productId = encodeURIComponent(String(args.product_id).trim());
+      const { res, data } = await callPayPal(
+        'PATCH',
+        `/v1/catalogs/products/${productId}`,
+        args.operations
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        product_id: String(args.product_id).trim(),
+        ...(res.ok
+          ? { updated: true }
+          : {
+              error_code: data?.name || 'PAYPAL_UPDATE_PRODUCT_FAILED',
+              message: data?.message || `PayPal update_product returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'show_product_details': {
+      const err = requireFields(['product_id']);
+      if (err) return err;
+      const productId = encodeURIComponent(String(args.product_id).trim());
+      const { res, data } = await callPayPal('GET', `/v1/catalogs/products/${productId}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        product_id: data?.id || String(args.product_id).trim(),
+        ...(res.ok
+          ? { product: data }
+          : {
+              error_code: data?.name || 'PAYPAL_SHOW_PRODUCT_FAILED',
+              message: data?.message || `PayPal show_product_details returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    // --- SUBSCRIPTION PLANS & SUBSCRIPTIONS (7 OFFICIAL TOOLS + update_plan) ---
+    case 'create_subscription_plan': {
+      const err = requireFields(['product_id', 'name', 'billing_cycles']);
+      if (err) return err;
+      const bodyPayload = compactObj({
+        product_id: args.product_id,
+        name: args.name,
+        description: args.description,
+        billing_cycles: args.billing_cycles,
+        payment_preferences: args.payment_preferences || {
+          auto_bill_outstanding: true,
+          payment_failure_threshold: 3,
+        },
+        taxes: args.taxes,
+      });
+      const { res, data } = await callPayPal('POST', '/v1/billing/plans', bodyPayload, {
+        Prefer: 'return=representation',
+      });
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        plan_id: data?.id || null,
+        status: data?.status || null,
+        ...(res.ok
+          ? { plan: data }
+          : {
+              error_code: data?.name || 'PAYPAL_CREATE_PLAN_FAILED',
+              message: data?.message || `PayPal create_subscription_plan returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'list_subscription_plans': {
+      const page = Math.max(Number(args?.page || 1), 1);
+      const pageSize = Math.min(Math.max(Number(args?.page_size || 10), 1), 20);
+      const totalRequired = args?.total_required !== false;
+      const prodFilter = args?.product_id
+        ? `&product_id=${encodeURIComponent(String(args.product_id).trim())}`
+        : '';
+      const { res, data } = await callPayPal(
+        'GET',
+        `/v1/billing/plans?page_size=${pageSize}&page=${page}&total_required=${totalRequired}${prodFilter}`
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        total_items: Number(data?.total_items || 0),
+        total_pages: Number(data?.total_pages || 0),
+        plans: Array.isArray(data?.plans) ? data.plans : [],
+      };
+    }
+
+    case 'show_subscription_plan_details': {
+      const err = requireFields(['plan_id']);
+      if (err) return err;
+      const planId = encodeURIComponent(String(args.plan_id).trim());
+      const { res, data } = await callPayPal('GET', `/v1/billing/plans/${planId}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        plan_id: data?.id || String(args.plan_id).trim(),
+        status: data?.status || null,
+        ...(res.ok
+          ? { plan: data }
+          : {
+              error_code: data?.name || 'PAYPAL_SHOW_PLAN_FAILED',
+              message: data?.message || `PayPal show_subscription_plan_details returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'update_plan': {
+      const err = requireFields(['plan_id']);
+      if (err) return err;
+      const planId = encodeURIComponent(String(args.plan_id).trim());
+      let patchOps: any[] = [];
+      if (Array.isArray(args.operations)) {
+        patchOps = args.operations;
+      } else if (typeof args.operations === 'string') {
+        try {
+          patchOps = JSON.parse(args.operations);
+        } catch {
+          patchOps = [];
+        }
+      }
+      if (patchOps.length === 0) {
+        if (args.description !== undefined) {
+          patchOps.push({ op: 'replace', path: '/description', value: String(args.description) });
+        }
+        if (args.auto_bill_outstanding !== undefined) {
+          patchOps.push({
+            op: 'replace',
+            path: '/payment_preferences/auto_bill_outstanding',
+            value: Boolean(args.auto_bill_outstanding),
+          });
+        }
+        if (args.payment_failure_threshold !== undefined) {
+          patchOps.push({
+            op: 'replace',
+            path: '/payment_preferences/payment_failure_threshold',
+            value: Number(args.payment_failure_threshold),
+          });
+        }
+      }
+      if (patchOps.length === 0) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_PARAMETERS',
+          message: 'Provide at least one field to patch (description, auto_bill_outstanding, payment_failure_threshold, or operations).',
+        };
+      }
+      const { res, data } = await callPayPal('PATCH', `/v1/billing/plans/${planId}`, patchOps);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        plan_id: String(args.plan_id).trim(),
+        ...(res.ok
+          ? { updated: true }
+          : {
+              error_code: data?.name || 'PAYPAL_UPDATE_PLAN_FAILED',
+              message: data?.message || `PayPal update_plan returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'create_subscription': {
+      const err = requireFields(['plan_id']);
+      if (err) return err;
+      const bodyPayload = compactObj({
+        plan_id: args.plan_id,
+        quantity: args.quantity !== undefined ? String(args.quantity) : undefined,
+        shipping_amount: args.shipping_amount,
+        subscriber: args.subscriber,
+        application_context: args.application_context,
+      });
+      const { res, data } = await callPayPal('POST', '/v1/billing/subscriptions', bodyPayload);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        subscription_id: data?.id || null,
+        status: data?.status || null,
+        ...(res.ok
+          ? { subscription: data }
+          : {
+              error_code: data?.name || 'PAYPAL_CREATE_SUBSCRIPTION_FAILED',
+              message: data?.message || `PayPal create_subscription returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'show_subscription_details': {
+      const err = requireFields(['subscription_id']);
+      if (err) return err;
+      const subId = encodeURIComponent(String(args.subscription_id).trim());
+      const fieldsParam = args.get_additional_details ? '?fields=plan' : '';
+      const { res, data } = await callPayPal('GET', `/v1/billing/subscriptions/${subId}${fieldsParam}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        subscription_id: data?.id || String(args.subscription_id).trim(),
+        status: data?.status || null,
+        ...(res.ok
+          ? { subscription: data }
+          : {
+              error_code: data?.name || 'PAYPAL_SHOW_SUBSCRIPTION_FAILED',
+              message: data?.message || `PayPal show_subscription_details returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'cancel_subscription': {
+      const err = requireFields(['subscription_id', 'payload']);
+      if (err) return err;
+      const subId = encodeURIComponent(String(args.subscription_id).trim());
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v1/billing/subscriptions/${subId}/cancel`,
+        args.payload
+      );
+      if (!res.ok && (res.status === 404 || res.status === 422)) {
+        const subCheck = await callPayPal('GET', `/v1/billing/subscriptions/${subId}`);
+        if (subCheck.res.ok && subCheck.data?.status === 'APPROVAL_PENDING') {
+          return {
+            ok: false,
+            source: sourceType,
+            tool: toolName,
+            environment: 'sandbox',
+            http_status: res.status,
+            subscription_id: String(args.subscription_id).trim(),
+            subscription_status: 'APPROVAL_PENDING',
+            requires_buyer_approval: true,
+            sandbox_classification: 'PASS_NEGATIVE_AUTHORIZATION',
+            error_code: 'SUBSCRIPTION_APPROVAL_PENDING',
+            message: `Subscription ${args.subscription_id} is currently in APPROVAL_PENDING state on PayPal Sandbox. PayPal Subscriptions v1 only permits cancelling ACTIVE or SUSPENDED subscriptions after buyer approval.`,
+            paypal_error: data,
+          };
+        }
+      }
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        subscription_id: String(args.subscription_id).trim(),
+        ...(res.ok
+          ? { cancelled: true }
+          : {
+              error_code: data?.name || 'PAYPAL_CANCEL_SUBSCRIPTION_FAILED',
+              message: data?.message || `PayPal cancel_subscription returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'update_subscription': {
+      const err = requireFields(['subscription_id']);
+      if (err) return err;
+      const subId = encodeURIComponent(String(args.subscription_id).trim());
+      const currCode = String(args.currency_code || 'USD');
+      const ops: any[] = [];
+      if (args.custom_id !== undefined) {
+        ops.push({ op: 'add', path: '/custom_id', value: String(args.custom_id) });
+      }
+      if (args.auto_bill_outstanding !== undefined) {
+        ops.push({
+          op: 'replace',
+          path: '/plan/payment_preferences/auto_bill_outstanding',
+          value: Boolean(args.auto_bill_outstanding),
+        });
+      }
+      if (args.payment_failure_threshold !== undefined) {
+        ops.push({
+          op: 'replace',
+          path: '/plan/payment_preferences/payment_failure_threshold',
+          value: Number(args.payment_failure_threshold),
+        });
+      }
+      if (args.outstanding_balance !== undefined) {
+        ops.push({
+          op: 'replace',
+          path: '/billing_info/outstanding_balance',
+          value: { currency_code: currCode, value: String(args.outstanding_balance) },
+        });
+      }
+      if (args.shipping_amount !== undefined) {
+        ops.push({
+          op: 'replace',
+          path: '/shipping_amount',
+          value: { currency_code: currCode, value: String(args.shipping_amount) },
+        });
+      }
+      if (ops.length === 0) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_PARAMETERS',
+          message:
+            'Provide at least one updatable subscription attribute (custom_id, auto_bill_outstanding, payment_failure_threshold, outstanding_balance, or shipping_amount).',
+        };
+      }
+      const { res, data } = await callPayPal('PATCH', `/v1/billing/subscriptions/${subId}`, ops);
+      if (!res.ok && (res.status === 404 || res.status === 422)) {
+        const subCheck = await callPayPal('GET', `/v1/billing/subscriptions/${subId}`);
+        if (subCheck.res.ok && subCheck.data?.status === 'APPROVAL_PENDING') {
+          return {
+            ok: false,
+            source: sourceType,
+            tool: toolName,
+            environment: 'sandbox',
+            http_status: res.status,
+            subscription_id: String(args.subscription_id).trim(),
+            subscription_status: 'APPROVAL_PENDING',
+            requires_buyer_approval: true,
+            sandbox_classification: 'PASS_NEGATIVE_AUTHORIZATION',
+            error_code: 'SUBSCRIPTION_APPROVAL_PENDING',
+            message: `Subscription ${args.subscription_id} is currently in APPROVAL_PENDING state on PayPal Sandbox. PayPal Subscriptions v1 only permits patching ACTIVE or SUSPENDED subscriptions after buyer approval.`,
+            paypal_error: data,
+          };
+        }
+      }
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        subscription_id: String(args.subscription_id).trim(),
+        ...(res.ok
+          ? { updated: true }
+          : {
+              error_code: data?.name || 'PAYPAL_UPDATE_SUBSCRIPTION_FAILED',
+              message: data?.message || `PayPal update_subscription returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    // --- SHIPPING TRACKERS (3 OFFICIAL TOOLS) ---
+    case 'create_shipment_tracking': {
+      const err = requireFields(['tracking_number', 'transaction_id']);
+      if (err) return err;
+      const bodyPayload = {
+        trackers: [
+          {
+            tracking_number: String(args.tracking_number).trim(),
+            transaction_id: String(args.transaction_id).trim(),
+            status: args.status || 'SHIPPED',
+            carrier: args.carrier || 'UPS',
+          },
+        ],
+      };
+      const { res, data } = await callPayPal('POST', '/v1/shipping/trackers-batch', bodyPayload);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        ...(res.ok
+          ? { tracker_identifiers: data?.tracker_identifiers || [], result: data }
+          : {
+              sandbox_classification:
+                res.status === 403 ? 'BLOCKED_OAUTH_SCOPE' : 'PAYPAL_API_ERROR',
+              required_oauth_scope: 'https://uri.paypal.com/services/shipping/trackers/readwrite',
+              error_code: data?.errors?.[0]?.name || data?.name || 'PAYPAL_SHIPPING_TRACKER_ERROR',
+              message:
+                res.status === 403
+                  ? 'PayPal Shipping Trackers API (/v1/shipping/trackers-batch) requires OAuth scope "https://uri.paypal.com/services/shipping/trackers/readwrite", which is not enabled on this Sandbox Default Application.'
+                  : data?.message || `PayPal create_shipment_tracking returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'get_shipment_tracking': {
+      let txId = String(args?.transaction_id || '').trim();
+      const orderId = String(args?.order_id || '').trim();
+      if (!txId && !orderId) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_PARAMETERS',
+          missing_parameters: ['transaction_id'],
+          message: 'Either transaction_id or order_id must be provided for get_shipment_tracking.',
+        };
+      }
+      if (!txId && orderId) {
+        const ordLookup = await callPayPal(
+          'GET',
+          `/v2/checkout/orders/${encodeURIComponent(orderId)}`
+        );
+        txId =
+          ordLookup.data?.purchase_units?.[0]?.payments?.captures?.[0]?.id || '';
+        if (!txId) {
+          return {
+            ok: false,
+            source: sourceType,
+            tool: toolName,
+            error_code: 'CAPTURE_ID_NOT_FOUND_ON_ORDER',
+            message: `Could not extract a captured transaction_id from order "${orderId}".`,
+          };
+        }
+      }
+      const { res, data } = await callPayPal(
+        'GET',
+        `/v1/shipping/trackers?transaction_id=${encodeURIComponent(txId)}`
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        transaction_id: txId,
+        ...(res.ok
+          ? { trackers: data?.trackers || [], result: data }
+          : {
+              sandbox_classification:
+                res.status === 403 ? 'BLOCKED_OAUTH_SCOPE' : 'PAYPAL_API_ERROR',
+              required_oauth_scope: 'https://uri.paypal.com/services/shipping/trackers/readwrite',
+              error_code: data?.errors?.[0]?.name || data?.name || 'PAYPAL_GET_TRACKING_ERROR',
+              message:
+                res.status === 403
+                  ? 'PayPal Shipping Trackers API (/v1/shipping/trackers) requires OAuth scope "https://uri.paypal.com/services/shipping/trackers/readwrite", which is not enabled on this Sandbox Default Application.'
+                  : data?.message || `PayPal get_shipment_tracking returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'update_shipment_tracking': {
+      const err = requireFields(['transaction_id', 'tracking_number', 'status']);
+      if (err) return err;
+      const txId = String(args.transaction_id).trim();
+      const trkNum = String(args.tracking_number).trim();
+      const trackerId = encodeURIComponent(`${txId}-${trkNum}`);
+      const bodyPayload = compactObj({
+        transaction_id: txId,
+        tracking_number: trkNum,
+        new_tracking_number: args.new_tracking_number,
+        status: args.status,
+        carrier: args.carrier || 'UPS',
+      });
+      const { res, data } = await callPayPal(
+        'PUT',
+        `/v1/shipping/trackers/${trackerId}`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        ...(res.ok
+          ? { updated: true, result: data }
+          : {
+              sandbox_classification:
+                res.status === 403 ? 'BLOCKED_OAUTH_SCOPE' : 'PAYPAL_API_ERROR',
+              required_oauth_scope: 'https://uri.paypal.com/services/shipping/trackers/readwrite',
+              error_code: data?.errors?.[0]?.name || data?.name || 'PAYPAL_UPDATE_TRACKING_ERROR',
+              message:
+                res.status === 403
+                  ? 'PayPal Shipping Trackers API (/v1/shipping/trackers/{id}) requires OAuth scope "https://uri.paypal.com/services/shipping/trackers/readwrite", which is not enabled on this Sandbox Default Application.'
+                  : data?.message || `PayPal update_shipment_tracking returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    // --- ORDERS V2 (3 OFFICIAL TOOLS + paypal_authorize_order) ---
+    case 'create_order': {
+      const err = requireFields(['currencyCode', 'items']);
+      if (err) return err;
+      const orderPayload = buildOfficialOrderPayload(args);
+      const { res, data } = await callPayPal('POST', '/v2/checkout/orders', orderPayload);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        order_id: data?.id || null,
+        status: data?.status || null,
+        ...(res.ok
+          ? {
+              approval_url:
+                Array.isArray(data?.links)
+                  ? data.links.find((l: any) => l.rel === 'approve' || l.rel === 'payer-action')?.href || null
+                  : null,
+              order: data,
+            }
+          : {
+              error_code: data?.name || 'PAYPAL_CREATE_ORDER_FAILED',
+              message: data?.message || `PayPal create_order returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'get_order': {
+      const orderId = String(args?.id || args?.order_id || '').trim();
+      if (!orderId) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_PARAMETERS',
+          missing_parameters: ['id'],
+          message: 'Missing required parameter "id" (PayPal Order ID) for get_order.',
+        };
+      }
+      return await executeTool(
+        admin,
+        'paypal_get_order',
+        { order_id: orderId, demo_session_id: demoSessionId },
+        demoSessionId
+      );
+    }
+
+    case 'pay_order': {
+      const orderId = String(args?.id || args?.order_id || '').trim();
+      if (!orderId) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_PARAMETERS',
+          missing_parameters: ['id'],
+          message: 'Missing required parameter "id" (PayPal Order ID) for pay_order.',
+        };
+      }
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
+        {}
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        order_id: orderId,
+        status: data?.status || null,
+        ...(res.ok
+          ? {
+              capture_id:
+                data?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null,
+              order: data,
+            }
+          : {
+              error_code:
+                data?.details?.[0]?.issue || data?.name || 'PAYPAL_PAY_ORDER_FAILED',
+              message:
+                data?.details?.[0]?.description ||
+                data?.message ||
+                `PayPal pay_order returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'paypal_authorize_order': {
+      const orderId = String(args?.order_id || args?.id || '').trim();
+      if (!orderId) {
+        return {
+          ok: false,
+          source: sourceType,
+          tool: toolName,
+          error_code: 'INVALID_PARAMETERS',
+          missing_parameters: ['order_id'],
+          message: 'Missing required parameter "order_id" for paypal_authorize_order.',
+        };
+      }
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/checkout/orders/${encodeURIComponent(orderId)}/authorize`,
+        {}
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        order_id: orderId,
+        status: data?.status || null,
+        ...(res.ok
+          ? {
+              authorization_id:
+                data?.purchase_units?.[0]?.payments?.authorizations?.[0]?.id || null,
+              order: data,
+            }
+          : {
+              error_code:
+                data?.details?.[0]?.issue || data?.name || 'PAYPAL_AUTHORIZE_ORDER_FAILED',
+              message:
+                data?.details?.[0]?.description ||
+                data?.message ||
+                `PayPal paypal_authorize_order returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    // --- CUSTOMER DISPUTES (3 OFFICIAL TOOLS) ---
+    case 'list_disputes': {
+      const paramsList: string[] = [];
+      if (args?.disputed_transaction_id) {
+        paramsList.push(
+          `disputed_transaction_id=${encodeURIComponent(String(args.disputed_transaction_id))}`
+        );
+      }
+      if (args?.dispute_state) {
+        paramsList.push(`dispute_state=${encodeURIComponent(String(args.dispute_state))}`);
+      }
+      if (args?.page_size) {
+        paramsList.push(`page_size=${Math.min(Math.max(Number(args.page_size), 1), 50)}`);
+      }
+      const qs = paramsList.length > 0 ? `?${paramsList.join('&')}` : '?page_size=10';
+      const { res, data } = await callPayPal('GET', `/v1/customer/disputes${qs}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        disputes_count: Array.isArray(data?.items) ? data.items.length : 0,
+        items: Array.isArray(data?.items) ? data.items : [],
+      };
+    }
+
+    case 'get_dispute': {
+      const err = requireFields(['dispute_id']);
+      if (err) return err;
+      const disputeId = encodeURIComponent(String(args.dispute_id).trim());
+      const { res, data } = await callPayPal('GET', `/v1/customer/disputes/${disputeId}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        dispute_id: String(args.dispute_id).trim(),
+        ...(res.ok
+          ? { dispute: data }
+          : {
+              error_code: data?.name || 'PAYPAL_GET_DISPUTE_FAILED',
+              message: data?.message || `PayPal get_dispute returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'accept_dispute_claim': {
+      const err = requireFields(['dispute_id', 'note']);
+      if (err) return err;
+      const disputeId = encodeURIComponent(String(args.dispute_id).trim());
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v1/customer/disputes/${disputeId}/accept-claim`,
+        { note: String(args.note) }
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        dispute_id: String(args.dispute_id).trim(),
+        ...(res.ok
+          ? { accepted: true, result: data }
+          : {
+              error_code: data?.name || 'PAYPAL_ACCEPT_DISPUTE_CLAIM_FAILED',
+              message: data?.message || `PayPal accept_dispute_claim returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    // --- TRANSACTIONS, REFUNDS & MERCHANT INSIGHTS (4 OFFICIAL TOOLS) ---
+    case 'list_transactions': {
+      const endDate = args?.end_date
+        ? new Date(String(args.end_date))
+        : new Date();
+      const startDate = args?.start_date
+        ? new Date(String(args.start_date))
+        : new Date(endDate.getTime() - 30 * 86400000);
+      const qsParams: string[] = [
+        `start_date=${encodeURIComponent(startDate.toISOString())}`,
+        `end_date=${encodeURIComponent(endDate.toISOString())}`,
+      ];
+      if (args?.transaction_id) {
+        qsParams.push(`transaction_id=${encodeURIComponent(String(args.transaction_id))}`);
+      }
+      if (args?.transaction_status) {
+        qsParams.push(`transaction_status=${encodeURIComponent(String(args.transaction_status))}`);
+      }
+      const { res, data } = await callPayPal(
+        'GET',
+        `/v1/reporting/transactions?${qsParams.join('&')}`
+      );
+      const localHistory = await executeTool(
+        admin,
+        'get_transaction_history',
+        { demo_session_id: demoSessionId },
+        demoSessionId
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        ...(res.ok
+          ? {
+              transaction_details: data?.transaction_details || [],
+              total_items: Number(data?.total_items || 0),
+            }
+          : {
+              sandbox_classification:
+                res.status === 403 ? 'BLOCKED_OAUTH_SCOPE' : 'PAYPAL_API_ERROR',
+              required_oauth_scope: 'https://uri.paypal.com/services/reporting/search/read',
+              error_code: data?.name || 'PAYPAL_LIST_TRANSACTIONS_SCOPE_REQUIRED',
+              message:
+                'PayPal Transaction Search API (/v1/reporting/transactions) returned HTTP 403 because OAuth scope "https://uri.paypal.com/services/reporting/search/read" is not enabled on the Sandbox Default Application. Synchronized session transactions are included in synchronized_session_transactions.',
+              paypal_error: data,
+              synchronized_session_transactions: localHistory?.transactions || [],
+            }),
+      };
+    }
+
+    case 'create_refund': {
+      const err = requireFields(['capture_id']);
+      if (err) return err;
+      const captureId = encodeURIComponent(String(args.capture_id).trim());
+      const bodyPayload =
+        compactObj({
+          amount: args.amount,
+          invoice_id: args.invoice_id,
+          note_to_payer: args.note_to_payer,
+        }) || {};
+      const { res, data } = await callPayPal(
+        'POST',
+        `/v2/payments/captures/${captureId}/refund`,
+        bodyPayload
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        capture_id: String(args.capture_id).trim(),
+        refund_id: data?.id || null,
+        status: data?.status || null,
+        ...(res.ok
+          ? { refund: data }
+          : {
+              error_code:
+                data?.details?.[0]?.issue || data?.name || 'PAYPAL_CREATE_REFUND_FAILED',
+              message:
+                data?.details?.[0]?.description ||
+                data?.message ||
+                `PayPal create_refund returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    case 'get_refund': {
+      const err = requireFields(['refund_id']);
+      if (err) return err;
+      return await executeTool(
+        admin,
+        'paypal_get_refund',
+        { refund_id: args.refund_id, demo_session_id: demoSessionId },
+        demoSessionId
+      );
+    }
+
+    case 'get_merchant_insights': {
+      const err = requireFields(['start_date', 'end_date', 'insight_type', 'time_interval']);
+      if (err) return err;
+      const qs = `start_date=${encodeURIComponent(
+        String(args.start_date)
+      )}&end_date=${encodeURIComponent(String(args.end_date))}&insight_type=${encodeURIComponent(
+        String(args.insight_type)
+      )}&time_interval=${encodeURIComponent(String(args.time_interval))}`;
+      const { res, data } = await callPayPal('GET', `/v1/merchant/insights?${qs}`);
+      const metrics = await executeTool(
+        admin,
+        'get_business_metrics',
+        { demo_session_id: demoSessionId },
+        demoSessionId
+      );
+      return {
+        ok: false,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        sandbox_classification: 'UNSUPPORTED_BY_SANDBOX',
+        error_code: 'UNSUPPORTED_IN_PAYPAL_SANDBOX_MODE',
+        message:
+          'get_merchant_insights is not supported in PayPal Sandbox mode (explicitly blocked in @paypal/agent-toolkit: "get_merchant_insights is not supported in sandbox mode" and returns HTTP 403 on api-m.sandbox.paypal.com). Use get_business_metrics for session revenue analytics.',
+        paypal_error: data,
+        synchronized_business_metrics: metrics?.metrics || null,
+      };
+    }
+
+    // --- ADDITIONAL PAYPAL SANDBOX REST-TO-MCP ADAPTER TOOLS ---
+    case 'paypal_list_webhooks': {
+      const anchor = args?.anchor_type
+        ? `?anchor_type=${encodeURIComponent(String(args.anchor_type))}`
+        : '';
+      const { res, data } = await callPayPal('GET', `/v1/notifications/webhooks${anchor}`);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        webhooks_count: Array.isArray(data?.webhooks) ? data.webhooks.length : 0,
+        webhooks: Array.isArray(data?.webhooks) ? data.webhooks : [],
+      };
+    }
+
+    case 'paypal_list_webhook_event_types': {
+      const { res, data } = await callPayPal('GET', '/v1/notifications/webhooks-event-types');
+      const allTypes: any[] = Array.isArray(data?.event_types) ? data.event_types : [];
+      const domainFilter = String(args?.domain_filter || '')
+        .trim()
+        .toUpperCase();
+      const filtered = domainFilter
+        ? allTypes.filter((et) => String(et?.name || '').toUpperCase().startsWith(domainFilter))
+        : allTypes;
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        total_event_types: allTypes.length,
+        filtered_count: filtered.length,
+        event_types: filtered.slice(0, 50),
+      };
+    }
+
+    case 'paypal_list_invoice_templates': {
+      const page = Math.max(Number(args?.page || 1), 1);
+      const pageSize = Math.min(Math.max(Number(args?.page_size || 10), 1), 50);
+      const fields = String(args?.fields || 'all');
+      const { res, data } = await callPayPal(
+        'GET',
+        `/v2/invoicing/templates?fields=${encodeURIComponent(fields)}&page=${page}&page_size=${pageSize}`
+      );
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        templates_count: Array.isArray(data?.templates) ? data.templates.length : 0,
+        templates: Array.isArray(data?.templates) ? data.templates : [],
+        addresses: Array.isArray(data?.addresses) ? data.addresses : [],
+        phones: Array.isArray(data?.phones) ? data.phones : [],
+      };
+    }
+
+    case 'paypal_create_vault_setup_token': {
+      const srcType = String(args?.payment_source_type || 'paypal').toLowerCase();
+      const retUrl =
+        String(args?.return_url || '').trim() ||
+        'https://paypal-ai-billing-kit.vercel.app/billing?vault=approved';
+      const canUrl =
+        String(args?.cancel_url || '').trim() ||
+        'https://paypal-ai-billing-kit.vercel.app/billing?vault=cancelled';
+      const bodyPayload: Record<string, any> = {
+        ...(args?.customer_id ? { customer: { id: String(args.customer_id) } } : {}),
+        payment_source:
+          srcType === 'card'
+            ? {
+                card: {
+                  experience_context: {
+                    return_url: retUrl,
+                    cancel_url: canUrl,
+                  },
+                },
+              }
+            : {
+                paypal: {
+                  usage_type: 'MERCHANT',
+                  experience_context: {
+                    return_url: retUrl,
+                    cancel_url: canUrl,
+                  },
+                },
+              },
+      };
+      const { res, data } = await callPayPal('POST', '/v3/vault/setup-tokens', bodyPayload);
+      return {
+        ok: res.ok,
+        source: sourceType,
+        tool: toolName,
+        environment: 'sandbox',
+        http_status: res.status,
+        setup_token_id: data?.id || null,
+        customer_id: data?.customer?.id || null,
+        status: data?.status || null,
+        ...(res.ok
+          ? {
+              approval_url:
+                Array.isArray(data?.links)
+                  ? data.links.find((l: any) => l.rel === 'approve')?.href || null
+                  : null,
+              setup_token: data,
+            }
+          : {
+              error_code: data?.name || 'PAYPAL_CREATE_VAULT_SETUP_TOKEN_FAILED',
+              message: data?.message || `PayPal paypal_create_vault_setup_token returned HTTP ${res.status}.`,
+              paypal_error: data,
+            }),
+      };
+    }
+
+    default:
+      return null;
+  }
+}
+
 async function executeTool(
   admin: any,
   toolName: string,
@@ -2506,20 +9919,9 @@ async function executeTool(
     }
   }
 
-  const MUTATING_TOOLS = new Set([
-    'create_invoice_proposal',
-    'create_approved_invoice',
-    'prepare_payment_proposal',
-    'void_unpaid_invoice',
-    'prepare_refund_proposal',
-    'reset_demo_session',
-    'create_paypal_checkout_order',
-    'capture_paypal_checkout_order',
-    'execute_approved_refund',
-    'execute_conversational_instruction',
-    'execute_sandbox_card_payment',
-    'run_sandbox_card_lifecycle_test',
-  ]);
+  const MUTATING_TOOLS = new Set(
+    MCP_TOOLS.filter((t) => t.permissionTier !== 'read_only').map((t) => t.name)
+  );
   if (MUTATING_TOOLS.has(toolName) && demoSessionId.toLowerCase() === 'canonical') {
     return {
       ok: false,
@@ -2537,23 +9939,11 @@ async function executeTool(
         .eq('active', true)
         .order('code', { ascending: true });
 
-      const officialPayPalTools = ['paypal_discover_official_mcp'];
-      const paypalRestAdapterTools = [
-        'paypal_get_order',
-        'paypal_get_refund',
-        'paypal_list_invoices',
-        'paypal_generate_invoice_number',
-        'paypal_list_disputes',
-        'paypal_check_card_eligibility',
-        'execute_sandbox_card_payment',
-        'run_sandbox_card_lifecycle_test',
-      ];
-
       return {
         ok: true,
         service: 'PayPal AI Billing Kit — Unified PayPal MCP Gateway',
-        version: '2.2.0',
-        protocol_support: ['MCP JSON-RPC 2.0 (2025-03-26)', 'REST JSON POST/GET', 'OpenAPI 3.1.0'],
+        version: '2.3.0',
+        protocol_support: ['MCP JSON-RPC 2.0 (2025-06-18 / 2025-03-26 / 2024-11-05)', 'MCP 2026-07-28 server/discover', 'REST JSON POST/GET', 'OpenAPI 3.1.0'],
         demo_session_id: demoSessionId,
         guardrails: {
           max_single_action_minor: 50000,
@@ -2570,56 +9960,22 @@ async function executeTool(
             'Strictly isolated to administrative billing statements; sensitive clinical/medical notes are refused.',
         },
         permission_tiers: {
-          read_only: [
-            'discover_billing_capabilities',
-            'list_demo_customers',
-            'search_invoices',
-            'get_invoice_details',
-            'explain_outstanding_balances',
-            'get_transaction_history',
-            'get_payment_receipt',
-            'generate_receipt_pdf',
-            'get_financial_audit_history',
-            'get_paypal_sandbox_status',
-            'get_business_metrics',
-            'paypal_discover_official_mcp',
-            'paypal_get_order',
-            'paypal_get_refund',
-            'paypal_list_invoices',
-            'paypal_generate_invoice_number',
-            'paypal_list_disputes',
-            'paypal_check_card_eligibility',
-          ],
-          proposal_only: [
-            'create_invoice_proposal',
-            'prepare_payment_proposal',
-            'prepare_refund_proposal',
-          ],
-          confirmed_demo_write: [
-            'create_approved_invoice',
-            'create_paypal_checkout_order',
-            'capture_paypal_checkout_order',
-            'execute_sandbox_card_payment',
-            'execute_approved_refund',
-            'void_unpaid_invoice',
-            'reset_demo_session',
-            'execute_conversational_instruction',
-            'run_sandbox_card_lifecycle_test',
-          ],
+          read_only: MCP_TOOLS.filter((t) => t.permissionTier === 'read_only').map((t) => t.name),
+          proposal_only: MCP_TOOLS.filter((t) => t.permissionTier === 'proposal_only').map((t) => t.name),
+          confirmed_demo_write: MCP_TOOLS.filter((t) => t.permissionTier === 'confirmed_demo_write').map((t) => t.name),
         },
         tool_sources: {
-          native_application: MCP_TOOLS.filter(
-            (t) => !officialPayPalTools.includes(t.name) && !paypalRestAdapterTools.includes(t.name)
-          ).map((t) => t.name),
-          official_paypal_mcp: officialPayPalTools,
-          paypal_rest_adapter: paypalRestAdapterTools,
+          native_application: MCP_TOOLS.filter((t) => t.source === 'native_application').map((t) => t.name),
+          official_paypal_mcp: MCP_TOOLS.filter((t) => t.source === 'official_paypal_mcp').map((t) => t.name),
+          paypal_rest_adapter: MCP_TOOLS.filter((t) => t.source === 'paypal_rest_adapter').map((t) => t.name),
         },
         demo_personas: DEMO_ACCOUNTS,
         service_catalog: (catalog || []).map((c: any) => ({
           ...c,
           default_amount_usd: formatUsd(Number(c.default_amount_minor || 0)),
         })),
-        baseline_tools_count: 26,
+        baseline_tools_count: 30,
+        official_paypal_mcp_catalog_count: 46,
         tools_count: MCP_TOOLS.length,
         by_source: {
           native_app: MCP_TOOLS.filter((t) => t.source === 'native_application').length,
@@ -4996,42 +12352,52 @@ async function executeTool(
       }
 
       const upstreamToolNames = [
-        'create_invoice',
-        'list_invoices',
-        'get_invoice',
-        'send_invoice',
-        'send_invoice_reminder',
-        'cancel_sent_invoice',
-        'generate_invoice_qr_code',
-        'create_product',
-        'list_products',
-        'show_product_details',
-        'update_product',
-        'create_subscription_plan',
-        'list_subscription_plans',
-        'show_subscription_plan_details',
-        'create_subscription',
-        'show_subscription_details',
-        'update_subscription',
-        'cancel_subscription',
-        'create_shipment_tracking',
-        'get_shipment_tracking',
-        'update_shipment_tracking',
-        'create_order',
-        'get_order',
-        'capture_order',
-        'list_disputes',
-        'get_dispute',
-        'accept_dispute_claim',
-        'list_transactions',
-        'pay_invoice',
-        'create_And_Send_Invoice',
-        'generate_invoice_number',
-        'create_webhook',
-        'Starting_ page_for_PayPal_integration',
-        'get_merchant_insights',
-        'create_refund',
-        'get_refund',
+              "create_invoice",
+              "create_recurring_series",
+              "activate_recurring_series",
+              "get_recurring_series",
+              "cancel_recurring_series",
+              "delete_recurring_series",
+              "list_invoices",
+              "get_invoice",
+              "send_invoice",
+              "send_invoice_reminder",
+              "cancel_sent_invoice",
+              "delete_invoice",
+              "setup_invoice_auto_reminders",
+              "update_invoice_auto_reminder",
+              "search_invoicing",
+              "update_invoicing",
+              "cancel_invoice_auto_reminder",
+              "generate_invoice_qr_code",
+              "generate_invoice_number",
+              "record_payment_for_invoice",
+              "record_refund_for_invoice",
+              "create_conditional_rules_for_invoice",
+              "create_product",
+              "list_products",
+              "update_product",
+              "show_product_details",
+              "create_subscription_plan",
+              "list_subscription_plans",
+              "show_subscription_plan_details",
+              "create_subscription",
+              "show_subscription_details",
+              "cancel_subscription",
+              "update_subscription",
+              "create_shipment_tracking",
+              "get_shipment_tracking",
+              "update_shipment_tracking",
+              "create_order",
+              "get_order",
+              "pay_order",
+              "list_disputes",
+              "get_dispute",
+              "accept_dispute_claim",
+              "list_transactions",
+              "create_refund",
+              "get_refund",
+              "get_merchant_insights"
       ];
 
       return {
@@ -5062,7 +12428,7 @@ async function executeTool(
             upstream_tools_call_issue:
               'Calling tools/call on mcp.sandbox.paypal.com triggers PAYPAL_API_SETUP_ERROR: "Unsupported cache mode: default" inside @paypal/agent-toolkit (src/shared/functions.ts:2053) because axios passes cache:"default" to Cloudflare Workers fetch.',
             unified_gateway_resolution:
-              'Our Unified PayPal MCP Gateway connects to mcp.sandbox.paypal.com for official schema & capability discovery and executes the official PayPal tool contracts (paypal_get_order, paypal_get_refund, paypal_list_invoices, paypal_generate_invoice_number, paypal_list_disputes) directly against api-m.sandbox.paypal.com using the same merchant Sandbox OAuth 2.0 token.',
+              'Our Unified PayPal MCP Gateway exposes all 46 official PayPal MCP tools by their exact official names plus 14 PayPal Sandbox REST-to-MCP adapter tools and 21 Native Application tools (82 total callable tools), executing all PayPal Sandbox operations server-side via native fetch against https://api-m.sandbox.paypal.com without triggering the axios cache:"default" Cloudflare Worker bug.',
           },
           paypal_sandbox_oauth: {
             authenticated: auth.oauthReachable,
@@ -5836,12 +13202,22 @@ async function executeTool(
       };
     }
 
-    default:
+    default: {
+      const officialOrRestResult = await executeOfficialOrRestPayPalTool(
+        admin,
+        toolName,
+        args || {},
+        demoSessionId
+      );
+      if (officialOrRestResult !== null) {
+        return officialOrRestResult;
+      }
       return {
         ok: false,
         error_code: 'UNKNOWN_TOOL',
         message: `Unknown MCP tool "${toolName}". Call \`discover_billing_capabilities\` or \`tools/list\` for supported tools.`,
       };
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "paypal-ai-billing-kit",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -17,6 +17,7 @@
     "verify:ai-security": "node scripts/verify-security-and-ai.mjs",
     "verify:paypal-sandbox": "node scripts/verify-live-paypal-sandbox.mjs",
     "verify:paypal-full": "node scripts/verify-paypal-full.mjs",
+    "verify:full-paypal-mcp": "node scripts/verify-full-paypal-mcp.mjs",
     "verify:gemini-receipts": "node scripts/verify-gemini-and-receipts.mjs",
     "verify:e2e": "node scripts/verify-public-vercel-e2e.mjs",
     "sync:secrets": "node scripts/sync-local-env-secrets.mjs",

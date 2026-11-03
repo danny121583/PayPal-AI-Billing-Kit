@@ -601,23 +601,23 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     expect(confirmCmd.reasonCode).toBe('AUTHORIZED_FOLLOW_UP_CONFIRMATION');
   });
 
-  it('Section 8, 9 & 11: Unified 30-Tool MCP Registry (26 Baseline + 4 Card/PDF Tools), PDF 1.4 Receipt Generator, Payment-Attempt Classification, and Conversational Anti-Spoofing', () => {
-    expect(UNIFIED_MCP_REGISTRY_SUMMARY.baselineTools).toBe(26);
-    expect(UNIFIED_MCP_REGISTRY_SUMMARY.totalTools).toBe(30);
-    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.read_only).toBe(18);
+  it('Section 8, 9 & 11: Unified 82-Tool MCP Registry (21 Native + 47 Official PayPal MCP + 14 PayPal REST Adapters), PDF 1.4 Receipt Generator, Payment-Attempt Classification, and Conversational Anti-Spoofing', () => {
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.baselineTools).toBe(30);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.officialPayPalMcpCatalogCount).toBe(46);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.totalTools).toBe(82);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.read_only).toBe(39);
     expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.proposal_only).toBe(3);
-    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.confirmed_write).toBe(9);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.byTier.confirmed_write).toBe(40);
     expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.native_app).toBe(21);
-    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp).toBe(1);
-    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter).toBe(8);
-    expect(UNIFIED_MCP_TOOL_REGISTRY.length).toBe(30);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp).toBe(47);
+    expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter).toBe(14);
+    expect(UNIFIED_MCP_TOOL_REGISTRY.length).toBe(82);
 
     const uniqueNames = new Set(UNIFIED_MCP_TOOL_REGISTRY.map((t) => t.name));
-    expect(uniqueNames.size).toBe(30);
+    expect(uniqueNames.size).toBe(82);
 
     const nonExistentLegacyNames = [
       'get_billing_summary',
-      'list_invoices',
       'list_customer_accounts',
       'list_service_catalog',
       'get_guardrail_policy',
@@ -626,6 +626,18 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     ];
     for (const badName of nonExistentLegacyNames) {
       expect(uniqueNames.has(badName)).toBe(false);
+    }
+
+    // Verify both official PayPal MCP tool names and existing paypal_* compatibility aliases are registered
+    for (const [officialName, aliasName] of [
+      ['get_order', 'paypal_get_order'],
+      ['get_refund', 'paypal_get_refund'],
+      ['list_invoices', 'paypal_list_invoices'],
+      ['generate_invoice_number', 'paypal_generate_invoice_number'],
+      ['list_disputes', 'paypal_list_disputes'],
+    ]) {
+      expect(uniqueNames.has(officialName)).toBe(true);
+      expect(uniqueNames.has(aliasName)).toBe(true);
     }
 
     for (const tool of UNIFIED_MCP_TOOL_REGISTRY) {
@@ -908,7 +920,7 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     );
     expect(getByTestId('maas-modal-brand-icon')).toBeTruthy();
     expect(getByTestId('maas-tool-count-title')).toBeTruthy();
-    expect(getByText('30 Exposed Tools by Permission Tier')).toBeTruthy();
+    expect(getByText('82 Exposed Tools by Permission Tier')).toBeTruthy();
     expect(getByTestId('maas-pdf-receipt-endpoint')).toBeTruthy();
 
     // Render Invoice Detail Modal for paid invoice #PPB-INV-2026-1003 and verify Download PDF Receipt button

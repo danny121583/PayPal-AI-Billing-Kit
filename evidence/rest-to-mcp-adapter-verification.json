@@ -1,0 +1,154 @@
+{
+  "verifiedAt": "2026-11-03T04:34:36.889Z",
+  "verificationSessionId": "full-paypal-mcp-verify-1793680372557",
+  "gatewayEndpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
+  "totalRestAdapterTools": 14,
+  "summaryByClassification": {
+    "PASS_LIVE_SANDBOX": 2,
+    "PASS_REST_ADAPTER": 11,
+    "PASS_NEGATIVE_AUTHORIZATION": 1,
+    "FAIL": 0
+  },
+  "results": [
+    {
+      "index": 1,
+      "toolName": "paypal_get_order",
+      "equivalentRestEndpoint": "GET /v2/checkout/orders/{id}",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 1433,
+      "paypalResourceId": "8TY35081NK8416356",
+      "notes": "Verified order 8TY35081NK8416356 (COMPLETED)."
+    },
+    {
+      "index": 2,
+      "toolName": "paypal_get_refund",
+      "equivalentRestEndpoint": "GET /v2/payments/refunds/{refund_id}",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 1056,
+      "paypalResourceId": "8C666541S71463443",
+      "notes": "Verified refund 8C666541S71463443 (COMPLETED)."
+    },
+    {
+      "index": 3,
+      "toolName": "paypal_list_invoices",
+      "equivalentRestEndpoint": "GET /v2/invoicing/invoices",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 677,
+      "paypalResourceId": "items:5",
+      "notes": "Listed PayPal Sandbox + synchronized application invoices."
+    },
+    {
+      "index": 4,
+      "toolName": "paypal_generate_invoice_number",
+      "equivalentRestEndpoint": "POST /v2/invoicing/generate-next-invoice-number",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 609,
+      "paypalResourceId": "0009",
+      "notes": "Generated invoice number 0009."
+    },
+    {
+      "index": 5,
+      "toolName": "paypal_list_disputes",
+      "equivalentRestEndpoint": "GET /v1/customer/disputes",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 694,
+      "paypalResourceId": "disputes:0",
+      "notes": "Queried PayPal Customer Disputes v1."
+    },
+    {
+      "index": 6,
+      "toolName": "paypal_check_card_eligibility",
+      "equivalentRestEndpoint": "POST /v1/oauth2/token",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 946,
+      "paypalResourceId": "APP-5SK74342S6474230W",
+      "notes": "Verified direct card eligibility on app APP-5SK74342S6474230W."
+    },
+    {
+      "index": 7,
+      "toolName": "execute_sandbox_card_payment",
+      "equivalentRestEndpoint": "POST /v2/checkout/orders",
+      "classification": "PASS_LIVE_SANDBOX",
+      "httpStatus": 201,
+      "latencyMs": 5224,
+      "paypalResourceId": "8TY35081NK8416356/79110818DY805061J",
+      "notes": "Executed server-side Sandbox Visa card capture 79110818DY805061J on order 8TY35081NK8416356."
+    },
+    {
+      "index": 8,
+      "toolName": "run_sandbox_card_lifecycle_test",
+      "equivalentRestEndpoint": "POST /v2/checkout/orders + /v2/payments/captures/{id}/refund",
+      "classification": "PASS_LIVE_SANDBOX",
+      "httpStatus": 200,
+      "latencyMs": 186,
+      "paypalResourceId": "8TY35081NK8416356",
+      "notes": "Verified human approval guard and full 8-stage card lifecycle execution."
+    },
+    {
+      "index": 9,
+      "toolName": "update_plan",
+      "equivalentRestEndpoint": "PATCH /v1/billing/plans/{plan_id}",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 204,
+      "latencyMs": 1076,
+      "paypalResourceId": "P-4GE08190NN7048127NLUWH7Q",
+      "notes": "Patched subscription plan P-4GE08190NN7048127NLUWH7Q (HTTP 204)."
+    },
+    {
+      "index": 10,
+      "toolName": "paypal_authorize_order",
+      "equivalentRestEndpoint": "POST /v2/checkout/orders/{id}/authorize",
+      "classification": "PASS_NEGATIVE_AUTHORIZATION",
+      "httpStatus": 422,
+      "latencyMs": 1177,
+      "paypalResourceId": "3FG350118V794661P",
+      "notes": "Verified buyer authorization requirement on /v2/checkout/orders/3FG350118V794661P/authorize (ORDER_NOT_APPROVED)."
+    },
+    {
+      "index": 11,
+      "toolName": "paypal_list_webhooks",
+      "equivalentRestEndpoint": "GET /v1/notifications/webhooks",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 819,
+      "paypalResourceId": "webhooks:0",
+      "notes": "Listed PayPal Sandbox webhooks (count=0)."
+    },
+    {
+      "index": 12,
+      "toolName": "paypal_list_webhook_event_types",
+      "equivalentRestEndpoint": "GET /v1/notifications/webhooks-event-types",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 615,
+      "paypalResourceId": "event_types:205",
+      "notes": "Retrieved 205 PayPal Sandbox webhook event types (55 PAYMENT.* events)."
+    },
+    {
+      "index": 13,
+      "toolName": "paypal_list_invoice_templates",
+      "equivalentRestEndpoint": "GET /v2/invoicing/templates",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 200,
+      "latencyMs": 716,
+      "paypalResourceId": "templates:3,addresses:2",
+      "notes": "Retrieved merchant invoice templates and 2 saved addresses."
+    },
+    {
+      "index": 14,
+      "toolName": "paypal_create_vault_setup_token",
+      "equivalentRestEndpoint": "POST /v3/vault/setup-tokens",
+      "classification": "PASS_REST_ADAPTER",
+      "httpStatus": 201,
+      "latencyMs": 1227,
+      "paypalResourceId": "02L568172M6937627",
+      "notes": "Created PayPal Vault v3 Setup Token 02L568172M6937627 (status=PAYER_ACTION_REQUIRED)."
+    }
+  ]
+}

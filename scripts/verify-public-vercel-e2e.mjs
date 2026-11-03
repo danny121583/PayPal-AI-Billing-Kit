@@ -494,14 +494,14 @@ async function run() {
     });
     const modalText = await page.locator('[data-testid="billing-maas-mcp-modal"]').innerText();
     check(
-      'Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 30 tools, source badges, PDF receipt endpoint, and zero MaaS branding',
+      'Step 10a: Header navigation pill and modal title use "Unified MCP Agent Interface" with 82 tools, source badges, PDF receipt endpoint, and zero MaaS branding',
       mcpBtnText.includes('MCP Agent Interface') &&
         !mcpBtnText.includes('MaaS') &&
         modalText.includes('MCP Agent Interface') &&
-        modalText.includes('30 Exposed Tools by Permission Tier') &&
+        modalText.includes('82 Exposed Tools by Permission Tier') &&
         modalText.includes('21 Native Application') &&
-        modalText.includes('1 Official PayPal MCP') &&
-        modalText.includes('8 PayPal REST Adapter') &&
+        modalText.includes('47 Official PayPal MCP') &&
+        modalText.includes('14 PayPal REST Adapter') &&
         !modalText.includes('MaaS') &&
         !modalText.includes('Model-as-a-Service')
     );

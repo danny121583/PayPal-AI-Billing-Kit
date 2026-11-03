@@ -20,9 +20,11 @@ This repository (`/Users/danny/Desktop/PayPal-AI-Billing-Kit`) is the **standalo
 | TypeScript static check | `npm run typecheck` |
 | Unit & component regression tests | `npm test -- --watchAll=false` |
 | Live Unified MCP Gateway verification | `npm run verify:mcp` (`node scripts/verify-maas-mcp.mjs`) |
+| Full 82-Tool PayPal MCP & REST-to-MCP verification | `npm run verify:full-paypal-mcp` (`node scripts/verify-full-paypal-mcp.mjs`) |
 | Live Gemini AI & security audit | `npm run verify:ai-security` (`node scripts/verify-security-and-ai.mjs`) |
 | Live PayPal Sandbox end-to-end test | `npm run verify:paypal-sandbox` (`node scripts/verify-live-paypal-sandbox.mjs`) |
 | Full 25-stage PayPal & MCP verification | `npm run verify:paypal-full` (`node scripts/verify-paypal-full.mjs`) |
+| Gemini 3.5 Flash-Lite & PDF Receipts verification | `npm run verify:gemini-receipts` (`node scripts/verify-gemini-and-receipts.mjs`) |
 | Playwright E2E browser verification | `npm run verify:e2e` (`node scripts/verify-public-vercel-e2e.mjs`) |
 | Secret & isolation scan | `npm run scan:secrets` (`node scripts/scan-secrets.mjs`) |
 

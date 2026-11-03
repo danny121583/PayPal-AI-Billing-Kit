@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.9.0] - 2026-11-02
+
+### Added
+- **Full 82-Tool Unified PayPal MCP Integration & Sandbox REST-to-MCP Expansion (`packages/paypal-billing-kit/src/mcpRegistry.ts`, `supabase/functions/billing-maas-mcp/index.ts`, `worker/src/index.ts`, `components/billing/BillingMaaSMcpModal.tsx`, `scripts/verify-full-paypal-mcp.mjs`):**
+  - Expanded the Unified PayPal MCP Gateway (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`, `https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp`, `https://paypal-ai-billing-kit.vercel.app/api/mcp`) from 30 tools to **82 callable tools** (`39` Read-Only, `3` Proposal-Only, `40` Confirmed Financial Execution):
+    - **21 Native Application Tools (`source: "native_application"`):** Preserved all 21 application billing, receipt, audit, guardrail, and conversational tools.
+    - **47 Official PayPal MCP Tools (`source: "official_paypal_mcp"`):** `paypal_discover_official_mcp` plus all **46 official PayPal MCP tools** discovered from `https://mcp.sandbox.paypal.com/sse` (`@paypal/mcp@1.8.1` / `@paypal/agent-toolkit@1.11.0`) exposed by their exact official names (`create_invoice`, `create_recurring_series`, `activate_recurring_series`, `get_recurring_series`, `cancel_recurring_series`, `delete_recurring_series`, `list_invoices`, `get_invoice`, `send_invoice`, `send_invoice_reminder`, `cancel_sent_invoice`, `delete_invoice`, `setup_invoice_auto_reminders`, `update_invoice_auto_reminder`, `search_invoicing`, `update_invoicing`, `cancel_invoice_auto_reminder`, `generate_invoice_qr_code`, `generate_invoice_number`, `record_payment_for_invoice`, `record_refund_for_invoice`, `create_conditional_rules_for_invoice`, `create_product`, `list_products`, `update_product`, `show_product_details`, `create_subscription_plan`, `list_subscription_plans`, `show_subscription_plan_details`, `create_subscription`, `show_subscription_details`, `cancel_subscription`, `update_subscription`, `create_shipment_tracking`, `get_shipment_tracking`, `update_shipment_tracking`, `create_order`, `get_order`, `pay_order`, `list_disputes`, `get_dispute`, `accept_dispute_claim`, `list_transactions`, `create_refund`, `get_refund`, `get_merchant_insights`).
+    - **14 PayPal Sandbox REST-to-MCP Adapter Tools (`source: "paypal_rest_adapter"`):** 8 existing (`paypal_get_order`, `paypal_get_refund`, `paypal_list_invoices`, `paypal_generate_invoice_number`, `paypal_list_disputes`, `paypal_check_card_eligibility`, `execute_sandbox_card_payment`, `run_sandbox_card_lifecycle_test`) + 6 new (`update_plan`, `paypal_authorize_order`, `paypal_list_webhooks`, `paypal_list_webhook_event_types`, `paypal_list_invoice_templates`, `paypal_create_vault_setup_token`).
+  - Resolved the upstream `PAYPAL_API_SETUP_ERROR: "Unsupported cache mode: default"` failure on `https://mcp.sandbox.paypal.com/sse` (caused by `@paypal/agent-toolkit`'s `axios` fetch adapter passing `cache: "default"` inside Cloudflare Workers) by executing all 46 official PayPal MCP tool contracts server-side against `https://api-m.sandbox.paypal.com` using native `fetch` with `PayPal-Request-Id` idempotency headers, `$500` single-action / `$2,500` daily guardrails, sensitive-data firewall (`SENSITIVE_CLINICAL_DATA_BLOCKED`), RBAC (`actor_role`), and immutable `billing_audit_events` logging.
+  - Added `npm run verify:full-paypal-mcp` (`scripts/verify-full-paypal-mcp.mjs`) and generated four machine-readable evidence reports (`evidence/official-paypal-mcp-tool-inventory.json`, `evidence/full-paypal-mcp-verification.json`, `evidence/rest-to-mcp-adapter-verification.json`, `evidence/mcp-cross-endpoint-parity.json`).
+
+---
+
 ## [1.8.0] - 2026-11-02
 
 ### Added

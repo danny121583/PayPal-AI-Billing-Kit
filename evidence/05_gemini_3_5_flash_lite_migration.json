@@ -1,7 +1,7 @@
 {
-  "verifiedAt": "2026-11-03T01:47:45.398Z",
+  "verifiedAt": "2026-11-03T04:36:54.616Z",
   "benchmarkEndpointStatus": 200,
-  "benchmarkTotalRoundtripMs": 11421,
+  "benchmarkTotalRoundtripMs": 7677,
   "ok": true,
   "configuredTargetModel": "gemini-3.5-flash-lite",
   "previousBaselineModel": "gemini-2.5-flash",
@@ -39,12 +39,12 @@
     "status": 200,
     "configuredModel": "gemini-3.5-flash-lite",
     "upstreamResolvedModel": "gemini-3.5-flash-lite",
-    "latencyMs": 1120,
+    "latencyMs": 1082,
     "usageMetadata": {
       "promptTokenCount": 23,
-      "candidatesTokenCount": 14,
-      "thoughtsTokenCount": 167,
-      "totalTokenCount": 204
+      "candidatesTokenCount": 15,
+      "thoughtsTokenCount": 187,
+      "totalTokenCount": 225
     },
     "error": null
   },
@@ -55,29 +55,29 @@
     "upstreamResolvedModel": "gemini-3.5-flash-lite",
     "redirectOrFallbackReason": null,
     "thinkingLevel": "MEDIUM",
-    "latencyMs": 2774,
+    "latencyMs": 2521,
     "usageMetadata": {
       "promptTokenCount": 74,
-      "candidatesTokenCount": 83,
-      "thoughtsTokenCount": 713,
-      "totalTokenCount": 870
+      "candidatesTokenCount": 297,
+      "thoughtsTokenCount": 359,
+      "totalTokenCount": 730
     },
     "thoughtSignaturesCount": 1,
-    "textPreview": "As the PayPal AI Billing Kit Assistant, here is the administrative summary distinguishing **Invoice #PPB-INV-2026-1003 ($125.00 USD, Sample Demo Settlement)** from a live PayPal Sandbox capture:\n\n1. **Nature of the Record:** Invoice #PPB-INV-2026-1003 is a **static ledger entry or"
+    "textPreview": "As the PayPal AI Billing Kit Assistant, I can confirm that **Invoice #PPB-INV-2026-1003 ($125.00 USD, Sample Demo Settlement)** is distinct from a live PayPal Sandbox capture for the following reasons:\n\n1. **Environment & Execution:** \n   * *Invoice #PPB-INV-2026-1003* is a static, simulated record "
   },
   "baseline25FlashProbe": {
     "ok": true,
     "status": 200,
     "configuredModel": "gemini-2.5-flash",
     "upstreamResolvedModel": "gemini-2.5-flash",
-    "latencyMs": 3039,
+    "latencyMs": 648,
     "usageMetadata": {
       "promptTokenCount": 74,
-      "candidatesTokenCount": 484,
+      "candidatesTokenCount": 59,
       "thoughtsTokenCount": 0,
-      "totalTokenCount": 558
+      "totalTokenCount": 133
     },
-    "textPreview": "Invoice #PPB-INV-2026-1003, with an amount of $125.00 USD and the description \"Sample Demo Settlement,\" is distinct from a live PayPal Sandbox capture primarily due to its nature as a **simulated, illustrative invoice within a demonstration context**.\n\nHere's a summary of the key distinctions:\n\n*   "
+    "textPreview": "Invoice #PPB-INV-2026-1003 is a distinct billing entry. The \"Sample Demo Settlement\" note indicates it's for illustrative purposes, likely from a demonstration or testing environment, and not a live transaction that would occur within a PayPal Sandbox capture."
   },
   "multiTurnFunctionCallingTest": {
     "turn1Ok": true,
@@ -88,36 +88,36 @@
         "args": {
           "invoice_number": "PPB-INV-2026-1002"
         },
-        "id": "call_446433"
+        "id": "call_226773"
       }
     ],
     "turn1ThoughtSignaturesPreserved": 1,
-    "turn1LatencyMs": 918,
+    "turn1LatencyMs": 724,
     "turn1Usage": {
       "promptTokenCount": 121,
       "candidatesTokenCount": 33,
-      "thoughtsTokenCount": 69,
-      "totalTokenCount": 223
+      "thoughtsTokenCount": 70,
+      "totalTokenCount": 224
     },
     "turn2Ok": true,
     "turn2Text": "Invoice PPB-INV-2026-1002 has a balance due of $50.00.",
-    "turn2LatencyMs": 615,
+    "turn2LatencyMs": 556,
     "turn2Usage": {
-      "promptTokenCount": 300,
+      "promptTokenCount": 301,
       "candidatesTokenCount": 27,
       "thoughtsTokenCount": 0,
-      "totalTokenCount": 327
+      "totalTokenCount": 328
     }
   },
   "structuredJsonOutputTest": {
     "ok": true,
     "upstreamModel": "gemini-3.5-flash-lite",
-    "latencyMs": 1392,
+    "latencyMs": 1579,
     "usageMetadata": {
       "promptTokenCount": 20,
       "candidatesTokenCount": 27,
-      "thoughtsTokenCount": 352,
-      "totalTokenCount": 399
+      "thoughtsTokenCount": 351,
+      "totalTokenCount": 398
     },
     "parsedJson": {
       "intent": "inquire_capability",
@@ -127,7 +127,7 @@
   },
   "conversationalLiveTurn": {
     "status": 200,
-    "latencyMs": 8381,
+    "latencyMs": 4550,
     "aiEngine": "gemini-3.5-flash-lite",
     "geminiCompatibility": {
       "configuredModel": "gemini-3.5-flash-lite",
@@ -135,14 +135,14 @@
       "thinkingLevel": "MEDIUM",
       "upstreamResolvedModel": "gemini-3.5-flash-lite",
       "thoughtSignaturesPreserved": 1,
-      "latencyMs": 4097,
+      "latencyMs": 3868,
       "usageMetadata": {
         "promptTokenCount": 5188,
-        "candidatesTokenCount": 58,
-        "thoughtsTokenCount": 1473,
-        "totalTokenCount": 6719
+        "candidatesTokenCount": 62,
+        "thoughtsTokenCount": 1470,
+        "totalTokenCount": 6720
       }
     },
-    "replyPreview": "Based on the administrative billing records for Dr. Sarah Jenkins, here is the practice billing collection analysis and open statement prioritization:\n\n### **Billing Collection Rate Analysis**\n* **Total Billed:** $480.00 across 6 total statements.\n* **Total Collected:** $"
+    "replyPreview": "### Practice Billing Collection Analysis\n\n* **Total Active Invoiced:** $445.00 across valid statements (excluding voided invoice `#PPB-INV-2026-1005` for $35.00).\n* **Total Collected:** $125"
   }
 }
