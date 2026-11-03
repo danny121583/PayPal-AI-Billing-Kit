@@ -135,6 +135,11 @@ async function run() {
     }
 
     // Step 1b: Regression check for Section 8 (PayPalConnectCard Connected <-> Disconnected states)
+    const toggleDetailsBtn = page.locator('[data-testid="paypal-connect-toggle-details-btn"]');
+    if ((await toggleDetailsBtn.count()) > 0 && !(await page.locator('[data-testid="paypal-disconnect-cta-btn"]').isVisible().catch(() => false))) {
+      await toggleDetailsBtn.click();
+      await page.waitForTimeout(250);
+    }
     await page.locator('[data-testid="paypal-disconnect-cta-btn"]').click();
     await page.waitForSelector('[data-testid="paypal-connect-cta-btn"]', {
       timeout: 10000,

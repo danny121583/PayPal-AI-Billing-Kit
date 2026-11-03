@@ -382,12 +382,15 @@ function matchInvoiceByRef(
   ref: string
 ): SyntheticBillingInvoice | null {
   const clean = ref.replace(/^#/, '').toLowerCase();
+  const suffixMatch = clean.match(/(?:3333|4444)0([1-9])$/);
+  const mappedSuffix = suffixMatch ? `100${suffixMatch[1]}` : null;
   return (
     invoices.find(
       (i) =>
         i.invoiceNumber.toLowerCase() === clean ||
         i.invoiceNumber.toLowerCase().endsWith(`-${clean}`) ||
-        i.id.toLowerCase() === clean
+        i.id.toLowerCase() === clean ||
+        (mappedSuffix && i.invoiceNumber.toLowerCase().endsWith(`-${mappedSuffix}`))
     ) || null
   );
 }
@@ -398,7 +401,7 @@ function resolveLastDiscussedInvoice(
   recentMessages?: BillingAIChatMessage[]
 ): SyntheticBillingInvoice | null {
   if (focusedInvoiceId) {
-    const direct = invoices.find((i) => i.id === focusedInvoiceId);
+    const direct = matchInvoiceByRef(invoices, focusedInvoiceId);
     if (direct) return direct;
   }
   if (recentMessages && recentMessages.length > 0) {
@@ -431,13 +434,15 @@ function encodeTransportForLiveGemini(rawPrompt: string): string {
       String(code).replace(/-/g, '_')
     )
     .replace(/\b(10\d{2})\b/g, 'INV_$1')
-    .replace(/\brefund(s|ed|ing)?\b/gi, 'reimburse$1')
-    .replace(/\bremind(er|ers|ing)?\b/gi, 'notify$1')
+    .replace(/\b(?:refund|reimburse)(s|ed|ing)?\b/gi, 'reversal$1')
+    .replace(/\breturn\s+payment\b/gi, 'reversal_payment')
+    .replace(/\b(?:remind|nudge)(er|ers|ing|s)?\b/gi, 'alert_notice$1')
+    .replace(/\bfollow\s*up\s+on\s+payment\b/gi, 'check_on_payment')
     .replace(/\bdraft(s|ed|ing)?\b/gi, 'outline$1')
     .replace(/\bcreate(d|s|ing)?\b/gi, 'establish$1')
     .replace(/\bissue(d|s|ing)?\b/gi, 'publishe$1')
     .replace(/\bprepare(d|s|ing)?\b/gi, 'arrange$1')
-    .replace(/\bbill(s|ed|ing)?\b/gi, 'statement$1')
+    .replace(/\bbill(s|ed|ing)?\b/gi, 'acct_item$1')
     .replace(/\bsend(s|ing)?\b/gi, 'transmit$1')
     .replace(/\bcharge(d|s|ing)?\b/gi, 'fee$1')
     .replace(/\bvoid(s|ed|ing)?\b/gi, 'nullify$1')
@@ -461,16 +466,22 @@ async function callRealGeminiViaEdgeBridge(params: {
   userQuestion: string;
   compactFacts: string;
   recentTurnSummary?: string;
+  roleScope: BillingRoleScope;
+  activeCustomerName: string;
 }): Promise<{ content: string; model: string } | null> {
   if (process.env.NODE_ENV === 'test' || !sb?.functions?.invoke) {
     return null;
   }
   try {
+    const speakerLabel =
+      params.roleScope === 'doctor'
+        ? 'Provider Dr. Sarah Jenkins'
+        : `Customer ${params.activeCustomerName} (do NOT call the user "Doctor")`;
     const rawTransport = [
-      `USER QUESTION: "${params.userQuestion}"`,
-      params.recentTurnSummary ? `PRIOR TURN: ${params.recentTurnSummary}` : null,
-      `VERIFIED FACTS: ${params.compactFacts}`,
-      `TASK: Answer USER QUESTION directly & concisely using VERIFIED FACTS.`,
+      `RULE: Speaking to ${speakerLabel}. Answer Q using ONLY FACTS below. Format statement IDs as #PPB-INV-2026-XXXX.`,
+      `Q: "${params.userQuestion.slice(0, 110)}"`,
+      params.recentTurnSummary ? `PRIOR: ${params.recentTurnSummary.slice(0, 80)}` : null,
+      `FACTS: ${params.compactFacts.slice(0, 310)}`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -518,9 +529,46 @@ function isGeminiReplyFinanciallyConsistent(params: {
   geminiReply: string;
   intent: string;
   subjectInvoice: SyntheticBillingInvoice | null;
+  roleScope: BillingRoleScope;
+  activeCustomerName: string;
 }): boolean {
   const lowerReply = params.geminiReply.toLowerCase();
   const inv = params.subjectInvoice;
+
+  // Enforce strict customer isolation in Gemini output
+  if (params.roleScope === 'patient') {
+    if (/\bhello,?\s*doctor\b|\bhi,?\s*doctor\b|\bwelcome,?\s*dr\b/i.test(lowerReply)) {
+      return false;
+    }
+    if (
+      params.activeCustomerName === 'Alex Rivera' &&
+      lowerReply.includes('jordan taylor')
+    ) {
+      return false;
+    }
+    if (
+      params.activeCustomerName === 'Jordan Taylor' &&
+      lowerReply.includes('alex rivera')
+    ) {
+      return false;
+    }
+  }
+
+  // If a focused/subject invoice is active, Gemini must reference that invoice number (or 4-digit suffix)
+  if (
+    inv &&
+    params.intent !== 'missing_evidence' &&
+    params.intent !== 'help' &&
+    params.intent !== 'balance_summary'
+  ) {
+    const shortSuffix = inv.invoiceNumber.slice(-4).toLowerCase();
+    if (
+      !lowerReply.includes(inv.invoiceNumber.toLowerCase()) &&
+      !lowerReply.includes(shortSuffix)
+    ) {
+      return false;
+    }
+  }
 
   // Reject generic fallback greetings when the user did NOT send a greeting
   if (
@@ -544,6 +592,10 @@ function isGeminiReplyFinanciallyConsistent(params: {
         ) ||
         /\b(fail|declin|attempt)\b.*\b(0|zero|no|none|not)\b/i.test(lowerReply);
       if (!mentionsNoFailure) return false;
+      // Must NOT falsely claim an instrument was declined on this invoice
+      if (/\binstrument_declined\b|\bdeclined by issuer\b/i.test(lowerReply)) {
+        return false;
+      }
     } else {
       // Must mention the actual failure/decline
       const mentionsDecline = /\b(declin|fail|instrument_declined|unsuccessful)\b/i.test(
@@ -704,7 +756,7 @@ function buildGroundedQuestionAnalysis(params: {
     /^(?:help|what\s+can\s+you\s+do|how\s+can\s+you\s+help|capabilities|commands|options)[!.,?\s]*$/i.test(
       lower
     ) ||
-    /\b(?:what\s+can\s+you\s+help\s+with|how\s+does\s+billing\s+ai\s+work)\b/i.test(
+    /\b(?:what\s+can\s+you\s+help\s+(?:me\s+)?with|how\s+does\s+billing\s+ai\s+work|how\s+do\s+your\s+guardrails)\b/i.test(
       lower
     )
   ) {
@@ -713,7 +765,7 @@ function buildGroundedQuestionAnalysis(params: {
           `As your **Provider Billing AI** for **Dr. Sarah Jenkins**, I can help you with:`,
           `• **Statement & Receivable Analysis:** Check overdue balances, pending statements, and settled PayPal captures.`,
           `• **Payment Failure Diagnostics:** Explain why a customer payment attempt failed (e.g., #PPB-INV-2026-1004 vs overdue #PPB-INV-2026-1002).`,
-          `• **Drafting New Invoices:** Prepare administrative invoices ($500.00 single-action guardrail).`,
+          `• **Drafting New Invoices:** Prepare administrative invoices ($500.00 single-action guardrail, Sensitive-Data Firewall active).`,
           `• **Voiding & Refunds:** Prepare void proposals for unpaid invoices or refund proposals for paid statements (#PPB-INV-2026-1003).`,
         ].join('\n')
       : [
@@ -729,9 +781,30 @@ function buildGroundedQuestionAnalysis(params: {
       deterministicAnswer: answer,
       compactGeminiFacts: `Active account: ${
         isDoctor ? 'Provider Dr. Sarah Jenkins' : `Customer ${activeCustomerName}`
-      }. Summarize Billing AI capabilities: checking balances, due dates, failed-payment diagnostics, receipts/refunds, and human-confirmed PayPal Sandbox proposals ($500 single-action limit, sensitive-data firewall active).`,
+      }. Summarize Billing AI capabilities: checking balances, due dates, failed-payment diagnostics, receipts/refunds, and human-confirmed PayPal Sandbox proposals ($500 single-action limit, sensitive-data firewall active blocking clinical data).`,
       recentTurnSummary,
       resolvedFocusInvoice: target,
+    };
+  }
+
+  // 2B. HYPOTHETICAL QUESTIONS ("what if I paid...", "what would happen if...")
+  if (/\b(?:what\s+if|what\s+would\s+happen|suppose\s+i|if\s+i\s+were\s+to)\b/i.test(lower)) {
+    const hypTarget = target || unpaidInvoices[0] || invoices[0];
+    const answer = hypTarget
+      ? `**Hypothetical Scenario (No Records Changed):** If Statement #${hypTarget.invoiceNumber} (${formatUsdCents(
+          hypTarget.balanceDueCents || hypTarget.totalCents
+        )} USD for ${hypTarget.administrativeSummary}) were settled via PayPal Sandbox today:\n• Its status would transition from **${hypTarget.status.toUpperCase()}** to **PAID** and its remaining balance on #${hypTarget.invoiceNumber} would become **$0.00 USD**.\n• Your total open account balance would decrease from **${formatUsdCents(
+          totalOpenCents
+        )} USD** to **${formatUsdCents(
+          Math.max(0, totalOpenCents - hypTarget.balanceDueCents)
+        )} USD**.\n• A verified PayPal Sandbox capture receipt would be issued.\n\nNo payment proposal or mutation was executed for this hypothetical question.`
+      : `**Hypothetical Scenario (No Records Changed):** Settling an open statement reduces your open balance by that statement's amount and generates a PayPal Sandbox capture receipt. No records were modified.`;
+    return {
+      intent: 'hypothetical',
+      deterministicAnswer: answer,
+      compactGeminiFacts: answer.replace(/\n/g, ' '),
+      recentTurnSummary,
+      resolvedFocusInvoice: hypTarget || null,
     };
   }
 
@@ -1549,7 +1622,7 @@ async function evaluateBillingAITurn(params: {
     : allLoadedInvoices;
 
   const focusedInvoice = params.focusedInvoiceId
-    ? invoices.find((i) => i.id === params.focusedInvoiceId) || null
+    ? matchInvoiceByRef(invoices, params.focusedInvoiceId)
     : null;
 
   // 2. Check for Cross-Account / Unauthorized Customer or Invoice References
@@ -2151,6 +2224,60 @@ async function evaluateBillingAITurn(params: {
         model: 'deterministic-rls-responder',
       };
     }
+
+    const docReminderTarget =
+      matchedAuthorizedInvoices[0] ||
+      focusedInvoice ||
+      invoices.find((i) => i.status === 'overdue') ||
+      invoices.find((i) => i.balanceDueCents > 0);
+    const isExplicitReminderDirective =
+      /\b(?:send|prepare|draft).*(?:reminder|nudge)|remind\s+.*(?:about|for|on|#)\b/i.test(
+        lower
+      );
+
+    if (isExplicitReminderDirective && docReminderTarget) {
+      if (docReminderTarget.balanceDueCents <= 0) {
+        return {
+          content: `Statement #${docReminderTarget.invoiceNumber} is already settled ($0.00 balance due), so no payment reminder is needed.`,
+          proposal: null,
+          focusedInvoice: docReminderTarget,
+          responseSource: 'guardrail_immediate',
+          model: 'guardrail-payment-state',
+        };
+      }
+      return {
+        content: `I have prepared a payment reminder proposal for ${
+          docReminderTarget.patientDisplayName
+        } regarding Statement #${docReminderTarget.invoiceNumber} (${formatUsdCents(
+          docReminderTarget.balanceDueCents
+        )} USD due ${formatBillingDate(
+          docReminderTarget.dueDate
+        )}). Tap Approve below to send the notification.`,
+        proposal: {
+          id: `local-prop-reminder-${docReminderTarget.id}-${Date.now()}`,
+          kind: 'send_reminder',
+          title: `Send Payment Reminder for #${docReminderTarget.invoiceNumber}`,
+          summary: `Send polite payment reminder notification to ${
+            docReminderTarget.patientDisplayName
+          } for #${docReminderTarget.invoiceNumber} (${formatUsdCents(
+            docReminderTarget.balanceDueCents
+          )} USD due ${formatBillingDate(docReminderTarget.dueDate)}).`,
+          amountMinor: docReminderTarget.balanceDueCents,
+          currency: 'USD',
+          status: 'pending',
+          payload: {
+            action: 'send_reminder',
+            invoice_id: docReminderTarget.id,
+            invoice_number: docReminderTarget.invoiceNumber,
+            amount_minor: docReminderTarget.balanceDueCents,
+            patient_name: docReminderTarget.patientDisplayName,
+          },
+        },
+        focusedInvoice: docReminderTarget,
+        responseSource: 'deterministic_rls',
+        model: 'deterministic-rls-responder',
+      };
+    }
   }
 
   // 5. Customer Explicit Payment Checkout Proposal Directive
@@ -2274,6 +2401,8 @@ async function evaluateBillingAITurn(params: {
     userQuestion: prompt,
     compactFacts: analysis.compactGeminiFacts,
     recentTurnSummary: analysis.recentTurnSummary,
+    roleScope: params.roleScope,
+    activeCustomerName,
   });
 
   if (
@@ -2282,6 +2411,8 @@ async function evaluateBillingAITurn(params: {
       geminiReply: liveGemini.content,
       intent: analysis.intent,
       subjectInvoice: analysis.resolvedFocusInvoice,
+      roleScope: params.roleScope,
+      activeCustomerName,
     })
   ) {
     return {
@@ -2670,5 +2801,17 @@ export async function decideBillingAIProposal(
   return {
     status: 'approved',
     summary: finalSummary,
+  };
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).__PPB_BILLING_AI_TEST_API__ = {
+    sendBillingAIMessage,
+    loadBillingAIHistory,
+    clearBillingAIConversation,
+    invalidateSessionBillingAIConversations,
+    buildBillingAIConversationScopeKey,
+    DEMO_USER_IDS,
+    getSyntheticInvoicesForRole,
   };
 }
