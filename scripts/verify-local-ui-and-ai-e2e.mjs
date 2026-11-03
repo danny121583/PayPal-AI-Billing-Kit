@@ -15,7 +15,7 @@ import { chromium } from 'playwright';
 const TARGET_URL = process.env.LOCAL_VERIFY_URL || 'http://localhost:8081';
 const SCREENSHOT_DIR = path.resolve(
   process.cwd(),
-  'docs/screenshots/local-polish'
+  'local-demo/06-private-screenshots/local-polish'
 );
 const ARTIFACT_DIR =
   process.env.ARTIFACT_DIR ||

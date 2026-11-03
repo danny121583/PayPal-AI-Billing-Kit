@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-03T10:27:33.387Z",
+  "timestamp": "2026-11-03T11:46:11.707Z",
   "targetUrl": "http://localhost:8081",
   "passed": 20,
   "failed": 0,
@@ -94,7 +94,7 @@
       "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter",
       "ok": true,
       "details": {
-        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex! I see your account is currently focused on sta"
+        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex, Welcome! I'm here to assist you with your bill"
       }
     },
     {

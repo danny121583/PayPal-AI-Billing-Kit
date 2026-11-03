@@ -23,6 +23,7 @@
     "verify:e2e": "node scripts/verify-public-vercel-e2e.mjs",
     "sync:secrets": "node scripts/sync-local-env-secrets.mjs",
     "build:web": "EXPO_NO_TELEMETRY=1 npx expo export --platform web && node scripts/inject-web-favicon.mjs",
+    "verify:repo-hygiene": "node scripts/verify-public-repo-hygiene.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs"
   },
   "dependencies": {

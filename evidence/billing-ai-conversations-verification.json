@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-11-03T10:29:34.327Z",
+  "timestamp": "2026-11-03T11:45:47.581Z",
   "targetUrl": "http://localhost:8081",
   "totalPromptScenarios": 33,
   "passedPromptScenarios": 33,
   "failedPromptScenarios": 0,
-  "liveGeminiResponsesCount": 22,
+  "liveGeminiResponsesCount": 21,
   "conversationIsolation": {
     "allPassed": true,
     "checks": {
@@ -32,7 +32,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hello Alex! Welcome. I see we are looking at your account, specifically invoice #PPB-INV-2026-1002 for the $75.00 administrative missed appointment fee, which is currently overdue. \n\nHow can I assist you with your billing today?"
+      "replyPreview": "Hello Alex! I see we are currently looking at your account context regarding invoice #PPB-INV-2026-1002 (Missed Appointment Fee, $75.00 USD, currently overdue with a balance due of $75.00). \n\nHow can I help you with your billing today?"
     },
     {
       "id": "S02_greeting_general_account",
@@ -45,7 +45,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hi there! Welcome. Looking at the account for Alex Rivera, you currently have 2 open statements totaling $225.00 USD (#PPB-INV-2026-1001 for $150.00 and #PPB-INV-2026-1002 for $75.00). \n\nHow can I assist you with your billing today?"
+      "replyPreview": "Hi there! Welcome, Alex Rivera. You currently have 2 open statements totaling $225.00 USD (#PPB-INV-2026-1001 for $150.00 and #PPB-INV-2026-1002 for $75.00). How can I assist you with your billing today?"
     },
     {
       "id": "S03_small_talk_thanks",
@@ -58,7 +58,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "You're very welcome, Dr. Jenkins! Please let me know if you need assistance reviewing any billing statements or transaction records."
+      "replyPreview": "You're very welcome, Dr. Jenkins! Let me know if you need assistance with any administrative billing records or statements."
     },
     {
       "id": "S04_capability_what_can_you_do",
@@ -71,7 +71,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hello Alex! I can help you with checking your account balances, due dates, failed-payment diagnostics, receipts and reversals, and human-confirmed PayPal Sandbox proposals (subject to our $500.00 single-action limit). \n\nFor instance, I can assist you with reviewing your administr"
+      "replyPreview": "Hello Alex! I can help you manage your administrative billing records. Specifically, my capabilities include:\n\n* Checking balances and due dates\n* Reviewing failed-payment diagnostics\n* Managing receipts and reversals\n* Assisting with human-confirmed PayPal Sandbox payment propos"
     },
     {
       "id": "S05_capability_guardrails_and_privacy",
@@ -84,7 +84,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Dr. Jenkins, our system operates under strict guardrails and a sensitive-data firewall designed for administrative security:\n\n- **Sensitive-Data Firewall:** Actively blocks all clinical data (such as diagnoses, labs, vitals, and medical records), restricting my access exclusively"
+      "replyPreview": "Dr. Jenkins, our guardrails and sensitive-data firewall operate under strict protocols:\n\n* **Financial Guardrails:** We enforce a single-action limit of $500.00 and a daily limit of $2500.00. The AI proposes billing actions, humans approve them, and PayPal confirms settlement.\n* "
     },
     {
       "id": "S06_why_did_it_fail_on_overdue_1002",
@@ -97,7 +97,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hello Alex, regarding invoice #PPB-INV-2026-1002 for $75.00, it did not actually fail a payment attempt. There are zero (0) failed payment attempts recorded for this statement. It is currently marked as overdue simply because the due date has passed without a payment being made y"
+      "replyPreview": "Hello Alex. Regarding invoice #PPB-INV-2026-1002 for $75.00, it did not fail due to a payment error. There are 0 failed payment attempts recorded for this invoice. It is currently marked as overdue simply because the due date of October 28, 2026, passed without a payment being su"
     },
     {
       "id": "S07_focused_overdue_1002_service_details",
@@ -110,7 +110,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hello Alex, \n\nRegarding statement #PPB-INV-2026-1002, it is for a Missed Appointment Fee (Administrative missed appointment fee) with a total of $75.00. The service code on this statement is `ADMIN-NOSHOW`."
+      "replyPreview": "Hello Alex,\n\nStatement #PPB-INV-2026-1002 is for a Missed Appointment Fee with a balance due of $75.00. The service code on this statement is `ADMIN-NOSHOW` (Administrative missed appointment fee)."
     },
     {
       "id": "S08_contextual_followup_when_on_1002",
@@ -123,7 +123,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hi Alex, \n\nStatement #PPB-INV-2026-1002 was published on October 13, 2026, and had a due date of October 29, 2026. Currently, there are zero (0) payment attempts recorded for this balance of $75.00."
+      "replyPreview": "For statement #PPB-INV-2026-1002 ($75.00), it was published on October 13, 2026, with a due date of October 29, 2026. There have been zero (0) payment attempts made on this overdue balance."
     },
     {
       "id": "S09_contextual_followup_how_much_on_1002",
@@ -136,7 +136,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hi Alex, \n\nFor statement #PPB-INV-2026-1002, the remaining balance due is $75.00 USD (original total $75.00 USD, paid $0.00 USD). Your total open balance across 2 unpaid statements is $225.00 USD."
+      "replyPreview": "For statement #PPB-INV-2026-1002, the remaining balance due is $75.00 USD. Your total open balance across 2 unpaid statements is $225.00 USD."
     },
     {
       "id": "S10_contextual_followup_can_i_try_again_on_1002",
@@ -149,7 +149,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hi Alex, \n\nYes, you can try again. Statement #PPB-INV-2026-1002 ($75.00 USD, status **overdue**) has 0 prior payment attempts and is open for settlement right now. \n\nYou can complete your payment by clicking \"Pay with PayPal\" or \"Pay with Sandbox Card\" in your Statement Details, "
+      "replyPreview": "Yes, you can try again. Statement #PPB-INV-2026-1002 ($75.00 USD, status **overdue**) has 0 prior payment attempts and is open for settlement right now. \n\nYou can complete your payment by selecting \"Pay with PayPal\" or \"Pay with Sandbox Card\" within the Statement Details, or by a"
     },
     {
       "id": "S11_contextual_followup_what_about_other_one",
@@ -162,7 +162,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hi Alex, \n\nRegarding your other statements, you currently have two open invoices:\n\n* **#PPB-INV-2026-1002**: $75.00 balance due for *Missed Appointment Fee — Administrative missed appointment fee* (Status: Overdue, due Oct 28, 2026).\n* **#PPB-INV-2026-1001**: $150.00 balance due "
+      "replyPreview": "Hi Alex, \n\nRegarding your other statements on file:\n\n* **#PPB-INV-2026-1001**: Telehealth Scheduling & Admin for $150.00 (Status: sent, due November 12, 2026).\n* **#PPB-INV-2026-1002**: Missed Appointment Fee for $75.00 (Status: overdue, due October 28, 2026).\n\nPlease let me know"
     },
     {
       "id": "S12_focused_paid_1003_receipt_status",
@@ -175,7 +175,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hello Alex, \n\nYes, statement #PPB-INV-2026-1003 in the amount of $125.00 has been fully paid with a balance due of $0.00. \n\nThe receipt reference for this transaction is `SAMPLE-DEMO-SETTLEMENT-1003` (Order ID: `SAMPLE-ORD-1003`). Please note that this is a Sample Demo Settlement"
+      "replyPreview": "Hello Alex,\n\nYes, statement #PPB-INV-2026-1003 was paid in full for $125.00 USD, leaving a balance due of $0.00 USD. \n\nThe receipt reference for this payment is **SAMPLE-DEMO-SETTLEMENT-1003** (Sample Demo Settlement — Not a Live PayPal Capture)."
     },
     {
       "id": "S13_focused_paid_1003_can_i_retry",
@@ -188,7 +188,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "No, you do not need to try again. Statement #PPB-INV-2026-1003 is already paid in full with a balance due of $0.00. \n\nFor your records, this transaction was processed as a Sample Demo Settlement — Not a Live PayPal Capture (Reference: `SAMPLE-DEMO-SETTLEMENT-1003`)."
+      "replyPreview": "Alex Rivera, statement #PPB-INV-2026-1003 is already fully paid with a balance due of $0.00, so you do not need to try again. \n\nPayment record details:\n* **Status:** Paid ($125.00 total)\n* **Settlement Type:** Sample Demo Settlement — Not a Live PayPal Capture \n* **Receipt Refere"
     },
     {
       "id": "S14_why_did_it_fail_on_failed_1004",
@@ -214,7 +214,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "For statement #PPB-INV-2026-1004 ($50.00), it was published on October 29, 2026, and is due on November 10, 2026. The declined payment attempt occurred on November 1, 2026."
+      "replyPreview": "The declined payment attempt for statement #PPB-INV-2026-1004 occurred on November 1, 2026. The statement was published on October 29, 2026, with a due date of November 10, 2026."
     },
     {
       "id": "S16_contextual_can_i_try_again_on_1004",
@@ -224,10 +224,10 @@
       "activeUserId": "11111111-1111-4111-8111-111111111103",
       "focusedInvoiceId": "44444444-4444-4444-8444-444444444404",
       "passed": true,
-      "responseSource": "gemini_live",
-      "model": "gemini-3.5-flash-lite",
+      "responseSource": "deterministic_rls",
+      "model": "deterministic-rls-responder",
       "hasProposal": false,
-      "replyPreview": "Yes, you can retry payment on statement #PPB-INV-2026-1004 ($50.00) at any time. No funds were captured during the declined attempt. \n\nYou can complete your payment by selecting \"Pay with PayPal\" or \"Pay with Sandbox Card\" in your Statement Details, or by asking the billing assis"
+      "replyPreview": "Yes — you can retry payment on Statement #PPB-INV-2026-1004 ($50.00 USD) at any time. No funds were captured during the declined attempt on Nov 1, 2026 (DEMO-ORD-DECLINED-1004).\n\nYou can complete payment in two ways:\n• **In Statement Details:** Tap **Pay with PayPal** (or **Pay w"
     },
     {
       "id": "S17_focused_pending_1001_explain",
@@ -240,7 +240,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "For statement #PPB-INV-2026-1001, the line item is **Telehealth Scheduling & Admin — Administrative telehealth scheduling and account coordination fee** with a total of **$150.00 USD**. The payment due date is **November 13, 2026**, and the current remaining balance due is **$150"
+      "replyPreview": "Hello Alex,\n\nFor statement #PPB-INV-2026-1001, the line item and due date details are as follows:\n\n* **Line Item:** Telehealth Scheduling & Admin — Administrative telehealth scheduling and account coordination fee (**$150.00**)\n* **Due Date:** November 12, 2026 (Remaining balance"
     },
     {
       "id": "S18_focused_refunded_invoice_status",
@@ -253,7 +253,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Statement #PPB-INV-2026-1006 for Alex Rivera (Records & Document Processing, $45.00) has been fully refunded and reversed. The remaining balance due is $0.00. \n\nNote: The original payment was processed via a Sample Demo Settlement — Not a Live PayPal Capture (Capture ID: `SAMPLE-"
+      "replyPreview": "Regarding statement #PPB-INV-2026-1006 for Alex Rivera (Records & Document Processing — Administrative records preparation and transfer fee, totaling $45.00): \n\n* **Status:** Fully refunded/reversed ($45.00 paid, $45.00 refunded).\n* **Remaining Balance Due:** $0.00.\n* **Settlemen"
     },
     {
       "id": "S19_balance_total_owed_alex_rivera",
@@ -266,7 +266,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "You have a total open balance of **$225.00** across 2 open statements:\n\n* **#PPB-INV-2026-1002**: **$75.00** (Missed Appointment Fee — Due October 28, 2026, and currently overdue)\n* **#PPB-INV-2026-1001**: **$150.00** (Telehealth Scheduling & Admin — Due November 12, 2026)"
+      "replyPreview": "Hello Alex, \n\nYou have a total open balance of **$225.00 USD** across your open statements:\n\n* **#PPB-INV-2026-1002**: **$75.00 USD** (Missed Appointment Fee — Administrative missed appointment fee, overdue since October 28, 2026)\n* **#PPB-INV-2026-1001**: **$150.00 USD** (Telehe"
     },
     {
       "id": "S20_due_dates_open_statements",
@@ -279,7 +279,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Your open statements are due on the following dates:\n\n* **#PPB-INV-2026-1002** ($75.00): Due October 28, 2026 (Overdue)\n* **#PPB-INV-2026-1001** ($150.00): Due November 12, 2026"
+      "replyPreview": "Hello Alex, here are the due dates for your open statements:\n\n- **#PPB-INV-2026-1002** ($75.00): Due October 28, 2026 (Currently overdue)\n- **#PPB-INV-2026-1001** ($150.00): Due November 12, 2026"
     },
     {
       "id": "S21_transaction_history_alex_rivera",
@@ -305,7 +305,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Here is a comparison of your statements:\n\n* **#PPB-INV-2026-1001**: \n  * **Description:** Telehealth Scheduling & Admin — Administrative telehealth scheduling and account coordination fee\n  * **Total / Balance Due:** $150.00\n  * **Status:** Sent\n  * **Due Date:** November 12, 202"
+      "replyPreview": "Here is the comparison between your statements, Alex Rivera:\n\n* **#PPB-INV-2026-1001**: Total amount is **$150.00** (Balance Due: **$150.00**). It is for *Telehealth Scheduling & Admin — Administrative telehealth scheduling and account coordination fee*, due on November 12, 2026,"
     },
     {
       "id": "S23_missing_evidence_card_last_4",
@@ -318,7 +318,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hello Jordan,\n\nRegarding statement #PPB-INV-2026-1004 ($50.00), raw credit card numbers, bank details, and personal addresses are never stored. We only record invoice numbers, ADMIN-* service codes, USD amounts, and PayPal Sandbox references—such as the masked email identifier (`"
+      "replyPreview": "Hello Jordan,\n\nRegarding statement #PPB-INV-2026-1004, the specific card details for the failed attempt are not recorded in our billing records. Raw card numbers, bank details, and personal addresses are never stored; we only record invoice numbers, ADMIN-* service codes, USD amo"
     },
     {
       "id": "S24_missing_evidence_bank_routing",
@@ -331,7 +331,7 @@
       "responseSource": "gemini_live",
       "model": "gemini-3.5-flash-lite",
       "hasProposal": false,
-      "replyPreview": "Hi Alex, \n\nRegarding invoice #PPB-INV-2026-1002 ($75.00), please note that raw card numbers, bank routing/account details, and personal street addresses are never stored in our billing records. \n\nOur administrative system only records invoice numbers, ADMIN-* service codes, USD a"
+      "replyPreview": "Hi Alex, \n\nRegarding statement #PPB-INV-2026-1002, bank routing numbers and personal street addresses are never stored in our administrative billing records. We only record invoice numbers (such as #PPB-INV-2026-1002), ADMIN-* service codes, USD amounts, and PayPal Sandbox refere"
     },
     {
       "id": "S25_hypothetical_what_if_paid_1002",

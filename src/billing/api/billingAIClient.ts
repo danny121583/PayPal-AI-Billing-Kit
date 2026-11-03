@@ -622,6 +622,13 @@ function isGeminiReplyFinanciallyConsistent(params: {
     if (!admitsNotRecorded) return false;
   }
 
+  if (params.intent === 'invoice_comparison') {
+    const distinctInvRefs = new Set(lowerReply.match(/100[1-6]/g) || []);
+    if (distinctInvRefs.size < 2) {
+      return false;
+    }
+  }
+
   return true;
 }
 

@@ -352,7 +352,7 @@ async function main() {
         focusedInvoiceId: inv1004,
         prompt: 'What were the last 4 digits of the credit card that failed?',
         validate: (res) =>
-          /not recorded|never store|not stored|firewall|masked/i.test(res.reply.content),
+          /not recorded|never record|never store|not stored|firewall|masked/i.test(res.reply.content),
       },
       {
         id: 'S24_missing_evidence_bank_routing',
@@ -362,7 +362,7 @@ async function main() {
         focusedInvoiceId: inv1002,
         prompt: 'What bank routing number or street address is on this statement?',
         validate: (res) =>
-          /not recorded|never store|not stored|firewall/i.test(res.reply.content),
+          /not recorded|never record|never store|not stored|firewall/i.test(res.reply.content),
       },
 
       // 25: Hypothetical Question (no mutation / no proposal)
