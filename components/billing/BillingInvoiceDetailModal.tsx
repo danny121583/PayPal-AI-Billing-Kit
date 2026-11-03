@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   FlaskConical,
   FileDown,
+  ExternalLink,
+  CreditCard,
+  ArrowLeft,
 } from 'lucide-react-native';
 import {
   ModalActionButtons,
@@ -38,6 +41,12 @@ import {
   voidBillingInvoice,
 } from '../../src/billing/api/billingService';
 
+export interface PayPalBrowserCheckoutReturnState {
+  mode: 'return' | 'cancel';
+  orderId?: string | null;
+  payerId?: string | null;
+}
+
 export interface BillingInvoiceDetailModalProps {
   visible: boolean;
   invoice: SyntheticBillingInvoice | null;
@@ -45,7 +54,15 @@ export interface BillingInvoiceDetailModalProps {
   onClose: () => void;
   onAskBillingAI: (invoice: SyntheticBillingInvoice) => void;
   onInvoiceMutated?: () => void;
+  initialCheckoutState?: PayPalBrowserCheckoutReturnState | null;
+  onClearCheckoutState?: () => void;
+  onBackToNotifications?: (() => void) | null;
 }
+
+type SandboxCardProfileOption =
+  | 'visa_sandbox'
+  | 'mastercard_sandbox'
+  | 'decline_refused';
 
 export default function BillingInvoiceDetailModal({
   visible,
@@ -54,6 +71,9 @@ export default function BillingInvoiceDetailModal({
   onClose,
   onAskBillingAI,
   onInvoiceMutated,
+  initialCheckoutState = null,
+  onClearCheckoutState,
+  onBackToNotifications = null,
 }: BillingInvoiceDetailModalProps) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [bannerMessage, setBannerMessage] = useState<{
@@ -61,11 +81,74 @@ export default function BillingInvoiceDetailModal({
     text: string;
   } | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [activeCheckoutSession, setActiveCheckoutSession] = useState<{
+    orderId: string;
+    approvalUrl: string;
+    guestCardCheckoutUrl: string;
+    classicWebCheckoutUrl: string;
+  } | null>(null);
+  const [selectedCardProfile, setSelectedCardProfile] =
+    useState<SandboxCardProfileOption>('visa_sandbox');
   const [localSettledReceipt, setLocalSettledReceipt] = useState<{
     invoiceId: string;
     receiptNumber: string;
     isSample: boolean;
   } | null>(null);
+  const capturedOrderIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!visible || !invoice) return;
+    if (initialCheckoutState?.mode === 'return') {
+      const returnedOrderId = initialCheckoutState.orderId
+        ? String(initialCheckoutState.orderId).trim()
+        : null;
+      if (invoice.status === 'paid' || invoice.balanceDueCents <= 0) {
+        setBannerMessage({
+          type: 'info',
+          text: `Duplicate Capture Prevented: Statement #${invoice.invoiceNumber} is already settled${
+            invoice.receiptNumber ? ` (Capture ID: ${invoice.receiptNumber})` : ''
+          }. Refreshing or returning from checkout did not charge your account again.`,
+        });
+        return;
+      }
+      if (returnedOrderId) {
+        setActiveOrderId(returnedOrderId);
+        const safeUrl = `https://www.sandbox.paypal.com/checkoutnow?token=${encodeURIComponent(
+          returnedOrderId
+        )}&appSwitchEligible=false`;
+        setActiveCheckoutSession({
+          orderId: returnedOrderId,
+          approvalUrl: safeUrl,
+          guestCardCheckoutUrl: `${safeUrl}&fundingSource=card`,
+          classicWebCheckoutUrl: `https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=${encodeURIComponent(
+            returnedOrderId
+          )}&useraction=commit`,
+        });
+      }
+      setBannerMessage({
+        type: 'info',
+        text: `Returned from PayPal Sandbox Browser Checkout${
+          returnedOrderId ? ` (Order ${returnedOrderId})` : ''
+        }${
+          initialCheckoutState.payerId
+            ? ` • Buyer Approved (Payer ${initialCheckoutState.payerId})`
+            : ''
+        }. Tap "Capture Approved Order" below to finalize settlement.`,
+      });
+    } else if (initialCheckoutState?.mode === 'cancel') {
+      const canceledOrderId = initialCheckoutState.orderId
+        ? String(initialCheckoutState.orderId).trim()
+        : null;
+      setActiveOrderId(null);
+      setActiveCheckoutSession(null);
+      setBannerMessage({
+        type: 'info',
+        text: `PayPal Sandbox browser checkout was canceled${
+          canceledOrderId ? ` (Order ${canceledOrderId})` : ''
+        }. No funds were charged. You can retry checkout below at any time.`,
+      });
+    }
+  }, [initialCheckoutState, invoice, visible]);
 
   if (!visible || !invoice) return null;
 
@@ -73,12 +156,18 @@ export default function BillingInvoiceDetailModal({
     localSettledReceipt && localSettledReceipt.invoiceId === invoice.id
       ? localSettledReceipt
       : null;
-  const effectiveReceiptNumber =
-    invoice.receiptNumber || activeLocalReceipt?.receiptNumber || null;
+  const isSettledInvoice =
+    invoice.status === 'paid' ||
+    invoice.status === 'refunded' ||
+    Boolean(activeLocalReceipt);
+  const effectiveReceiptNumber = isSettledInvoice
+    ? invoice.receiptNumber || activeLocalReceipt?.receiptNumber || null
+    : null;
 
   const isDoctor = roleScope === 'doctor';
   const canCustomerPay =
     !isDoctor &&
+    !activeLocalReceipt &&
     (invoice.status === 'pending' ||
       invoice.status === 'sent' ||
       invoice.status === 'overdue' ||
@@ -128,16 +217,46 @@ export default function BillingInvoiceDetailModal({
       a.attemptClassification !== 'awaiting_buyer_approval'
   );
 
+  const openBrowserUrlSafely = (targetUrl: string) => {
+    if (!targetUrl) return;
+    // Never invoke native paypal:// app schemes; always stay in HTTP/HTTPS web browser
+    const safeBrowserUrl = targetUrl.includes('appSwitchEligible=')
+      ? targetUrl
+      : `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}appSwitchEligible=false`;
+    if (typeof window !== 'undefined' && typeof window.open === 'function') {
+      window.open(safeBrowserUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      try {
+        void Linking.openURL(safeBrowserUrl);
+      } catch {
+        // Ignore in test environment
+      }
+    }
+  };
+
   const handlePayWithPayPal = async () => {
+    if (invoice.status === 'paid' || Boolean(activeLocalReceipt)) {
+      setBannerMessage({
+        type: 'info',
+        text: `Duplicate Capture Prevented: Statement #${invoice.invoiceNumber} is already paid ($0.00 balance due).`,
+      });
+      return;
+    }
     setBannerMessage(null);
+    onClearCheckoutState?.();
     setBusyAction('create_order');
     try {
+      const appOrigin =
+        typeof window !== 'undefined' && window.location?.origin
+          ? window.location.origin
+          : 'https://paypal-ai-billing-kit.vercel.app';
       const res = await invokePayPalBillingFunction({
         action: 'create-order',
         invoiceId: invoice.id,
         invoice_id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         invoice_number: invoice.invoiceNumber,
+        appOrigin,
       });
       if (!res.ok) {
         if (res.code === 'PAYPAL_SANDBOX_CREDENTIALS_MISSING') {
@@ -157,27 +276,42 @@ export default function BillingInvoiceDetailModal({
         });
         return;
       }
-      const orderId = res.data?.order_id || res.data?.orderId;
-      const approvalUrl = res.data?.approval_url || res.data?.approveUrl || res.data?.approvalUrl;
+      const orderId = String(res.data?.order_id || res.data?.orderId || '');
+      const rawApprove =
+        res.data?.approval_url || res.data?.approveUrl || res.data?.approvalUrl || '';
+      const approvalUrl = rawApprove
+        ? rawApprove.includes('appSwitchEligible=')
+          ? String(rawApprove)
+          : `${rawApprove}${String(rawApprove).includes('?') ? '&' : '?'}appSwitchEligible=false`
+        : orderId
+          ? `https://www.sandbox.paypal.com/checkoutnow?token=${encodeURIComponent(
+              orderId
+            )}&appSwitchEligible=false`
+          : '';
+      const guestCardCheckoutUrl =
+        res.data?.guestCardCheckoutUrl ||
+        (approvalUrl ? `${approvalUrl}&fundingSource=card` : '');
+      const classicWebCheckoutUrl =
+        res.data?.classicWebCheckoutUrl ||
+        (orderId
+          ? `https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=${encodeURIComponent(
+              orderId
+            )}&useraction=commit`
+          : '');
+
       if (orderId) {
-        setActiveOrderId(String(orderId));
-      }
-      if (approvalUrl) {
-        setBannerMessage({
-          type: 'info',
-          text: `PayPal Sandbox Order ${orderId} created. Approve in the PayPal Sandbox window, then tap "Capture Approved Order".`,
-        });
-        try {
-          await Linking.openURL(String(approvalUrl));
-        } catch {
-          // Ignore linking error in test environment
-        }
-      } else {
-        setBannerMessage({
-          type: 'info',
-          text: `PayPal Sandbox Order ${orderId} prepared. Tap "Capture Approved Order" to complete settlement.`,
+        setActiveOrderId(orderId);
+        setActiveCheckoutSession({
+          orderId,
+          approvalUrl,
+          guestCardCheckoutUrl,
+          classicWebCheckoutUrl,
         });
       }
+      setBannerMessage({
+        type: 'info',
+        text: `PayPal Sandbox Order ${orderId} created in Browser Checkout Mode (iOS app handoff disabled via appSwitchEligible=false). Complete approval in the Browser Checkout Panel below, then tap "Capture Approved Order".`,
+      });
       onInvoiceMutated?.();
     } catch (err: any) {
       setBannerMessage({
@@ -189,8 +323,32 @@ export default function BillingInvoiceDetailModal({
     }
   };
 
+  const handleCancelBrowserCheckout = () => {
+    const canceledOrder = activeOrderId;
+    setActiveOrderId(null);
+    setActiveCheckoutSession(null);
+    onClearCheckoutState?.();
+    setBannerMessage({
+      type: 'info',
+      text: `PayPal Sandbox checkout canceled${
+        canceledOrder ? ` for Order ${canceledOrder}` : ''
+      }. No funds were charged. You can restart checkout whenever you are ready.`,
+    });
+  };
+
   const handleCaptureOrder = async () => {
     if (!activeOrderId) return;
+    if (
+      invoice.status === 'paid' ||
+      Boolean(activeLocalReceipt) ||
+      capturedOrderIdsRef.current.has(activeOrderId)
+    ) {
+      setBannerMessage({
+        type: 'info',
+        text: `Duplicate Capture Prevented: Order ${activeOrderId} for Statement #${invoice.invoiceNumber} has already been captured.`,
+      });
+      return;
+    }
     setBannerMessage(null);
     setBusyAction('capture_order');
     try {
@@ -219,6 +377,7 @@ export default function BillingInvoiceDetailModal({
         return;
       }
       const captureId = res.data?.capture_id || res.data?.captureId || 'COMPLETED';
+      capturedOrderIdsRef.current.add(activeOrderId);
       setLocalSettledReceipt({
         invoiceId: invoice.id,
         receiptNumber: String(captureId),
@@ -229,6 +388,8 @@ export default function BillingInvoiceDetailModal({
         text: `Payment settled! Verified PayPal Sandbox Capture ID: ${captureId}.`,
       });
       setActiveOrderId(null);
+      setActiveCheckoutSession(null);
+      onClearCheckoutState?.();
       onInvoiceMutated?.();
     } catch (err: any) {
       setBannerMessage({
@@ -325,14 +486,17 @@ export default function BillingInvoiceDetailModal({
     }
   };
 
-  const handlePayWithSandboxCard = async () => {
+  const handlePayWithSandboxCard = async (
+    profileOverride?: SandboxCardProfileOption
+  ) => {
+    const chosenProfile = profileOverride || selectedCardProfile || 'visa_sandbox';
     setBannerMessage(null);
     setBusyAction('pay_with_sandbox_card');
     try {
       const res = await payInvoiceWithSandboxCard({
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
-        cardProfile: 'visa_sandbox',
+        cardProfile: chosenProfile,
         intent: 'CAPTURE',
       });
       if (!res.ok) {
@@ -348,6 +512,12 @@ export default function BillingInvoiceDetailModal({
       const captureId =
         res.data?.capture_id || res.data?.captureId || 'COMPLETED';
       const orderId = res.data?.order_id || res.data?.orderId || '';
+      const brandLabel =
+        res.data?.card_brand ||
+        (chosenProfile === 'mastercard_sandbox' ? 'MASTERCARD' : 'VISA');
+      const lastDigits =
+        res.data?.card_last_digits ||
+        (chosenProfile === 'mastercard_sandbox' ? '8291' : '0191');
       setLocalSettledReceipt({
         invoiceId: invoice.id,
         receiptNumber: `PP-CAP-${captureId}`,
@@ -355,9 +525,11 @@ export default function BillingInvoiceDetailModal({
       });
       setBannerMessage({
         type: 'success',
-        text: `PayPal Sandbox Direct Card Payment Captured! Order ${orderId} • Capture ID: ${captureId} (VISA •••• ${res.data?.card_last_digits || '0191'}).`,
+        text: `PayPal Sandbox Direct Card Payment Captured! Order ${orderId} • Capture ID: ${captureId} (${brandLabel} •••• ${lastDigits}).`,
       });
       setActiveOrderId(null);
+      setActiveCheckoutSession(null);
+      onClearCheckoutState?.();
       onInvoiceMutated?.();
     } catch (err: any) {
       setBannerMessage({
@@ -458,6 +630,22 @@ export default function BillingInvoiceDetailModal({
       testID="billing-invoice-detail-modal"
       closeTestID="billing-detail-close-btn"
       closeAccessibilityLabel="Close invoice details"
+      headerAccessory={
+        onBackToNotifications ? (
+          <Pressable
+            style={styles.backToNotificationsChip}
+            onPress={onBackToNotifications}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Billing Notifications"
+            testID="billing-detail-back-to-notifications-btn"
+          >
+            <ArrowLeft size={13} color="#C2410C" />
+            <Text style={styles.backToNotificationsText}>
+              Back to Notifications
+            </Text>
+          </Pressable>
+        ) : undefined
+      }
       footer={<ModalActionButtons actions={footerActions} />}
     >
       {bannerMessage ? (
@@ -492,6 +680,150 @@ export default function BillingInvoiceDetailModal({
           >
             {bannerMessage.text}
           </Text>
+        </View>
+      ) : null}
+
+      {/* Browser-Based PayPal Sandbox Checkout Panel (Prevents Mobile App Handoff) */}
+      {canCustomerPay && (activeCheckoutSession || activeOrderId) ? (
+        <View
+          style={styles.browserCheckoutPanel}
+          testID="billing-detail-browser-checkout-panel"
+        >
+          <View style={styles.browserCheckoutHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.browserCheckoutTitle}>
+                PayPal Sandbox Browser Checkout
+              </Text>
+              <Text style={styles.browserCheckoutSub}>
+                Stays in your mobile/desktop browser — never hands off to the
+                installed PayPal app (`appSwitchEligible=false`).
+              </Text>
+            </View>
+            <View
+              style={styles.browserCheckoutOrderBadge}
+              testID="billing-checkout-panel-order-id"
+            >
+              <Text style={styles.browserCheckoutOrderBadgeText}>
+                Order {activeCheckoutSession?.orderId || activeOrderId}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.browserCheckoutActionsCol}>
+            {activeCheckoutSession?.approvalUrl ? (
+              <Pressable
+                style={styles.browserOpenPrimaryBtn}
+                onPress={() =>
+                  openBrowserUrlSafely(activeCheckoutSession.approvalUrl)
+                }
+                disabled={Boolean(busyAction)}
+                accessibilityRole="button"
+                accessibilityLabel="Open PayPal Browser Checkout without App Switch"
+                testID="billing-checkout-panel-open-browser-btn"
+              >
+                <ExternalLink size={15} color="#FFFFFF" />
+                <Text style={styles.browserOpenPrimaryBtnText}>
+                  Open PayPal Browser Checkout (No App Switch)
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {activeCheckoutSession?.guestCardCheckoutUrl ? (
+              <Pressable
+                style={styles.browserOpenSecondaryBtn}
+                onPress={() =>
+                  openBrowserUrlSafely(activeCheckoutSession.guestCardCheckoutUrl)
+                }
+                disabled={Boolean(busyAction)}
+                accessibilityRole="button"
+                accessibilityLabel="Open PayPal Guest Card Web Form"
+                testID="billing-checkout-panel-open-guest-card-btn"
+              >
+                <CreditCard size={15} color="#1E40AF" />
+                <Text style={styles.browserOpenSecondaryBtnText}>
+                  Open PayPal Guest Card Web Form (Browser Only)
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.inAppCardBox}>
+            <Text style={styles.inAppCardTitle}>
+              Or Complete In-Browser Sandbox Card Checkout (`Orders v2 payment_source.card`)
+            </Text>
+            <View style={styles.cardProfilePillsRow}>
+              {(
+                [
+                  {
+                    key: 'visa_sandbox' as const,
+                    label: 'VISA •••• 0191 (Approve)',
+                  },
+                  {
+                    key: 'mastercard_sandbox' as const,
+                    label: 'Mastercard •••• 8291 (Approve)',
+                  },
+                  {
+                    key: 'decline_refused' as const,
+                    label: 'Test Decline (4000 •••• 0002)',
+                  },
+                ]
+              ).map((opt) => {
+                const isSelected = selectedCardProfile === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    style={[
+                      styles.cardProfilePill,
+                      isSelected && styles.cardProfilePillActive,
+                    ]}
+                    onPress={() => setSelectedCardProfile(opt.key)}
+                    disabled={Boolean(busyAction)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    testID={`billing-checkout-card-profile-${opt.key}`}
+                  >
+                    <Text
+                      style={[
+                        styles.cardProfilePillText,
+                        isSelected && styles.cardProfilePillTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.browserPanelBottomRow}>
+              <Pressable
+                style={[styles.inAppCardSubmitBtn, { flex: 1 }]}
+                onPress={() => void handlePayWithSandboxCard(selectedCardProfile)}
+                disabled={Boolean(busyAction)}
+                accessibilityRole="button"
+                accessibilityLabel="Complete In-Browser Sandbox Card Checkout"
+                testID="billing-checkout-panel-card-pay-btn"
+              >
+                <CreditCard size={14} color="#FFFFFF" />
+                <Text style={styles.inAppCardSubmitBtnText}>
+                  {busyAction === 'pay_with_sandbox_card'
+                    ? 'Capturing Sandbox Card...'
+                    : 'Complete In-Browser Sandbox Card Checkout'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.cancelCheckoutBtn}
+                onPress={handleCancelBrowserCheckout}
+                disabled={Boolean(busyAction)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel PayPal Sandbox Checkout"
+                testID="billing-checkout-panel-cancel-btn"
+              >
+                <Text style={styles.cancelCheckoutBtnText}>Cancel Checkout</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       ) : null}
 
@@ -666,7 +998,7 @@ export default function BillingInvoiceDetailModal({
           <View style={styles.providerButtonsRow}>
             <Pressable
               style={[billingModalStyles.primaryButton, { alignSelf: 'flex-start' }]}
-              onPress={handlePayWithSandboxCard}
+              onPress={() => void handlePayWithSandboxCard()}
               disabled={Boolean(busyAction)}
               accessibilityRole="button"
               testID="billing-detail-sandbox-card-btn"
@@ -829,6 +1161,169 @@ export default function BillingInvoiceDetailModal({
 }
 
 const styles = StyleSheet.create({
+  backToNotificationsChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  backToNotificationsText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#C2410C',
+  },
+  browserCheckoutPanel: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+    marginBottom: 12,
+  },
+  browserCheckoutHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  browserCheckoutTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E3A8A',
+  },
+  browserCheckoutSub: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#1D4ED8',
+    marginTop: 2,
+  },
+  browserCheckoutOrderBadge: {
+    backgroundColor: '#DBEAFE',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  browserCheckoutOrderBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  browserCheckoutActionsCol: {
+    gap: 8,
+  },
+  browserOpenPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1D4ED8',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  browserOpenPrimaryBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  browserOpenSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  browserOpenSecondaryBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  inAppCardBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  inAppCardTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  cardProfilePillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  cardProfilePill: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  cardProfilePillActive: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  cardProfilePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  cardProfilePillTextActive: {
+    color: '#B45309',
+    fontWeight: '800',
+  },
+  browserPanelBottomRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  inAppCardSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#D97706',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  inAppCardSubmitBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  cancelCheckoutBtn: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  cancelCheckoutBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
   feedbackBanner: {
     flexDirection: 'row',
     alignItems: 'center',

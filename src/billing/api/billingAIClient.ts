@@ -148,12 +148,59 @@ export interface BillingAIProposal {
   resultSummary?: string | null;
 }
 
+export interface BillingAIResponseTelemetry {
+  responseSource: 'gemini_live' | 'deterministic_rls' | 'guardrail_immediate';
+  backendDurationMs: number;
+  totalTurnDurationMs?: number;
+  requiresProcessingHold: boolean;
+  model?: string;
+}
+
 export interface BillingAIChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
   proposal?: BillingAIProposal | null;
+  telemetry?: BillingAIResponseTelemetry | null;
+}
+
+let minProcessingMsOverrideForTests: number | null = null;
+
+export function setBillingAIMinProcessingMsForTests(ms: number | null): void {
+  minProcessingMsOverrideForTests = ms;
+}
+
+export function getBillingAIMinProcessingMs(): number {
+  if (minProcessingMsOverrideForTests !== null) {
+    return minProcessingMsOverrideForTests;
+  }
+  return process.env.NODE_ENV === 'test' ? 0 : 2000;
+}
+
+function isImmediateGuardrailOrAuthContent(
+  prompt: string,
+  replyContent: string,
+  proposal?: BillingAIProposal | null
+): boolean {
+  if (CLINICAL_REFUSAL_REGEX.test(prompt)) return true;
+  if (
+    /^(?:Guardrail Blocked|Payment-State Protection|Duplicate Approval Prevented|Approval Token Expired|Proposal declined|Payment proposal declined|Payment Proposal Confirmed)/i.test(
+      replyContent.trim()
+    )
+  ) {
+    return true;
+  }
+  if (
+    proposal &&
+    (proposal.status === 'approved' ||
+      proposal.status === 'executed' ||
+      proposal.status === 'rejected' ||
+      proposal.status === 'blocked')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 const CLINICAL_REFUSAL_REGEX =
@@ -683,7 +730,30 @@ async function buildDeterministicRlsBackedReply(params: {
           focusedInvoice: docFocusedInvoice,
         };
       }
-      const refundMinor = docFocusedInvoice.amountPaidCents || docFocusedInvoice.totalCents;
+      const explicitRefundDollarMatch = prompt.match(
+        /\$\s*(\d+(?:\.\d{1,2})?)|(\d+(?:\.\d{1,2})?)\s*(?:dollars|usd)/i
+      );
+      const explicitRefundDollars = explicitRefundDollarMatch
+        ? Number.parseFloat(
+            explicitRefundDollarMatch[1] || explicitRefundDollarMatch[2]
+          )
+        : null;
+      const refundMinor =
+        explicitRefundDollars !== null && Number.isFinite(explicitRefundDollars)
+          ? Math.round(explicitRefundDollars * 100)
+          : docFocusedInvoice.amountPaidCents || docFocusedInvoice.totalCents;
+      const singleLimit = dash.settings.maxSingleActionMinor;
+      if (refundMinor > singleLimit) {
+        return {
+          content: `Guardrail Blocked: A single AI-prepared refund of ${formatUsdCents(
+            refundMinor
+          )} exceeds your configured Maximum Single AI-Assisted Action limit of ${formatUsdCents(
+            singleLimit
+          )}.`,
+          proposal: null,
+          focusedInvoice: docFocusedInvoice,
+        };
+      }
       return {
         content: `I have prepared a refund proposal of ${formatUsdCents(
           refundMinor
@@ -1040,6 +1110,8 @@ export async function sendBillingAIMessage(params: {
     createdAt: new Date().toISOString(),
   };
 
+  const backendStartMs = Date.now();
+
   try {
     const { data: sessData } =
       typeof sb?.auth?.getSession === 'function'
@@ -1064,12 +1136,28 @@ export async function sendBillingAIMessage(params: {
         const resolvedSessionId = String(
           data.sessionId || effectiveSessionId || `local-session-${Date.now()}`
         );
+        const mappedProposal = data.reply.proposal
+          ? mapDbProposal(data.reply.proposal)
+          : null;
+        const replyContent = String(data.reply.content || '');
+        const isImmediate = isImmediateGuardrailOrAuthContent(
+          cleanMessage,
+          replyContent,
+          mappedProposal
+        );
+        const backendDurationMs = Math.max(0, Date.now() - backendStartMs);
         const replyMsg: BillingAIChatMessage = {
           id: String(data.reply.id || `ai-${Date.now()}`),
           role: 'assistant',
-          content: String(data.reply.content || ''),
+          content: replyContent,
           createdAt: String(data.reply.createdAt || new Date().toISOString()),
-          proposal: data.reply.proposal ? mapDbProposal(data.reply.proposal) : null,
+          proposal: mappedProposal,
+          telemetry: {
+            responseSource: isImmediate ? 'guardrail_immediate' : 'gemini_live',
+            backendDurationMs,
+            requiresProcessingHold: !isImmediate,
+            model: String(data.model || 'gemini-3.5-flash-lite'),
+          },
         };
         await persistHistorySnapshot(params.roleScope, resolvedSessionId, [
           ...effectiveRecentMessages,
@@ -1093,12 +1181,24 @@ export async function sendBillingAIMessage(params: {
     recentMessages: effectiveRecentMessages,
   } as any);
   const resolvedSessionId = effectiveSessionId || `local-session-${Date.now()}`;
+  const isImmediate = isImmediateGuardrailOrAuthContent(
+    cleanMessage,
+    fallback.content,
+    fallback.proposal ?? null
+  );
+  const backendDurationMs = Math.max(0, Date.now() - backendStartMs);
   const replyMsg: BillingAIChatMessage = {
     id: `ai-${Date.now()}`,
     role: 'assistant',
     content: fallback.content,
     createdAt: new Date().toISOString(),
     proposal: fallback.proposal ?? null,
+    telemetry: {
+      responseSource: isImmediate ? 'guardrail_immediate' : 'deterministic_rls',
+      backendDurationMs,
+      requiresProcessingHold: !isImmediate,
+      model: 'deterministic-rls-responder',
+    },
   };
 
   const updatedPriorMessages = effectiveRecentMessages.map((m) =>

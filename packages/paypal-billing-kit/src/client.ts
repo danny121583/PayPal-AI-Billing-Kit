@@ -305,10 +305,15 @@ export class PayPalAgentKitClient {
     const links: Array<{ href: string; rel: string }> = Array.isArray(order?.links)
       ? order.links
       : [];
-    const approveLink =
+    const rawApproveLink =
       links.find((l) => l.rel === 'payer-action')?.href ??
       links.find((l) => l.rel === 'approve')?.href ??
       null;
+    const approveLink = rawApproveLink
+      ? rawApproveLink.includes('appSwitchEligible=')
+        ? rawApproveLink
+        : `${rawApproveLink}${rawApproveLink.includes('?') ? '&' : '?'}appSwitchEligible=false`
+      : null;
 
     return {
       orderId: String(order.id),

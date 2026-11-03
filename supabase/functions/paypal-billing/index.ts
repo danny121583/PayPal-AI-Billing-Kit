@@ -555,8 +555,11 @@ Deno.serve(async (req: Request) => {
         body?.invoiceId || body?.invoice_id || body?.invoiceNumber || body?.invoice_number || ''
       ).trim();
       const rawInvoiceNum = String(body?.invoiceNumber || body?.invoice_number || '').trim();
-      const returnUrl = String(body?.returnUrl || body?.return_url || 'https://paypal-ai-billing-kit.vercel.app/?paypal=return');
-      const cancelUrl = String(body?.cancelUrl || body?.cancel_url || 'https://paypal-ai-billing-kit.vercel.app/?paypal=cancel');
+      const baseAppOrigin = String(
+        body?.appOrigin || body?.app_origin || 'https://paypal-ai-billing-kit.vercel.app'
+      )
+        .trim()
+        .replace(/\/+$/, '');
 
       const invoice = await resolveInvoiceByIdOrNumber(serviceClient, rawInvoiceRef, rawInvoiceNum);
 
@@ -571,6 +574,19 @@ Deno.serve(async (req: Request) => {
       const idempotencyKey = String(body?.idempotencyKey || body?.idempotency_key || `ord-${invoiceId}-${Date.now()}`);
       const callerSessionId = String(body?.demoSessionId || body?.demo_session_id || '').trim();
       const isCanonicalInvoice = String(invoice.demo_session_id || '') === 'canonical';
+      const targetAccountKey =
+        String(invoice.recipient_user_id) === JORDAN_ID ? 'jordan_taylor' : 'alex_rivera';
+      const defaultReturnQuery = `invoiceId=${encodeURIComponent(invoiceId)}&invoiceNumber=${encodeURIComponent(String(invoice.invoice_number))}&account=${encodeURIComponent(targetAccountKey)}${callerSessionId ? `&demo_session_id=${encodeURIComponent(callerSessionId)}` : ''}`;
+      const returnUrl = String(
+        body?.returnUrl ||
+          body?.return_url ||
+          `${baseAppOrigin}/?paypal=return&${defaultReturnQuery}`
+      );
+      const cancelUrl = String(
+        body?.cancelUrl ||
+          body?.cancel_url ||
+          `${baseAppOrigin}/?paypal=cancel&${defaultReturnQuery}`
+      );
 
       // Canonical seed statements cannot be mutated directly without an isolated visitor demo_session_id
       if (isCanonicalInvoice && (!callerSessionId || callerSessionId === 'canonical')) {
@@ -707,6 +723,8 @@ Deno.serve(async (req: Request) => {
                 brand_name: 'PayPal AI Billing Kit Sandbox',
                 shipping_preference: 'NO_SHIPPING',
                 user_action: 'PAY_NOW',
+                landing_page: 'LOGIN',
+                payment_method_preference: 'IMMEDIATE_PAYMENT_REQUIRED',
                 return_url: returnUrl,
                 cancel_url: cancelUrl,
               },
@@ -731,10 +749,23 @@ Deno.serve(async (req: Request) => {
       const links: Array<{ href: string; rel: string }> = Array.isArray(orderData?.links)
         ? orderData.links
         : [];
-      const approvalUrl =
+      const rawApprovalUrl =
         links.find((l) => l.rel === 'payer-action')?.href ??
         links.find((l) => l.rel === 'approve')?.href ??
         null;
+      const approvalUrl = rawApprovalUrl
+        ? rawApprovalUrl.includes('appSwitchEligible=')
+          ? rawApprovalUrl
+          : `${rawApprovalUrl}${rawApprovalUrl.includes('?') ? '&' : '?'}appSwitchEligible=false`
+        : null;
+      const guestCardCheckoutUrl = approvalUrl
+        ? `${approvalUrl}&fundingSource=card`
+        : null;
+      const classicWebCheckoutUrl = orderData?.id
+        ? `https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=${encodeURIComponent(
+            String(orderData.id)
+          )}&useraction=commit`
+        : null;
 
       const effectiveAttemptSessionId =
         callerSessionId || String(invoice.demo_session_id || 'canonical');
@@ -794,6 +825,14 @@ Deno.serve(async (req: Request) => {
             'PayPal is waiting for buyer approval. Complete Sandbox checkout before capturing this payment.',
           approvalUrl,
           approval_url: approvalUrl,
+          rawApprovalUrl,
+          guestCardCheckoutUrl,
+          guest_card_checkout_url: guestCardCheckoutUrl,
+          classicWebCheckoutUrl,
+          classic_web_checkout_url: classicWebCheckoutUrl,
+          returnUrl,
+          cancelUrl,
+          appSwitchDisabled: true,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

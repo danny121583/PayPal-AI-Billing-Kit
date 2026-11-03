@@ -4,6 +4,28 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
 
 ---
 
+## [`v1.9.1`] — 2026-11-03
+
+### Added & Fixed (Mobile UI Polish, Global Search, PayPal Browser Checkout, Billing AI & Notifications)
+- **Issue #1 — Compact Mobile Header & Scrollable Demo Account Controls (`app/index.tsx`, `components/billing/DoctorBillingView.tsx`, `components/billing/PatientBillingView.tsx`):**
+  - Reduced the mobile (`< 768px`) orange header (`testID="billing-main-header"`) to a compact `62px` height with untruncated `Provider Billing` / `Customer Billing` titles and concise role subtitles (`Dr. Sarah Jenkins • Provider`, `Alex Rivera • Customer`, `Jordan Taylor • Customer`).
+  - Moved the **Active Demo Account** switcher bar (`testID="demo-account-switcher-bar"`, containing `Provider: Dr. Sarah Jenkins`, `Customer: Alex Rivera`, `Customer: Jordan Taylor`, `MCP Agent Interface`, and `Reset Demo`) below the main header inside the normal scrollable `<ScrollView>` content so it scrolls naturally with the dashboard and is never sticky on mobile, while preserving the desktop (`>= 768px`) header layout.
+- **Issue #2 — Global Billing Search Modal (`components/billing/BillingGlobalSearchModal.tsx`, `src/billing/api/billingService.ts`):**
+  - Wired the header search button (`testID="billing-header-search-btn"`) to open a responsive Global Billing Search modal that auto-focuses the search input (`doctor-billing-search-input` / `patient-billing-search-input`) and searches authorized records across **Invoices**, **Customers**, **Transactions/Payments**, and **Refunds** (`searchAuthorizedBillingRecords`).
+  - Added category filter chips (`All`, `Invoices`, `Customers`, `Transactions`, `Refunds`), quick search suggestions, clear query button, loading/empty/error states, tappable result cards that open `BillingInvoiceDetailModal` or `BillingAIAssistantModal`, and strict role/account isolation.
+- **Issue #3 — PayPal Sandbox Mobile Browser Checkout (`appSwitchEligible=false`) (`supabase/functions/paypal-billing/index.ts`, `src/billing/api/billingService.ts`, `packages/paypal-billing-kit/src/client.ts`, `components/billing/BillingInvoiceDetailModal.tsx`, `app/index.tsx`):**
+  - Resolved the iOS PayPal app handoff issue (`"Head back to PayPal to finish checking out"` at `/app-switch-checkout`) by appending `appSwitchEligible=false` to all PayPal Sandbox `/checkoutnow` approval URLs and providing guest card web checkout (`fundingSource=card`) and classic `/cgi-bin/webscr` fallback URLs.
+  - Added an in-modal **PayPal Sandbox Browser Checkout Panel** (`testID="billing-detail-browser-checkout-panel"`) at the top of `BillingInvoiceDetailModal` with browser-only PayPal checkout buttons and in-browser `Orders v2 payment_source.card` direct card checkout (`visa_sandbox`, `mastercard_sandbox`, `decline_refused`), plus `?paypal=return` / `?paypal=cancel` handling and duplicate capture protection.
+- **Issue #4 — Billing AI Mobile Formatting & Safe Markdown Rendering (`components/billing/BillingAIAssistantModal.tsx`, `components/billing/BillingModalShell.tsx`):**
+  - Built a structured, XSS-safe Markdown & invoice summary renderer (`FormattedAssistantMessage` + `sanitizeUntrustedAiContent`) supporting section headings, statement status pills, bullet lists, numbered steps, bold key-value metadata, and a compact **Financial Summary** pill grid (`Original Total`, `Paid`, `Refunded`, `Remaining Balance Due`).
+  - Optimized mobile modal spacing (`< 480px`) with independent conversation scrolling and keyboard-safe message composer.
+- **Issue #5 — Billing AI Processing Indicator (`"Preparing your response…"`) (`src/billing/api/billingAIClient.ts`, `components/billing/BillingAIAssistantModal.tsx`):**
+  - Added an immediate accessible processing state (`testID="billing-ai-typing"`, `"Preparing your response…"`) with a 2,000ms minimum display hold on conversational turns while firing backend execution immediately at `t = 0`, bypassing the hold for urgent guardrail/security warnings and errors, and recording timing telemetry (`actualDurationMs`, `displayedDurationMs`, `holdAppliedMs`).
+- **Issue #6 — Billing Notifications Linked Statement Navigation (`components/billing/BillingNotificationsModal.tsx`, `src/billing/api/billingService.ts`, `app/index.tsx`):**
+  - Applied Supabase migration `fix_billing_notifications_session_scope_and_seed` so `public.billing_notify` rows inherit `demo_session_id` and `invoiceNumber`, resolved linked statements via canonical ID or invoice number (`resolveNotificationLinkedInvoice`), enforced active account authorization, marked tapped notifications read with badge decrement, opened `BillingInvoiceDetailModal` with a `"Back to Notifications"` chip, and added an in-modal error banner (`testID="billing-notifications-error-banner"`) for unavailable or unauthorized records.
+
+---
+
 ## [`v1.9.0`] — 2026-11-02
 
 ### Added

@@ -19,6 +19,7 @@
     "verify:paypal-full": "node scripts/verify-paypal-full.mjs",
     "verify:full-paypal-mcp": "node scripts/verify-full-paypal-mcp.mjs",
     "verify:gemini-receipts": "node scripts/verify-gemini-and-receipts.mjs",
+    "verify:mobile-polish": "node scripts/verify-mobile-polish-e2e.mjs",
     "verify:e2e": "node scripts/verify-public-vercel-e2e.mjs",
     "sync:secrets": "node scripts/sync-local-env-secrets.mjs",
     "build:web": "EXPO_NO_TELEMETRY=1 npx expo export --platform web && node scripts/inject-web-favicon.mjs",

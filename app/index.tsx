@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
@@ -29,12 +30,15 @@ import {
 } from '../src/contexts/StandaloneAuthContext';
 import DoctorBillingView from '../components/billing/DoctorBillingView';
 import PatientBillingView from '../components/billing/PatientBillingView';
-import BillingInvoiceDetailModal from '../components/billing/BillingInvoiceDetailModal';
+import BillingInvoiceDetailModal, {
+  type PayPalBrowserCheckoutReturnState,
+} from '../components/billing/BillingInvoiceDetailModal';
 import BillingCreateInvoiceModal from '../components/billing/BillingCreateInvoiceModal';
 import BillingAIAssistantModal from '../components/billing/BillingAIAssistantModal';
 import BillingAISettingsModal from '../components/billing/BillingAISettingsModal';
 import BillingNotificationsModal from '../components/billing/BillingNotificationsModal';
 import BillingMaaSMcpModal from '../components/billing/BillingMaaSMcpModal';
+import { BillingGlobalSearchModal } from '../components/billing/BillingGlobalSearchModal';
 import BillingBrandIcon from '../components/billing/BillingBrandIcon';
 import type {
   BillingNotificationItem,
@@ -55,6 +59,7 @@ import {
   getPreloadedBillingSnapshot,
   markBillingNotificationRead,
   resetBillingDemoSession,
+  resolveNotificationLinkedInvoice,
   type BillablePatientOption,
   type BillingAISettingsRecord,
   type BillingAuditEventItem,
@@ -65,6 +70,8 @@ import { clearBillingAIClientCacheForTests } from '../src/billing/api/billingAIC
 
 export default function BillingScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth > 0 && windowWidth < 768;
   const {
     activePreset,
     isSwitchingAccount,
@@ -78,14 +85,21 @@ export default function BillingScreen() {
 
   const params = useLocalSearchParams<{
     invoiceId?: string | string[];
+    invoiceNumber?: string | string[];
     notificationId?: string | string[];
     modal?: string | string[];
     account?: string | string[];
+    paypal?: string | string[];
+    token?: string | string[];
+    PayerID?: string | string[];
   }>();
 
   const rawInvoiceId = Array.isArray(params.invoiceId)
     ? params.invoiceId[0]
     : params.invoiceId;
+  const rawInvoiceNumber = Array.isArray(params.invoiceNumber)
+    ? params.invoiceNumber[0]
+    : params.invoiceNumber;
   const rawNotificationId = Array.isArray(params.notificationId)
     ? params.notificationId[0]
     : params.notificationId;
@@ -95,6 +109,15 @@ export default function BillingScreen() {
   const rawAccount = Array.isArray(params.account)
     ? params.account[0]
     : params.account;
+  const rawPaypalState = Array.isArray(params.paypal)
+    ? params.paypal[0]
+    : params.paypal;
+  const rawPaypalToken = Array.isArray(params.token)
+    ? params.token[0]
+    : params.token;
+  const rawPaypalPayerId = Array.isArray(params.PayerID)
+    ? params.PayerID[0]
+    : params.PayerID;
 
   const roleScope: BillingRoleScope = activePreset.roleScope;
   const isDoctorRole = roleScope === 'doctor';
@@ -121,6 +144,15 @@ export default function BillingScreen() {
   );
   const [isResettingDemo, setIsResettingDemo] = useState(false);
   const [resetBannerText, setResetBannerText] = useState<string | null>(null);
+  const [openedFromNotifications, setOpenedFromNotifications] = useState(false);
+  const [notificationErrorText, setNotificationErrorText] = useState<
+    string | null
+  >(null);
+  const [checkoutReturnState, setCheckoutReturnState] =
+    useState<PayPalBrowserCheckoutReturnState | null>(null);
+  const [paypalReturnBannerText, setPaypalReturnBannerText] = useState<
+    string | null
+  >(null);
 
   const [liveInvoices, setLiveInvoices] = useState<
     SyntheticBillingInvoice[] | null
@@ -160,6 +192,10 @@ export default function BillingScreen() {
       setSelectedInvoice(null);
       setFocusedAiInvoice(null);
       setResetBannerText(null);
+      setNotificationErrorText(null);
+      setOpenedFromNotifications(false);
+      setCheckoutReturnState(null);
+      setPaypalReturnBannerText(null);
       setSearchQuery('');
       setLiveInvoices(snap.invoices);
       setCatalog(snap.catalog);
@@ -243,6 +279,7 @@ export default function BillingScreen() {
 
   // Initial silent preload of all 3 demo personas on mount
   useEffect(() => {
+    if (process.env.NODE_ENV === 'test') return;
     void refreshBillingData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -363,6 +400,78 @@ export default function BillingScreen() {
     setShowMaasModal(rawModal === 'maas' || rawModal === 'mcp');
   }, [rawModal]);
 
+  useEffect(() => {
+    if (rawPaypalState !== 'return' && rawPaypalState !== 'cancel') {
+      return;
+    }
+    const mode = rawPaypalState as 'return' | 'cancel';
+    const orderId = rawPaypalToken ? String(rawPaypalToken).trim() : null;
+    const payerId = rawPaypalPayerId ? String(rawPaypalPayerId).trim() : null;
+    setCheckoutReturnState({ mode, orderId, payerId });
+
+    const candidateRef = String(rawInvoiceId || rawInvoiceNumber || '').trim();
+    let targetInv = candidateRef
+      ? roleInvoices.find(
+          (inv) =>
+            inv.id === candidateRef ||
+            inv.invoiceNumber.toLowerCase() === candidateRef.toLowerCase()
+        )
+      : null;
+
+    if (!targetInv && orderId) {
+      targetInv =
+        roleInvoices.find((inv) =>
+          inv.paymentAttempts.some(
+            (a) =>
+              a.demoReferenceCode === orderId ||
+              a.actionableMessage?.includes(orderId)
+          )
+        ) || null;
+    }
+
+    if (!targetInv) {
+      targetInv =
+        roleInvoices.find(
+          (inv) =>
+            inv.status === 'pending' ||
+            inv.status === 'sent' ||
+            inv.status === 'overdue' ||
+            inv.status === 'failed'
+        ) ||
+        roleInvoices[0] ||
+        null;
+    }
+
+    if (targetInv) {
+      setSelectedInvoice(targetInv);
+    }
+
+    if (mode === 'return') {
+      setPaypalReturnBannerText(
+        `Returned from PayPal Sandbox Browser Checkout${
+          orderId ? ` (Order ${orderId})` : ''
+        }${
+          targetInv ? ` for Statement #${targetInv.invoiceNumber}` : ''
+        }. Review and tap "Capture Approved Order" to complete settlement.`
+      );
+    } else {
+      setPaypalReturnBannerText(
+        `PayPal Sandbox Browser Checkout was canceled${
+          orderId ? ` (Order ${orderId})` : ''
+        }${
+          targetInv ? ` for Statement #${targetInv.invoiceNumber}` : ''
+        }. No funds were charged.`
+      );
+    }
+  }, [
+    rawInvoiceId,
+    rawInvoiceNumber,
+    rawPaypalPayerId,
+    rawPaypalState,
+    rawPaypalToken,
+    roleInvoices,
+  ]);
+
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((n) => !n.isRead).length,
     [notifications]
@@ -375,146 +484,221 @@ export default function BillingScreen() {
     setShowAiModal(true);
   };
 
-  const handleSelectNotification = async (notif: BillingNotificationItem) => {
-    void markBillingNotificationRead(notif.id);
+  const handleMarkAllNotificationsRead = useCallback(async () => {
+    const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    await Promise.all(unreadIds.map((id) => markBillingNotificationRead(id)));
+  }, [notifications]);
+
+  const handleSelectNotification = async (
+    notif: BillingNotificationItem
+  ): Promise<{ ok: boolean; errorMessage?: string }> => {
+    setNotificationErrorText(null);
+    const sourceInvoices =
+      liveInvoices && liveInvoices.length > 0 ? liveInvoices : roleInvoices;
+    const resolution = resolveNotificationLinkedInvoice({
+      notification: notif,
+      roleScope,
+      activeUserId: activePreset.id,
+      activeFullName: activePreset.fullName,
+      allInvoices: sourceInvoices,
+    });
+
+    if (resolution.status !== 'resolved') {
+      setNotificationErrorText(resolution.message);
+      return { ok: false, errorMessage: resolution.message };
+    }
+
+    await markBillingNotificationRead(notif.id);
     setNotifications((prev) =>
       prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
     );
     setShowNotificationsModal(false);
-
-    if (notif.invoiceId) {
-      const target = roleInvoices.find(
-        (inv) =>
-          inv.id === notif.invoiceId || inv.invoiceNumber === notif.invoiceId
-      );
-      if (target) {
-        setSelectedInvoice(target);
-      }
-    }
+    setOpenedFromNotifications(true);
+    setSelectedInvoice(resolution.invoice);
+    return { ok: true };
   };
+
+  const demoAccountSwitcherNode = (
+    <View
+      style={[
+        styles.demoSwitcherContainer,
+        isMobile && styles.demoSwitcherContainerMobile,
+      ]}
+      testID="demo-account-switcher-bar"
+    >
+      <View style={styles.demoSwitcherLabelRow}>
+        <UserCheck size={13} color={isMobile ? '#B45309' : '#FEF3C7'} />
+        <Text
+          style={[
+            styles.demoSwitcherTitle,
+            isMobile && styles.demoSwitcherTitleMobile,
+          ]}
+        >
+          Active Demo Account ({activePreset.badgeText}):
+        </Text>
+        {isSwitchingAccount ? (
+          <ActivityIndicator
+            size="small"
+            color={isMobile ? '#D97706' : '#FFFFFF'}
+          />
+        ) : null}
+      </View>
+      <View style={styles.demoAccountsRow}>
+        {availableAccounts.map((acct) => {
+          const isSelected = acct.key === activePreset.key;
+          return (
+            <Pressable
+              key={acct.key}
+              style={[
+                styles.demoAccountChip,
+                isMobile && styles.demoAccountChipMobile,
+                isSelected &&
+                  (isMobile
+                    ? styles.demoAccountChipActiveMobile
+                    : styles.demoAccountChipActive),
+              ]}
+              onPress={() => handleSelectDemoAccount(acct.key)}
+              disabled={isSwitchingAccount}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              testID={`demo-account-chip-${acct.key}`}
+            >
+              <Text
+                style={[
+                  styles.demoAccountChipText,
+                  isMobile && styles.demoAccountChipTextMobile,
+                  isSelected &&
+                    (isMobile
+                      ? styles.demoAccountChipTextActiveMobile
+                      : styles.demoAccountChipTextActive),
+                ]}
+                numberOfLines={1}
+              >
+                {acct.shortLabel}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          style={[
+            styles.demoActionChip,
+            isMobile && styles.demoActionChipMobile,
+          ]}
+          onPress={() => setShowMaasModal(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open MCP Agent Interface"
+          testID="demo-open-maas-mcp-btn"
+        >
+          <Cpu size={12} color="#FEF3C7" />
+          <Text style={styles.demoActionChipText} numberOfLines={1}>
+            MCP Agent Interface
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.demoActionChip,
+            isMobile && styles.demoActionChipMobile,
+          ]}
+          onPress={() => void handleResetDemoSession()}
+          disabled={isResettingDemo}
+          accessibilityRole="button"
+          accessibilityLabel="Reset Demo Session"
+          testID="demo-reset-session-btn"
+        >
+          <RotateCcw size={12} color="#FEF3C7" />
+          <Text style={styles.demoActionChipText} numberOfLines={1}>
+            {isResettingDemo ? 'Resetting...' : 'Reset Demo'}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.page} testID="billing-screen">
-      {/* Approved Orange Rounded Header (#F59E0B) — No Home Icon */}
+      {/* Approved Orange Rounded Header (#F59E0B) — Compact on Mobile */}
       <LinearGradient
         colors={['#F59E0B', '#F59E0B']}
-        style={[styles.header, { paddingTop: insets.top + 8 }]}
+        style={[
+          styles.header,
+          isMobile && styles.headerMobile,
+          {
+            paddingTop: isMobile
+              ? Math.max(insets.top, 8) + 4
+              : insets.top + 8,
+          },
+        ]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
+        testID="billing-main-header"
       >
-        {/* Top Demo Account Switcher Bar */}
-        <View
-          style={styles.demoSwitcherContainer}
-          testID="demo-account-switcher-bar"
-        >
-          <View style={styles.demoSwitcherLabelRow}>
-            <UserCheck size={13} color="#FEF3C7" />
-            <Text style={styles.demoSwitcherTitle}>
-              Active Demo Account ({activePreset.badgeText}):
-            </Text>
-            {isSwitchingAccount ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : null}
-          </View>
-          <View style={styles.demoAccountsRow}>
-            {availableAccounts.map((acct) => {
-              const isSelected = acct.key === activePreset.key;
-              return (
-                <Pressable
-                  key={acct.key}
-                  style={[
-                    styles.demoAccountChip,
-                    isSelected && styles.demoAccountChipActive,
-                  ]}
-                  onPress={() => handleSelectDemoAccount(acct.key)}
-                  disabled={isSwitchingAccount}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  testID={`demo-account-chip-${acct.key}`}
-                >
-                  <Text
-                    style={[
-                      styles.demoAccountChipText,
-                      isSelected && styles.demoAccountChipTextActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {acct.shortLabel}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              style={styles.demoActionChip}
-              onPress={() => setShowMaasModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Open MCP Agent Interface"
-              testID="demo-open-maas-mcp-btn"
-            >
-              <Cpu size={12} color="#FEF3C7" />
-              <Text style={styles.demoActionChipText} numberOfLines={1}>
-                MCP Agent Interface
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.demoActionChip}
-              onPress={() => void handleResetDemoSession()}
-              disabled={isResettingDemo}
-              accessibilityRole="button"
-              accessibilityLabel="Reset Demo Session"
-              testID="demo-reset-session-btn"
-            >
-              <RotateCcw size={12} color="#FEF3C7" />
-              <Text style={styles.demoActionChipText} numberOfLines={1}>
-                {isResettingDemo ? 'Resetting...' : 'Reset Demo'}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        {/* Desktop: Top Demo Account Switcher Bar stays in header */}
+        {!isMobile ? demoAccountSwitcherNode : null}
 
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, isMobile && styles.headerRowMobile]}>
           <View style={styles.headerText}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <BillingBrandIcon size={28} />
-              <Text style={styles.title} testID="billing-header-title">
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: isMobile ? 8 : 10,
+              }}
+            >
+              <BillingBrandIcon size={isMobile ? 24 : 28} />
+              <Text
+                style={[styles.title, isMobile && styles.titleMobile]}
+                numberOfLines={1}
+                testID="billing-header-title"
+              >
                 {isDoctorRole ? 'Provider Billing' : 'Customer Billing'}
               </Text>
             </View>
             <Text
-              style={styles.subtitle}
+              style={[styles.subtitle, isMobile && styles.subtitleMobile]}
               numberOfLines={1}
               testID="billing-header-subtitle"
             >
-              {isDoctorRole
-                ? `${activePreset.fullName} • Manage invoices, PayPal Sandbox & Billing AI`
-                : `${activePreset.fullName} • View statements, PayPal Sandbox & Billing AI`}
+              {isMobile
+                ? `${activePreset.fullName} • ${
+                    isDoctorRole ? 'Provider' : 'Customer'
+                  }`
+                : isDoctorRole
+                  ? `${activePreset.fullName} • Manage invoices, PayPal Sandbox & Billing AI`
+                  : `${activePreset.fullName} • View statements, PayPal Sandbox & Billing AI`}
             </Text>
           </View>
 
-          <View style={styles.headerIcons}>
+          <View
+            style={[styles.headerIcons, isMobile && styles.headerIconsMobile]}
+          >
             <Pressable
-              style={styles.iconButton}
-              onPress={() =>
-                setSearchVisible((prev) => {
-                  if (prev) setSearchQuery('');
-                  return !prev;
-                })
-              }
+              style={[styles.iconButton, isMobile && styles.iconButtonMobile]}
+              onPress={() => setSearchVisible(true)}
               accessibilityRole="button"
               accessibilityLabel="Search invoices"
               testID="billing-header-search-btn"
             >
-              <Search size={20} color="#FFFFFF" strokeWidth={2.5} />
+              <Search
+                size={isMobile ? 18 : 20}
+                color="#FFFFFF"
+                strokeWidth={2.5}
+              />
             </Pressable>
 
             <Pressable
-              style={styles.iconButton}
+              style={[styles.iconButton, isMobile && styles.iconButtonMobile]}
               onPress={() => setShowNotificationsModal(true)}
               accessibilityRole="button"
               accessibilityLabel="Billing Notifications"
               testID="billing-header-notifications-btn"
             >
-              <Bell size={20} color="#FFFFFF" strokeWidth={2.5} />
+              <Bell
+                size={isMobile ? 18 : 20}
+                color="#FFFFFF"
+                strokeWidth={2.5}
+              />
               {unreadNotificationsCount > 0 ? (
                 <View
                   style={styles.notificationBadge}
@@ -528,24 +712,32 @@ export default function BillingScreen() {
             </Pressable>
 
             <Pressable
-              style={styles.iconButton}
+              style={[styles.iconButton, isMobile && styles.iconButtonMobile]}
               onPress={() => setShowSettingsModal(true)}
               accessibilityRole="button"
               accessibilityLabel="Billing Settings"
               testID="billing-header-settings-btn"
             >
-              <Settings size={20} color="#FFFFFF" strokeWidth={2.5} />
+              <Settings
+                size={isMobile ? 18 : 20}
+                color="#FFFFFF"
+                strokeWidth={2.5}
+              />
             </Pressable>
 
             {isDoctorRole ? (
               <Pressable
-                style={styles.iconButton}
+                style={[styles.iconButton, isMobile && styles.iconButtonMobile]}
                 onPress={() => setShowCreateInvoiceModal(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Create Invoice"
                 testID="billing-header-add-btn"
               >
-                <Plus size={22} color="#FFFFFF" strokeWidth={2.5} />
+                <Plus
+                  size={isMobile ? 20 : 22}
+                  color="#FFFFFF"
+                  strokeWidth={2.5}
+                />
               </Pressable>
             ) : null}
           </View>
@@ -553,7 +745,10 @@ export default function BillingScreen() {
       </LinearGradient>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          isMobile && styles.contentMobile,
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -565,6 +760,21 @@ export default function BillingScreen() {
           />
         }
       >
+        {/* Mobile: Demo Account Controls sit below main header inside scrollable content */}
+        {isMobile ? demoAccountSwitcherNode : null}
+
+        {/* PayPal Browser Checkout Return / Cancel Banner */}
+        {paypalReturnBannerText ? (
+          <View
+            style={styles.deepLinkResolvedBanner}
+            testID="billing-paypal-return-banner"
+          >
+            <Text style={styles.deepLinkResolvedText}>
+              {paypalReturnBannerText}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Deep-Link Error / Unauthorized Banner */}
         {resetBannerText ? (
           <View
@@ -645,14 +855,49 @@ export default function BillingScreen() {
       </ScrollView>
 
       {/* Conditionally Mounted Modals per Fabric Yoga Rule */}
+      {searchVisible ? (
+        <BillingGlobalSearchModal
+          visible={searchVisible}
+          roleScope={roleScope}
+          activeUserId={activePreset.id}
+          activeAccountLabel={`${activePreset.shortLabel} (${activePreset.badgeText})`}
+          invoices={roleInvoices}
+          billablePatients={billablePatients}
+          searchQuery={searchQuery}
+          onChangeSearchQuery={setSearchQuery}
+          onClose={() => setSearchVisible(false)}
+          onSelectInvoice={(inv) => {
+            setOpenedFromNotifications(false);
+            setSelectedInvoice(inv);
+          }}
+          onAskBillingAI={(inv) => handleOpenBillingAI(inv)}
+          onRetry={() => void refreshBillingData(true)}
+        />
+      ) : null}
+
       {selectedInvoice ? (
         <BillingInvoiceDetailModal
           visible={Boolean(selectedInvoice)}
           invoice={selectedInvoice}
           roleScope={roleScope}
-          onClose={() => setSelectedInvoice(null)}
+          onClose={() => {
+            setSelectedInvoice(null);
+            setOpenedFromNotifications(false);
+            setCheckoutReturnState(null);
+          }}
           onAskBillingAI={(inv) => handleOpenBillingAI(inv)}
           onInvoiceMutated={() => void refreshBillingData()}
+          initialCheckoutState={checkoutReturnState}
+          onClearCheckoutState={() => setCheckoutReturnState(null)}
+          onBackToNotifications={
+            openedFromNotifications
+              ? () => {
+                  setSelectedInvoice(null);
+                  setOpenedFromNotifications(false);
+                  setShowNotificationsModal(true);
+                }
+              : null
+          }
         />
       ) : null}
 
@@ -667,6 +912,7 @@ export default function BillingScreen() {
           onOpenInvoice={(inv) => {
             if (inv) {
               setShowAiModal(false);
+              setOpenedFromNotifications(false);
               setSelectedInvoice(inv);
             }
           }}
@@ -700,8 +946,14 @@ export default function BillingScreen() {
         <BillingNotificationsModal
           visible={showNotificationsModal}
           notifications={notifications}
-          onClose={() => setShowNotificationsModal(false)}
-          onSelectNotification={(n) => void handleSelectNotification(n)}
+          onClose={() => {
+            setShowNotificationsModal(false);
+            setNotificationErrorText(null);
+          }}
+          onSelectNotification={(n) => handleSelectNotification(n)}
+          onMarkAllRead={() => void handleMarkAllNotificationsRead()}
+          errorMessage={notificationErrorText}
+          onClearError={() => setNotificationErrorText(null)}
         />
       ) : null}
 
@@ -728,12 +980,28 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
     gap: 10,
   },
+  headerMobile: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    gap: 6,
+  },
   demoSwitcherContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.14)',
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 6,
+  },
+  demoSwitcherContainerMobile: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
   },
   demoSwitcherLabelRow: {
     flexDirection: 'row',
@@ -745,6 +1013,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FEF3C7',
     flex: 1,
+  },
+  demoSwitcherTitleMobile: {
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '800',
   },
   demoAccountsRow: {
     flexDirection: 'row',
@@ -759,17 +1032,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.28)',
   },
+  demoAccountChipMobile: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FCD34D',
+  },
   demoAccountChipActive: {
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
+  },
+  demoAccountChipActiveMobile: {
+    backgroundColor: '#D97706',
+    borderColor: '#B45309',
   },
   demoAccountChipText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  demoAccountChipTextMobile: {
+    color: '#92400E',
+  },
   demoAccountChipTextActive: {
     color: '#B45309',
+    fontWeight: '800',
+  },
+  demoAccountChipTextActiveMobile: {
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   demoActionChip: {
@@ -783,6 +1071,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(254, 243, 199, 0.45)',
   },
+  demoActionChipMobile: {
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
+  },
   demoActionChipText: {
     fontSize: 11,
     fontWeight: '800',
@@ -795,13 +1087,20 @@ const styles = StyleSheet.create({
     gap: 10,
     width: '100%',
   },
+  headerRowMobile: {
+    gap: 8,
+  },
   headerText: {
     flex: 1,
+    minWidth: 0,
   },
   headerIcons: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  headerIconsMobile: {
+    gap: 6,
   },
   iconButton: {
     width: 40,
@@ -811,6 +1110,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  iconButtonMobile: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
   },
   notificationBadge: {
     position: 'absolute',
@@ -836,15 +1140,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  titleMobile: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
   subtitle: {
     color: '#FEF3C7',
     fontSize: 13,
     marginTop: 2,
   },
+  subtitleMobile: {
+    fontSize: 11,
+    marginTop: 1,
+  },
   content: {
     padding: 20,
     gap: 16,
     paddingBottom: 40,
+  },
+  contentMobile: {
+    padding: 14,
+    gap: 12,
+    paddingBottom: 32,
   },
   deepLinkErrorBanner: {
     flexDirection: 'row',

@@ -285,6 +285,107 @@ interface PreloadedSessionCache {
   notificationsByUserId: Record<string, BillingNotificationItem[]>;
 }
 
+const localReadNotificationIds = new Set<string>();
+
+export function getDefaultNotificationsByUserId(): Record<string, BillingNotificationItem[]> {
+  return {
+    [DEMO_USER_IDS.sarah_jenkins]: [
+      {
+        id: 'notif-seed-doc-1003',
+        recipientUserId: DEMO_USER_IDS.sarah_jenkins,
+        invoiceId: '33333333-3333-4333-8333-333333333303',
+        type: 'payment_confirmed',
+        title: 'Payment received',
+        body: 'A customer payment ($125.00 USD) was received for invoice PPB-INV-2026-1003 (Jordan Taylor).',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333303',
+        isRead: localReadNotificationIds.has('notif-seed-doc-1003'),
+        createdAt: '2026-11-03T04:35:00.000Z',
+      },
+      {
+        id: 'notif-seed-doc-1001',
+        recipientUserId: DEMO_USER_IDS.sarah_jenkins,
+        invoiceId: '33333333-3333-4333-8333-333333333301',
+        type: 'invoice_overdue',
+        title: 'Overdue statement alert',
+        body: 'Statement PPB-INV-2026-1001 ($150.00 USD for Alex Rivera) is past due.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333301',
+        isRead: localReadNotificationIds.has('notif-seed-doc-1001'),
+        createdAt: '2026-11-03T03:00:00.000Z',
+      },
+      {
+        id: 'notif-seed-doc-1004',
+        recipientUserId: DEMO_USER_IDS.sarah_jenkins,
+        invoiceId: '33333333-3333-4333-8333-333333333304',
+        type: 'payment_failed',
+        title: 'Payment attempt declined',
+        body: 'A card payment attempt on statement PPB-INV-2026-1004 ($50.00 USD for Alex Rivera) was declined.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333304',
+        isRead: localReadNotificationIds.has('notif-seed-doc-1004'),
+        createdAt: '2026-11-03T01:15:00.000Z',
+      },
+    ],
+    [DEMO_USER_IDS.alex_rivera]: [
+      {
+        id: 'notif-seed-alex-1001',
+        recipientUserId: DEMO_USER_IDS.alex_rivera,
+        invoiceId: '33333333-3333-4333-8333-333333333301',
+        type: 'invoice_overdue',
+        title: 'Overdue statement reminder',
+        body: 'Statement PPB-INV-2026-1001 ($150.00 USD) from Dr. Sarah Jenkins is overdue.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333301',
+        isRead: localReadNotificationIds.has('notif-seed-alex-1001'),
+        createdAt: '2026-11-03T04:00:00.000Z',
+      },
+      {
+        id: 'notif-seed-alex-1002',
+        recipientUserId: DEMO_USER_IDS.alex_rivera,
+        invoiceId: '33333333-3333-4333-8333-333333333302',
+        type: 'invoice_sent',
+        title: 'New invoice',
+        body: 'You have received a new invoice (PPB-INV-2026-1002 • $75.00 USD) from Dr. Sarah Jenkins.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333302',
+        isRead: localReadNotificationIds.has('notif-seed-alex-1002'),
+        createdAt: '2026-11-03T02:30:00.000Z',
+      },
+      {
+        id: 'notif-seed-alex-1004',
+        recipientUserId: DEMO_USER_IDS.alex_rivera,
+        invoiceId: '33333333-3333-4333-8333-333333333304',
+        type: 'payment_failed',
+        title: 'Payment not completed',
+        body: 'Your payment attempt on statement PPB-INV-2026-1004 ($50.00 USD) was declined. Tap to retry.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333304',
+        isRead: localReadNotificationIds.has('notif-seed-alex-1004'),
+        createdAt: '2026-11-03T01:00:00.000Z',
+      },
+    ],
+    [DEMO_USER_IDS.jordan_taylor]: [
+      {
+        id: 'notif-seed-jordan-1003',
+        recipientUserId: DEMO_USER_IDS.jordan_taylor,
+        invoiceId: '33333333-3333-4333-8333-333333333303',
+        type: 'payment_confirmed',
+        title: 'Payment confirmed',
+        body: 'Your payment ($125.00 USD) for invoice PPB-INV-2026-1003 has been confirmed.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333303',
+        isRead: localReadNotificationIds.has('notif-seed-jordan-1003'),
+        createdAt: '2026-11-03T04:30:00.000Z',
+      },
+      {
+        id: 'notif-seed-jordan-1006',
+        recipientUserId: DEMO_USER_IDS.jordan_taylor,
+        invoiceId: '33333333-3333-4333-8333-333333333306',
+        type: 'refund_completed',
+        title: 'Refund completed',
+        body: 'Your $45.00 USD refund for invoice PPB-INV-2026-1006 has been completed.',
+        deepLink: '/billing?invoiceId=33333333-3333-4333-8333-333333333306',
+        isRead: localReadNotificationIds.has('notif-seed-jordan-1006'),
+        createdAt: '2026-11-02T22:00:00.000Z',
+      },
+    ],
+  };
+}
+
 const preloadedCache: PreloadedSessionCache = {
   sessionId: null,
   loadedAt: 0,
@@ -303,11 +404,7 @@ const preloadedCache: PreloadedSessionCache = {
     [DEMO_USER_IDS.alex_rivera]: getDefaultPayPalConnection('patient', DEMO_USER_IDS.alex_rivera),
     [DEMO_USER_IDS.jordan_taylor]: getDefaultPayPalConnection('patient', DEMO_USER_IDS.jordan_taylor),
   },
-  notificationsByUserId: {
-    [DEMO_USER_IDS.sarah_jenkins]: [],
-    [DEMO_USER_IDS.alex_rivera]: [],
-    [DEMO_USER_IDS.jordan_taylor]: [],
-  },
+  notificationsByUserId: getDefaultNotificationsByUserId(),
 };
 
 let inflightPreloadPromise: Promise<BillingDashboardData> | null = null;
@@ -415,14 +512,20 @@ export async function fetchBillingDashboardData(
 
   try {
     if (process.env.NODE_ENV === 'test' || !sb?.from || !sb?.rpc) {
+      const fallbackUserId =
+        targetUserId ||
+        (roleScope === 'doctor'
+          ? DEMO_USER_IDS.sarah_jenkins
+          : DEMO_USER_IDS.alex_rivera);
+      const defaultNotifs = getDefaultNotificationsByUserId();
       return {
         invoices: fallbackInvoices,
         catalog: DEFAULT_SERVICE_CATALOG,
         billablePatients: DEFAULT_BILLABLE_PATIENTS,
-        settings: getDefaultBillingAISettings(),
+        settings: getDefaultBillingAISettings(fallbackUserId),
         connection: defaultConnection,
         auditEvents: [],
-        notifications: [],
+        notifications: defaultNotifs[fallbackUserId] || [],
         isLiveStagingData: false,
       };
     }
@@ -703,6 +806,20 @@ export async function fetchBillingDashboardData(
         const hasFailedAttempt = invAttempts.some((a) => a.isGenuineFailure === true);
         const dueDateStr = String(inv.due_date || new Date().toISOString().slice(0, 10));
         const mappedStatus = mapDbInvoiceStatus(inv.status, dueDateStr, hasFailedAttempt);
+        const isInvoiceSettled =
+          mappedStatus === 'paid' ||
+          mappedStatus === 'refunded' ||
+          Number(inv.amount_paid_minor || 0) > 0;
+        const settledTx = isInvoiceSettled ? matchingTx : undefined;
+        const settledIsSampleSeed = Boolean(
+          settledTx && settledTx.verified_via === 'seed_demo'
+        );
+        const settledIsPayPalVerified = Boolean(
+          settledTx &&
+            (settledTx.verified_via === 'capture_api' ||
+              settledTx.verified_via === 'order_lookup' ||
+              settledTx.verified_via === 'webhook')
+        );
 
         const primarySummary =
           invItems[0]?.description || 'Administrative Service Statement';
@@ -741,24 +858,24 @@ export async function fetchBillingDashboardData(
           dueDate: `${dueDateStr}T23:59:59Z`,
           paidAt: inv.paid_at ? String(inv.paid_at) : undefined,
           refundedAt: inv.refunded_at ? String(inv.refunded_at) : undefined,
-          receiptNumber: matchingTx?.paypal_capture_id
-            ? isSampleSeedSettlement
-              ? String(matchingTx.paypal_capture_id)
-              : `PP-CAP-${matchingTx.paypal_capture_id}`
+          receiptNumber: settledTx?.paypal_capture_id
+            ? settledIsSampleSeed
+              ? String(settledTx.paypal_capture_id)
+              : `PP-CAP-${settledTx.paypal_capture_id}`
             : undefined,
-          settlementVerificationStatus: isPayPalVerifiedSettlement
+          settlementVerificationStatus: settledIsPayPalVerified
             ? 'paypal_verified'
-            : isSampleSeedSettlement
+            : settledIsSampleSeed
               ? 'sample_demo'
               : 'unpaid',
           administrativeSummary: primarySummary,
           statementMemoSafe:
             'Administrative billing statement stored in dedicated Supabase project with Row-Level Security.',
           isSyntheticDemoRecord: true,
-          verificationNotice: isPayPalVerifiedSettlement
-            ? `Verified PayPal Sandbox Capture (${matchingTx.paypal_capture_id})`
-            : isSampleSeedSettlement
-              ? `Fictional Sample Record — Seeded demo settlement (${matchingTx.paypal_capture_id}), not a live PayPal Sandbox capture.`
+          verificationNotice: settledIsPayPalVerified
+            ? `Verified PayPal Sandbox Capture (${settledTx?.paypal_capture_id})`
+            : settledIsSampleSeed
+              ? `Fictional Sample Record — Seeded demo settlement (${settledTx?.paypal_capture_id}), not a live PayPal Sandbox capture.`
               : mappedStatus === 'void'
                 ? 'Voided Statement — Archived with $0.00 remaining balance.'
                 : mappedStatus === 'refunded'
@@ -848,33 +965,99 @@ export async function fetchBillingDashboardData(
         };
       }
 
-      // Populate multi-persona notification cache
+      // Populate multi-persona notification cache (strictly scoped to current session & canonical statements)
+      const sessionInvoicesByNumber = new Map<string, SyntheticBillingInvoice>();
+      const sessionInvoicesById = new Map<string, SyntheticBillingInvoice>();
+      const effectiveSessionInvoices =
+        mappedDbInvoices.length > 0 ? mappedDbInvoices : fallbackInvoices;
+      for (const inv of effectiveSessionInvoices) {
+        sessionInvoicesById.set(inv.id, inv);
+        sessionInvoicesByNumber.set(inv.invoiceNumber.toUpperCase(), inv);
+      }
+
+      const defaultSeededNotifs = getDefaultNotificationsByUserId();
       const nextNotificationsByUser: Record<string, BillingNotificationItem[]> = {
         [DEMO_USER_IDS.sarah_jenkins]: [],
         [DEMO_USER_IDS.alex_rivera]: [],
         [DEMO_USER_IDS.jordan_taylor]: [],
       };
       const notifRows: any[] = Array.isArray(notifRes?.data) ? notifRes.data : [];
+      const seenNotifKeyByUser = new Set<string>();
+
       for (const n of notifRows) {
         const recUid = String(n.user_id || DEMO_USER_IDS.sarah_jenkins);
         if (!nextNotificationsByUser[recUid]) {
           nextNotificationsByUser[recUid] = [];
         }
+        const rawMetaInvId = n.metadata?.invoiceId
+          ? String(n.metadata.invoiceId)
+          : n.invoice_id
+            ? String(n.invoice_id)
+            : null;
+        const rawMetaInvNum = n.metadata?.invoiceNumber
+          ? String(n.metadata.invoiceNumber).toUpperCase()
+          : null;
+        const bodyInvMatch = String(n.body || n.title || '').match(
+          /\b((?:PPB|HER)-INV-\d{4}-\d+)\b/i
+        );
+        const extractedInvNum =
+          rawMetaInvNum || (bodyInvMatch ? bodyInvMatch[1].toUpperCase() : null);
+
+        const matchedSessionInv =
+          (rawMetaInvId ? sessionInvoicesById.get(rawMetaInvId) : undefined) ||
+          (extractedInvNum
+            ? sessionInvoicesByNumber.get(extractedInvNum)
+            : undefined);
+
+        // Exclude notifications belonging to other visitors' ephemeral demo sessions
+        const rowSession = String(n.demo_session_id || 'canonical');
+        if (
+          rowSession !== 'canonical' &&
+          rowSession !== demoSessionId &&
+          !matchedSessionInv
+        ) {
+          continue;
+        }
+        if ((rawMetaInvId || extractedInvNum) && !matchedSessionInv) {
+          continue;
+        }
+
+        const resolvedInvoiceId = matchedSessionInv?.id || rawMetaInvId || null;
+        const notifId = String(n.id);
+        const dedupeKey = `${recUid}:${resolvedInvoiceId || notifId}:${String(
+          n.title || ''
+        )}`;
+        if (seenNotifKeyByUser.has(dedupeKey)) {
+          continue;
+        }
+        seenNotifKeyByUser.add(dedupeKey);
+
         nextNotificationsByUser[recUid].push({
-          id: String(n.id),
+          id: notifId,
           recipientUserId: recUid,
-          invoiceId: n.metadata?.invoiceId
-            ? String(n.metadata.invoiceId)
-            : n.invoice_id
-              ? String(n.invoice_id)
-              : null,
-          type: String(n.type || 'billing_alert'),
+          invoiceId: resolvedInvoiceId,
+          type: String(n.metadata?.kind || n.type || 'billing_alert'),
           title: String(n.title || 'Billing Notification'),
           body: String(n.body || ''),
-          deepLink: String(n.metadata?.route || n.deep_link || '/billing'),
-          isRead: Boolean(n.read ?? n.is_read),
+          deepLink: resolvedInvoiceId
+            ? `/billing?invoiceId=${encodeURIComponent(resolvedInvoiceId)}`
+            : String(n.metadata?.route || n.deep_link || '/billing'),
+          isRead:
+            localReadNotificationIds.has(notifId) ||
+            Boolean(n.read ?? n.is_read),
           createdAt: String(n.created_at || new Date().toISOString()),
         });
+      }
+
+      // Ensure each persona has its canonical seed notifications if DB returned none for that persona
+      for (const uid of ALL_DEMO_USER_IDS) {
+        if (
+          (!nextNotificationsByUser[uid] ||
+            nextNotificationsByUser[uid].length === 0) &&
+          defaultSeededNotifs[uid]
+        ) {
+          nextNotificationsByUser[uid] = defaultSeededNotifs[uid];
+        }
       }
 
       const mappedSettings = mapDbSettingsRow(settingsRes?.data, userId!);
@@ -924,22 +1107,163 @@ function dbOrgsFromRes(data: any[]): any[] {
   return Array.isArray(data) ? data : [];
 }
 
-export async function markBillingNotificationRead(notificationId: string): Promise<void> {
+export async function markBillingNotificationRead(notificationId: string): Promise<boolean> {
+  if (!notificationId) return false;
+  localReadNotificationIds.add(notificationId);
   // Immediately update preloaded memory cache
   for (const uid of Object.keys(preloadedCache.notificationsByUserId)) {
     preloadedCache.notificationsByUserId[uid] = (
       preloadedCache.notificationsByUserId[uid] || []
     ).map((n) => (n.id === notificationId ? { ...n, isRead: true } : n));
   }
-  if (!notificationId || !sb?.from) return;
+  if (!sb?.from || notificationId.startsWith('notif-seed-')) {
+    return true;
+  }
   try {
-    await sb
+    const { error } = await sb
       .from('billing_notifications')
       .update({ read: true })
       .eq('id', notificationId);
+    return !error;
   } catch {
-    // Non-fatal
+    return true;
   }
+}
+
+export type NotificationInvoiceResolution =
+  | {
+      status: 'resolved';
+      invoice: SyntheticBillingInvoice;
+      notificationId: string;
+    }
+  | {
+      status: 'unauthorized';
+      message: string;
+      notificationId: string;
+    }
+  | {
+      status: 'not_found';
+      message: string;
+      notificationId: string;
+    };
+
+export function resolveNotificationLinkedInvoice(params: {
+  notification: BillingNotificationItem;
+  roleScope: BillingRoleScope;
+  activeUserId: string;
+  activeFullName?: string;
+  allInvoices: SyntheticBillingInvoice[];
+}): NotificationInvoiceResolution {
+  const { notification, roleScope, activeUserId, activeFullName, allInvoices } = params;
+  const notifId = String(notification?.id || '');
+
+  // If notification itself belongs to a different recipientUserId, reject cross-account access
+  if (
+    notification?.recipientUserId &&
+    notification.recipientUserId !== activeUserId
+  ) {
+    return {
+      status: 'unauthorized',
+      notificationId: notifId,
+      message:
+        'Access Restricted: This notification belongs to a different account and cannot be opened in the current workspace.',
+    };
+  }
+
+  // Extract canonical invoiceId or invoiceNumber from notification fields
+  const rawInvId = notification?.invoiceId
+    ? String(notification.invoiceId).trim()
+    : null;
+  let deepLinkInvId: string | null = null;
+  if (notification?.deepLink) {
+    const dlMatch = String(notification.deepLink).match(
+      /[?&]invoiceId=([^&#]+)/i
+    );
+    if (dlMatch) {
+      try {
+        deepLinkInvId = decodeURIComponent(dlMatch[1]).trim();
+      } catch {
+        deepLinkInvId = dlMatch[1].trim();
+      }
+    }
+  }
+  const textNumMatch = `${notification?.title || ''} ${notification?.body || ''}`.match(
+    /\b((?:PPB|HER)-INV-\d{4}-\d+)\b/i
+  );
+  const extractedInvNumber = textNumMatch ? textNumMatch[1].toUpperCase() : null;
+
+  const candidateId = rawInvId || deepLinkInvId;
+  if (!candidateId && !extractedInvNumber) {
+    return {
+      status: 'not_found',
+      notificationId: notifId,
+      message:
+        'Linked statement unavailable: This notification does not reference an active statement identifier.',
+    };
+  }
+
+  const matchedInvoice = (allInvoices || []).find((inv) => {
+    if (candidateId) {
+      if (
+        inv.id.toLowerCase() === candidateId.toLowerCase() ||
+        inv.invoiceNumber.toLowerCase() === candidateId.toLowerCase()
+      ) {
+        return true;
+      }
+    }
+    if (
+      extractedInvNumber &&
+      inv.invoiceNumber.toUpperCase() === extractedInvNumber
+    ) {
+      return true;
+    }
+    return false;
+  });
+
+  if (!matchedInvoice) {
+    return {
+      status: 'not_found',
+      notificationId: notifId,
+      message:
+        'Statement Unavailable: The linked statement could not be found in the current session (it may have been deleted or belongs to a prior demo session).',
+    };
+  }
+
+  // Verify active account authorization for the matched invoice
+  if (roleScope === 'patient') {
+    const expectedName =
+      activeFullName ||
+      (activeUserId === DEMO_USER_IDS.jordan_taylor
+        ? 'Jordan Taylor'
+        : 'Alex Rivera');
+    const matchesDisplayName =
+      matchedInvoice.patientDisplayName.toLowerCase() ===
+      expectedName.toLowerCase();
+
+    if (!matchesDisplayName) {
+      return {
+        status: 'unauthorized',
+        notificationId: notifId,
+        message:
+          'Access Restricted: Your active customer account is not authorized to view this statement.',
+      };
+    }
+
+    if (matchedInvoice.status === 'draft') {
+      return {
+        status: 'unauthorized',
+        notificationId: notifId,
+        message:
+          'Access Restricted: Draft statements are only visible to the issuing provider until sent.',
+      };
+    }
+  }
+
+  return {
+    status: 'resolved',
+    invoice: matchedInvoice,
+    notificationId: notifId,
+  };
 }
 
 export async function createBillingInvoice(params: {
@@ -1110,7 +1434,9 @@ export async function resetBillingDemoSession(): Promise<void> {
   if (error) {
     throw new Error(error.message || 'Could not reset demo session.');
   }
+  localReadNotificationIds.clear();
   preloadedCache.invoices = getSyntheticInvoicesForRole('doctor');
+  preloadedCache.notificationsByUserId = getDefaultNotificationsByUserId();
   preloadedCache.loadedAt = 0;
 }
 
@@ -1253,6 +1579,28 @@ export async function invokePayPalBillingFunction(
       };
     }
 
+    if (data && typeof data === 'object') {
+      const rawApprove =
+        data.approval_url || data.approveUrl || data.approvalUrl || null;
+      if (rawApprove && typeof rawApprove === 'string') {
+        const browserSafeApprove = rawApprove.includes('appSwitchEligible=')
+          ? rawApprove
+          : `${rawApprove}${rawApprove.includes('?') ? '&' : '?'}appSwitchEligible=false`;
+        data.rawApprovalUrl = data.rawApprovalUrl || rawApprove;
+        data.approvalUrl = browserSafeApprove;
+        data.approval_url = browserSafeApprove;
+        data.guestCardCheckoutUrl =
+          data.guestCardCheckoutUrl || `${browserSafeApprove}&fundingSource=card`;
+        const oid = data.orderId || data.order_id;
+        if (oid && !data.classicWebCheckoutUrl) {
+          data.classicWebCheckoutUrl = `https://www.sandbox.paypal.com/cgi-bin/webscr?cmd=_express-checkout&token=${encodeURIComponent(
+            String(oid)
+          )}&useraction=commit`;
+        }
+        data.appSwitchDisabled = true;
+      }
+    }
+
     return {
       ok: true,
       data,
@@ -1307,3 +1655,376 @@ export async function checkPayPalCardEligibility(): Promise<{
     action: 'check-card-eligibility',
   });
 }
+
+export type BillingSearchCategory =
+  | 'all'
+  | 'invoice'
+  | 'customer'
+  | 'transaction'
+  | 'refund';
+
+export interface BillingSearchResultItem {
+  id: string;
+  category: Exclude<BillingSearchCategory, 'all'>;
+  title: string;
+  subtitle: string;
+  badgeText: string;
+  badgeTone: 'paid' | 'overdue' | 'pending' | 'failed' | 'refunded' | 'neutral';
+  amountFormatted?: string;
+  dateFormatted?: string;
+  invoice: SyntheticBillingInvoice;
+  matchedFields: string[];
+}
+
+export interface BillingSearchResponse {
+  query: string;
+  category: BillingSearchCategory;
+  roleScope: BillingRoleScope;
+  activeUserId: string;
+  results: BillingSearchResultItem[];
+  countsByCategory: {
+    all: number;
+    invoice: number;
+    customer: number;
+    transaction: number;
+    refund: number;
+  };
+}
+
+function formatSearchUsd(cents: number): string {
+  const sign = cents < 0 ? '-' : '';
+  const abs = Math.abs(cents);
+  return `${sign}$${(abs / 100).toFixed(2)}`;
+}
+
+export function searchAuthorizedBillingRecords(params: {
+  query: string;
+  category?: BillingSearchCategory;
+  roleScope: BillingRoleScope;
+  activeUserId: string;
+  invoices: SyntheticBillingInvoice[];
+  billablePatients?: BillablePatientOption[];
+}): BillingSearchResponse {
+  const rawQuery = String(params.query || '').trim();
+  const normalizedQuery = rawQuery.toLowerCase();
+  const selectedCategory: BillingSearchCategory = params.category || 'all';
+  const { roleScope, activeUserId } = params;
+
+  // Enforce strict account isolation on invoices before building any search index
+  const activePatientDisplayName =
+    activeUserId === DEMO_USER_IDS.jordan_taylor ? 'Jordan Taylor' : 'Alex Rivera';
+  const authorizedInvoices = (params.invoices || []).filter((inv) => {
+    if (roleScope === 'doctor') {
+      return true;
+    }
+    return (
+      inv.patientDisplayName.toLowerCase() ===
+        activePatientDisplayName.toLowerCase() && inv.status !== 'draft'
+    );
+  });
+
+  const allItems: BillingSearchResultItem[] = [];
+
+  // 1. Invoice / Statement records
+  for (const inv of authorizedInvoices) {
+    const lineItemCodes = inv.lineItems.map((li) => li.serviceCode).join(', ');
+    const lineItemDescriptions = inv.lineItems.map((li) => li.description).join(' ');
+    const totalFormatted = formatSearchUsd(inv.totalCents);
+    const balanceFormatted = formatSearchUsd(inv.balanceDueCents);
+    const statusLabel = inv.status.toUpperCase();
+
+    const tone: BillingSearchResultItem['badgeTone'] =
+      inv.status === 'paid'
+        ? 'paid'
+        : inv.status === 'overdue'
+          ? 'overdue'
+          : inv.status === 'failed'
+            ? 'failed'
+            : inv.status === 'refunded'
+              ? 'refunded'
+              : inv.status === 'sent'
+                ? 'pending'
+                : 'neutral';
+
+    allItems.push({
+      id: `inv-${inv.id}`,
+      category: 'invoice',
+      title: `#${inv.invoiceNumber} • ${inv.administrativeSummary}`,
+      subtitle:
+        roleScope === 'doctor'
+          ? `Customer: ${inv.patientDisplayName} • ${lineItemCodes || 'ADMIN-SERVICE'} • Balance ${balanceFormatted}`
+          : `Provider: ${inv.issuerDoctorName} (${inv.organizationName}) • ${lineItemCodes || 'ADMIN-SERVICE'}`,
+      badgeText: statusLabel,
+      badgeTone: tone,
+      amountFormatted: totalFormatted,
+      dateFormatted: inv.dueDate,
+      invoice: inv,
+      matchedFields: [
+        inv.invoiceNumber,
+        inv.administrativeSummary,
+        inv.patientDisplayName,
+        inv.issuerDoctorName,
+        inv.organizationName,
+        inv.status,
+        totalFormatted,
+        String(inv.totalCents / 100),
+        balanceFormatted,
+        inv.dueDate,
+        lineItemCodes,
+        lineItemDescriptions,
+      ],
+    });
+  }
+
+  // 2. Customer / Counterpart records (strictly scoped to active account)
+  if (roleScope === 'doctor') {
+    const patientsMap = new Map<
+      string,
+      {
+        patientId: string;
+        fullName: string;
+        emailMasked: string | null;
+        invoices: SyntheticBillingInvoice[];
+      }
+    >();
+
+    for (const bp of params.billablePatients || DEFAULT_BILLABLE_PATIENTS) {
+      patientsMap.set(bp.fullName.toLowerCase(), {
+        patientId: bp.patientId,
+        fullName: bp.fullName,
+        emailMasked: bp.emailMasked,
+        invoices: [],
+      });
+    }
+
+    for (const inv of authorizedInvoices) {
+      const key = inv.patientDisplayName.toLowerCase();
+      const existing = patientsMap.get(key);
+      if (existing) {
+        existing.invoices.push(inv);
+      } else {
+        patientsMap.set(key, {
+          patientId: key,
+          fullName: inv.patientDisplayName,
+          emailMasked: null,
+          invoices: [inv],
+        });
+      }
+    }
+
+    for (const [, p] of patientsMap) {
+      if (p.invoices.length === 0) continue;
+      const openBalanceCents = p.invoices.reduce(
+        (acc, inv) =>
+          inv.status === 'sent' || inv.status === 'overdue' || inv.status === 'failed'
+            ? acc + inv.balanceDueCents
+            : acc,
+        0
+      );
+      const primaryInvoice =
+        p.invoices.find(
+          (inv) =>
+            inv.status === 'overdue' || inv.status === 'failed' || inv.status === 'sent'
+        ) || p.invoices[0];
+
+      allItems.push({
+        id: `cust-${p.patientId}`,
+        category: 'customer',
+        title: `${p.fullName} (Customer Account)`,
+        subtitle: `${p.invoices.length} statements (${p.invoices
+          .map((i) => `#${i.invoiceNumber}`)
+          .join(', ')}) • Open balance ${formatSearchUsd(openBalanceCents)}${
+          p.emailMasked ? ` • ${p.emailMasked}` : ''
+        }`,
+        badgeText: openBalanceCents > 0 ? 'OPEN BALANCE' : 'SETTLED',
+        badgeTone: openBalanceCents > 0 ? 'pending' : 'paid',
+        amountFormatted: formatSearchUsd(openBalanceCents),
+        invoice: primaryInvoice,
+        matchedFields: [
+          p.fullName,
+          p.emailMasked || '',
+          'customer',
+          'patient',
+          ...p.invoices.map((i) => i.invoiceNumber),
+        ],
+      });
+    }
+  } else {
+    // Customer view: only expose the active customer's own account & their provider
+    const primaryInvoice = authorizedInvoices[0];
+    if (primaryInvoice) {
+      const openBalanceCents = authorizedInvoices.reduce(
+        (acc, inv) =>
+          inv.status === 'sent' || inv.status === 'overdue' || inv.status === 'failed'
+            ? acc + inv.balanceDueCents
+            : acc,
+        0
+      );
+      allItems.push({
+        id: `cust-self-${activeUserId}`,
+        category: 'customer',
+        title: `${primaryInvoice.patientDisplayName} • Active Customer Account`,
+        subtitle: `Billed by ${primaryInvoice.issuerDoctorName} (${primaryInvoice.organizationName}) • ${authorizedInvoices.length} statements`,
+        badgeText: openBalanceCents > 0 ? 'BALANCE DUE' : 'ALL PAID',
+        badgeTone: openBalanceCents > 0 ? 'pending' : 'paid',
+        amountFormatted: formatSearchUsd(openBalanceCents),
+        invoice: primaryInvoice,
+        matchedFields: [
+          primaryInvoice.patientDisplayName,
+          primaryInvoice.issuerDoctorName,
+          primaryInvoice.organizationName,
+          ...authorizedInvoices.map((i) => i.invoiceNumber),
+        ],
+      });
+    }
+  }
+
+  // 3. Transactions & Payment Attempts (Captures, Orders, Declined Cards, Sample Settlements)
+  for (const inv of authorizedInvoices) {
+    if (inv.receiptNumber && (inv.status === 'paid' || inv.amountPaidCents > 0)) {
+      const isLivePayPal = inv.settlementVerificationStatus === 'paypal_verified';
+      allItems.push({
+        id: `tx-receipt-${inv.id}`,
+        category: 'transaction',
+        title: `${
+          isLivePayPal ? 'PayPal Sandbox Capture' : 'Sample Settlement'
+        } • ${inv.receiptNumber}`,
+        subtitle: `Statement #${inv.invoiceNumber} (${inv.patientDisplayName}) • ${
+          isLivePayPal ? 'Verified PayPal Capture' : 'Seeded Demo Settlement'
+        }`,
+        badgeText: isLivePayPal ? 'PAYPAL CAPTURED' : 'DEMO PAID',
+        badgeTone: 'paid',
+        amountFormatted: formatSearchUsd(inv.amountPaidCents || inv.totalCents),
+        dateFormatted: inv.paidAt || inv.dueDate,
+        invoice: inv,
+        matchedFields: [
+          inv.receiptNumber,
+          inv.invoiceNumber,
+          inv.patientDisplayName,
+          isLivePayPal ? 'paypal verified capture' : 'sample demo settlement',
+          formatSearchUsd(inv.amountPaidCents || inv.totalCents),
+        ],
+      });
+    }
+
+    for (const att of inv.paymentAttempts || []) {
+      const isFailed =
+        att.status === 'failed_demo' &&
+        att.attemptClassification !== 'approval_required' &&
+        att.attemptClassification !== 'awaiting_buyer_approval';
+      const isApprovalPending =
+        att.attemptClassification === 'approval_required' ||
+        att.attemptClassification === 'awaiting_buyer_approval';
+      const refCode = att.demoReferenceCode || att.id;
+      const cardInfo =
+        att.cardBrand && att.cardLastDigits
+          ? `${att.cardBrand.toUpperCase()} •••• ${att.cardLastDigits}`
+          : att.paymentSourceType || 'PayPal Sandbox';
+
+      allItems.push({
+        id: `tx-att-${att.id}`,
+        category: 'transaction',
+        title: `${
+          isFailed
+            ? `Declined Payment Attempt (${refCode})`
+            : isApprovalPending
+              ? `PayPal Order Awaiting Approval (${refCode})`
+              : `Payment Transaction (${refCode})`
+        }`,
+        subtitle: `Statement #${inv.invoiceNumber} • ${inv.patientDisplayName} • ${cardInfo}${
+          att.failureReason ? ` • ${att.failureReason}` : ''
+        }`,
+        badgeText: isFailed
+          ? 'DECLINED'
+          : isApprovalPending
+            ? 'AWAITING APPROVAL'
+            : 'SETTLED',
+        badgeTone: isFailed ? 'failed' : isApprovalPending ? 'pending' : 'paid',
+        amountFormatted: formatSearchUsd(att.amountCents || inv.totalCents),
+        dateFormatted: att.attemptedAt,
+        invoice: inv,
+        matchedFields: [
+          refCode,
+          att.demoReferenceCode || '',
+          att.paypalErrorCode || '',
+          att.failureReason || '',
+          att.actionableMessage || '',
+          cardInfo,
+          inv.invoiceNumber,
+          inv.patientDisplayName,
+          isFailed ? 'failed declined instrument_declined' : 'payment transaction order',
+        ],
+      });
+    }
+  }
+
+  // 4. Refunds & Refunded Receipts
+  for (const inv of authorizedInvoices) {
+    if (inv.status === 'refunded' || inv.amountRefundedCents > 0) {
+      const refundCents = inv.amountRefundedCents || inv.totalCents;
+      const refId = inv.receiptNumber || `REF-${inv.invoiceNumber}`;
+      allItems.push({
+        id: `refund-${inv.id}`,
+        category: 'refund',
+        title: `Refund Processed • #${inv.invoiceNumber} (${refId})`,
+        subtitle: `Customer: ${inv.patientDisplayName} • ${inv.administrativeSummary} • Refunded ${formatSearchUsd(
+          refundCents
+        )} ($0.00 balance due)`,
+        badgeText: 'REFUNDED',
+        badgeTone: 'refunded',
+        amountFormatted: formatSearchUsd(refundCents),
+        dateFormatted: inv.refundedAt || inv.dueDate,
+        invoice: inv,
+        matchedFields: [
+          'refund',
+          'refunded',
+          refId,
+          inv.invoiceNumber,
+          inv.patientDisplayName,
+          inv.administrativeSummary,
+          formatSearchUsd(refundCents),
+          String(refundCents / 100),
+        ],
+      });
+    }
+  }
+
+  // Filter by query across matchedFields, title, subtitle, badgeText
+  const queryMatched = normalizedQuery
+    ? allItems.filter((item) => {
+        const haystack = [
+          item.title,
+          item.subtitle,
+          item.badgeText,
+          item.amountFormatted || '',
+          ...item.matchedFields,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : allItems;
+
+  const countsByCategory = {
+    all: queryMatched.length,
+    invoice: queryMatched.filter((i) => i.category === 'invoice').length,
+    customer: queryMatched.filter((i) => i.category === 'customer').length,
+    transaction: queryMatched.filter((i) => i.category === 'transaction').length,
+    refund: queryMatched.filter((i) => i.category === 'refund').length,
+  };
+
+  const filteredResults =
+    selectedCategory === 'all'
+      ? queryMatched
+      : queryMatched.filter((i) => i.category === selectedCategory);
+
+  return {
+    query: rawQuery,
+    category: selectedCategory,
+    roleScope,
+    activeUserId,
+    results: filteredResults,
+    countsByCategory,
+  };
+}
+

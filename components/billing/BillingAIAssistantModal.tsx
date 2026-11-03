@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {
   AlertCircle,
+  ArrowUpRight,
   RotateCcw,
   ShieldCheck,
   Sparkles,
@@ -25,6 +26,7 @@ import {
   sendBillingAIMessage,
   loadBillingAIHistory,
   decideBillingAIProposal,
+  getBillingAIMinProcessingMs,
   type BillingAIChatMessage,
   type BillingAIProposal,
 } from '../../src/billing/api/billingAIClient';
@@ -51,9 +53,227 @@ export interface BillingAIAssistantModalProps {
   onClose: () => void;
   onDataChanged?: () => void;
   onOpenInvoice?: (invoice: SyntheticBillingInvoice) => void;
+  minProcessingDurationMs?: number;
 }
 
 type UiMessage = BillingAIChatMessage & { status?: 'sending' | 'failed' };
+
+/**
+ * Strips any executable HTML/script payloads or raw HTML tags so untrusted
+ * AI-generated content can never inject HTML or scripts on Web or Mobile.
+ */
+export function sanitizeUntrustedAiContent(raw: string): string {
+  if (!raw) return '';
+  return String(raw)
+    .replace(/<\s*script[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '[script-removed]')
+    .replace(/<\s*(?:iframe|object|embed|style|link|meta)[^>]*>[\s\S]*?<\s*\/\s*(?:iframe|object|embed|style|link|meta)\s*>/gi, '')
+    .replace(/<\s*(?:iframe|object|embed|script|img|svg|body|input|form)[^>]*\/?>/gi, '')
+    .replace(/\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:')
+    .replace(/data\s*:\s*text\/html/gi, 'blocked:');
+}
+
+function renderInlineMarkdownText(
+  rawText: string,
+  baseStyle: any,
+  boldStyle: any,
+  codeStyle: any
+): React.ReactNode {
+  const safe = sanitizeUntrustedAiContent(rawText);
+  const parts = safe.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
+  if (parts.length <= 1) {
+    return safe;
+  }
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return (
+        <Text key={idx} style={[baseStyle, boldStyle]}>
+          {part.slice(2, -2)}
+        </Text>
+      );
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return (
+        <Text key={idx} style={[baseStyle, codeStyle]}>
+          {part.slice(1, -1)}
+        </Text>
+      );
+    }
+    return <Text key={idx}>{part}</Text>;
+  });
+}
+
+function FormattedAssistantMessage({
+  content,
+}: {
+  content: string;
+}) {
+  const safeContent = sanitizeUntrustedAiContent(content);
+  const lines = safeContent
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l, idx, arr) => !(l === '' && arr[idx - 1] === ''));
+
+  return (
+    <View style={styles.formattedContainer} testID="billing-ai-formatted-content">
+      {lines.map((line, idx) => {
+        if (!line) {
+          return <View key={`sp-${idx}`} style={{ height: 4 }} />;
+        }
+
+        // 1. Markdown Heading (#, ##, ###) or Statement Header ("Statement #PPB-INV-... (PAID)")
+        const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+        const statementTitleMatch = line.match(
+          /^(Statement\s+#(?:PPB|HER)-INV-\d{4}-\d+)\s*\(([A-Z_]+)\)$/i
+        );
+        const summaryHeaderMatch = line.match(
+          /^(Practice Billing Summary[^:]*:|Your recorded payment & refund statements:|Payment Workflow Stages:|Current Status:.*)$/i
+        );
+
+        if (statementTitleMatch) {
+          const stmtTitle = statementTitleMatch[1];
+          const stmtStatus = statementTitleMatch[2].toUpperCase();
+          const isPaid = stmtStatus === 'PAID';
+          const isOverdue = stmtStatus === 'OVERDUE' || stmtStatus === 'FAILED';
+          const isRefunded = stmtStatus === 'REFUNDED';
+          return (
+            <View key={`stmt-${idx}`} style={styles.statementHeaderBanner}>
+              <Text style={styles.statementHeaderTitle}>
+                {stmtTitle} ({stmtStatus})
+              </Text>
+              <View
+                style={[
+                  styles.statementStatusBadge,
+                  isPaid
+                    ? styles.badgePaid
+                    : isOverdue
+                      ? styles.badgeOverdue
+                      : isRefunded
+                        ? styles.badgeRefunded
+                        : styles.badgeNeutral,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statementStatusBadgeText,
+                    isPaid
+                      ? styles.badgePaidText
+                      : isOverdue
+                        ? styles.badgeOverdueText
+                        : isRefunded
+                          ? styles.badgeRefundedText
+                          : styles.badgeNeutralText,
+                  ]}
+                >
+                  {stmtStatus}
+                </Text>
+              </View>
+            </View>
+          );
+        }
+
+        if (headingMatch || summaryHeaderMatch) {
+          const headingText = headingMatch ? headingMatch[2] : line;
+          return (
+            <Text key={`h-${idx}`} style={styles.markdownHeading}>
+              {renderInlineMarkdownText(
+                headingText,
+                styles.markdownHeading,
+                styles.inlineBold,
+                styles.inlineCode
+              )}
+            </Text>
+          );
+        }
+
+        // 2. Multi-segment Financial Summary line ("• Financial Summary: Original Total $125.00 USD • Paid $125.00 USD...")
+        if (
+          /^(?:[•\-*]\s*)?Financial Summary:/i.test(line) &&
+          line.split('•').length >= 3
+        ) {
+          const cleanLine = line.replace(/^[•\-*]\s*/, '');
+          const afterColon = cleanLine.replace(/^Financial Summary:\s*/i, '');
+          const segments = afterColon
+            .split('•')
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          return (
+            <View
+              key={`fin-${idx}`}
+              style={styles.financialSummaryCard}
+              testID="billing-ai-financial-summary-card"
+            >
+              <Text style={styles.financialSummaryTitle}>Financial Summary:</Text>
+              <View style={styles.financialSummaryGrid}>
+                {segments.map((seg, sIdx) => (
+                  <View key={`seg-${sIdx}`} style={styles.financialSummaryPill}>
+                    <Text style={styles.financialSummaryPillText}>{seg}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        }
+
+        // 3. Bullet item (•, -, *) or Step item (✓, ▶, ⏳, 1., 2.)
+        const bulletMatch = line.match(/^([•\-*✓▶⏳]|\d+\.)\s+(.+)$/);
+        if (bulletMatch) {
+          const marker = bulletMatch[1];
+          const body = bulletMatch[2];
+          const kvMatch = body.match(
+            /^([A-Za-z0-9][A-Za-z0-9\s/#()-]{1,42}):\s*(.*)$/
+          );
+
+          return (
+            <View key={`li-${idx}`} style={styles.bulletRow}>
+              <Text style={styles.bulletMarker}>
+                {marker === '-' || marker === '*' ? '•' : marker}
+              </Text>
+              <Text style={styles.bulletText}>
+                {kvMatch ? (
+                  <>
+                    <Text style={styles.inlineBold}>{kvMatch[1]}:</Text>
+                    {kvMatch[2] ? (
+                      <Text>
+                        {' '}
+                        {renderInlineMarkdownText(
+                          kvMatch[2],
+                          styles.bulletText,
+                          styles.inlineBold,
+                          styles.inlineCode
+                        )}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : (
+                  renderInlineMarkdownText(
+                    body,
+                    styles.bulletText,
+                    styles.inlineBold,
+                    styles.inlineCode
+                  )
+                )}
+              </Text>
+            </View>
+          );
+        }
+
+        // 4. Standard paragraph line
+        return (
+          <Text key={`p-${idx}`} style={styles.bubbleText}>
+            {renderInlineMarkdownText(
+              line,
+              styles.bubbleText,
+              styles.inlineBold,
+              styles.inlineCode
+            )}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function BillingAIAssistantModal({
   visible,
@@ -63,6 +283,7 @@ export default function BillingAIAssistantModal({
   onClose,
   onDataChanged,
   onOpenInvoice,
+  minProcessingDurationMs,
 }: BillingAIAssistantModalProps) {
   const [composerValue, setComposerValue] = useState('');
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -75,7 +296,28 @@ export default function BillingAIAssistantModal({
     focusedInvoice ?? null
   );
   const scrollRef = useRef<ScrollView>(null);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
   const isDoctor = roleScope === 'doctor';
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (pendingTimerRef.current) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible && pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+      setSending(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (focusedInvoice) {
@@ -124,6 +366,13 @@ export default function BillingAIAssistantModal({
       ]);
       setSending(true);
       scrollToEnd();
+
+      const startedAtMs = Date.now();
+      const targetMinHoldMs =
+        minProcessingDurationMs !== undefined
+          ? minProcessingDurationMs
+          : getBillingAIMinProcessingMs();
+
       try {
         const res = await sendBillingAIMessage({
           message: text,
@@ -134,13 +383,41 @@ export default function BillingAIAssistantModal({
             activeInvoice?.invoiceNumber ?? focusedInvoice?.invoiceNumber ?? null,
           recentMessages: messages,
         });
+
+        const elapsedMs = Math.max(0, Date.now() - startedAtMs);
+        const shouldHold =
+          res.reply?.telemetry?.requiresProcessingHold !== false &&
+          targetMinHoldMs > elapsedMs;
+        const remainingWaitMs = shouldHold ? targetMinHoldMs - elapsedMs : 0;
+
+        if (remainingWaitMs > 0) {
+          await new Promise<void>((resolve) => {
+            pendingTimerRef.current = setTimeout(() => {
+              pendingTimerRef.current = null;
+              resolve();
+            }, remainingWaitMs);
+          });
+        }
+
+        if (!isMountedRef.current) return;
+
+        const enrichedReply: BillingAIChatMessage = {
+          ...res.reply,
+          telemetry: res.reply.telemetry
+            ? {
+                ...res.reply.telemetry,
+                totalTurnDurationMs: Math.max(0, Date.now() - startedAtMs),
+              }
+            : undefined,
+        };
+
         setSessionId(res.sessionId);
         if (res.focusedInvoice) {
           setActiveInvoice(res.focusedInvoice);
         }
         setMessages((prev) => [
           ...prev.map((m) => (m.id === localId ? { ...m, status: undefined } : m)),
-          res.reply,
+          enrichedReply,
         ]);
         if (
           res.reply?.proposal?.status === 'approved' ||
@@ -149,6 +426,7 @@ export default function BillingAIAssistantModal({
           onDataChanged?.();
         }
       } catch (e) {
+        if (!isMountedRef.current) return;
         const msg = e instanceof Error ? e.message : String(e);
         setMessages((prev) =>
           prev.map((m) => (m.id === localId ? { ...m, status: 'failed' } : m))
@@ -156,14 +434,19 @@ export default function BillingAIAssistantModal({
         setError(msg || 'Billing AI could not respond.');
         setLastFailedPrompt(text);
       } finally {
-        setSending(false);
-        scrollToEnd();
+        if (isMountedRef.current) {
+          setSending(false);
+          scrollToEnd();
+        }
       }
     },
     [
       activeInvoice?.id,
+      activeInvoice?.invoiceNumber,
       focusedInvoice?.id,
+      focusedInvoice?.invoiceNumber,
       messages,
+      minProcessingDurationMs,
       onDataChanged,
       roleScope,
       scrollToEnd,
@@ -274,27 +557,39 @@ export default function BillingAIAssistantModal({
         />
       }
     >
-      <View style={styles.isolationRow} testID="billing-ai-isolation-banner">
-        <ShieldCheck size={14} color="#065F46" strokeWidth={2.4} />
-        <Text style={styles.isolationText}>
-          Billing data only — sensitive customer notes are never sent to PayPal.
-        </Text>
-      </View>
-
-      {activeInvoice ? (
-        <View style={styles.focusChip} testID="billing-ai-focused-invoice-chip">
-          <Text style={styles.focusChipText} numberOfLines={1}>
-            Invoice #{activeInvoice.invoiceNumber}
+      <View style={styles.topMetaRow}>
+        <View style={styles.isolationRow} testID="billing-ai-isolation-banner">
+          <ShieldCheck size={13} color="#065F46" strokeWidth={2.4} />
+          <Text style={styles.isolationText} numberOfLines={2}>
+            Billing data only — sensitive customer notes are never sent to PayPal.
           </Text>
         </View>
-      ) : null}
+
+        {activeInvoice ? (
+          <Pressable
+            style={styles.focusChip}
+            onPress={() => onOpenInvoice?.(activeInvoice)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open focused statement ${activeInvoice.invoiceNumber}`}
+            testID="billing-ai-focused-invoice-chip"
+          >
+            <Text style={styles.focusChipText} numberOfLines={1}>
+              Invoice #{activeInvoice.invoiceNumber}
+            </Text>
+            {onOpenInvoice ? (
+              <ArrowUpRight size={12} color="#3730A3" />
+            ) : null}
+          </Pressable>
+        ) : null}
+      </View>
 
       <ScrollView
         ref={scrollRef}
         style={styles.messages}
         contentContainerStyle={styles.messagesContent}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
         onContentSizeChange={scrollToEnd}
         testID="billing-ai-messages"
       >
@@ -329,14 +624,29 @@ export default function BillingAIAssistantModal({
               ]}
               testID={`billing-ai-msg-${m.role}`}
             >
-              <Text
-                style={[
-                  styles.bubbleText,
-                  m.role === 'user' && styles.bubbleTextUser,
-                ]}
-              >
-                {m.content}
-              </Text>
+              {m.role === 'user' ? (
+                <Text style={[styles.bubbleText, styles.bubbleTextUser]}>
+                  {sanitizeUntrustedAiContent(m.content)}
+                </Text>
+              ) : (
+                <FormattedAssistantMessage content={m.content} />
+              )}
+
+              {m.role === 'assistant' && m.telemetry ? (
+                <View
+                  style={styles.telemetryFooter}
+                  testID={`billing-ai-telemetry-${m.telemetry.responseSource}`}
+                >
+                  <Text style={styles.telemetryText}>
+                    {m.telemetry.responseSource === 'gemini_live'
+                      ? 'Verified via Gemini 3.5 Flash-Lite'
+                      : m.telemetry.responseSource === 'guardrail_immediate'
+                        ? 'Security & Guardrail Verification'
+                        : 'Verified Billing Ledger Record'}
+                  </Text>
+                </View>
+              ) : null}
+
               {m.status === 'failed' ? (
                 <Text style={styles.failedTag}>Not sent</Text>
               ) : null}
@@ -420,10 +730,18 @@ export default function BillingAIAssistantModal({
         {sending ? (
           <View
             style={[styles.bubble, styles.bubbleAssistant, styles.typingRow]}
+            accessibilityRole="progressbar"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="Preparing your response"
             testID="billing-ai-typing"
           >
             <ActivityIndicator size="small" color="#D97706" />
-            <Text style={styles.typingText}>Billing AI is thinking…</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.typingText}>Preparing your response…</Text>
+              <Text style={styles.typingSubtext}>
+                Checking authorized billing records & guardrails
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -450,28 +768,42 @@ export default function BillingAIAssistantModal({
 }
 
 const styles = StyleSheet.create({
+  topMetaRow: {
+    gap: 6,
+    marginBottom: 8,
+  },
   isolationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   isolationText: {
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 15,
     color: '#065F46',
     fontWeight: '600',
     flex: 1,
   },
   focusChip: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    marginBottom: 8,
   },
   focusChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#3730A3',
   },
@@ -480,7 +812,7 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     gap: 10,
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   emptyState: {
     gap: 10,
@@ -512,26 +844,175 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   bubble: {
-    maxWidth: '88%',
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    overflow: 'hidden',
   },
   bubbleUser: {
     alignSelf: 'flex-end',
+    maxWidth: '86%',
     backgroundColor: '#F59E0B',
   },
   bubbleAssistant: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F3F4F6',
+    alignSelf: 'stretch',
+    maxWidth: '98%',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   bubbleText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#111827',
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#0F172A',
   },
   bubbleTextUser: {
+    fontSize: 14,
+    lineHeight: 20,
     color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  formattedContainer: {
+    gap: 6,
+  },
+  statementHeaderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingBottom: 7,
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  statementHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    flexShrink: 1,
+  },
+  statementStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  badgePaid: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  badgePaidText: {
+    color: '#047857',
+  },
+  badgeOverdue: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  badgeOverdueText: {
+    color: '#B91C1C',
+  },
+  badgeRefunded: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#DDD6FE',
+  },
+  badgeRefundedText: {
+    color: '#6D28D9',
+  },
+  badgeNeutral: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  badgeNeutralText: {
+    color: '#B45309',
+  },
+  statementStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  markdownHeading: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingLeft: 2,
+  },
+  bulletMarker: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    color: '#EA580C',
+    minWidth: 12,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#1E293B',
+  },
+  inlineBold: {
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  inlineCode: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    backgroundColor: '#E2E8F0',
+    color: '#0F172A',
+    paddingHorizontal: 4,
+    borderRadius: 4,
+  },
+  financialSummaryCard: {
+    marginTop: 4,
+    padding: 9,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  financialSummaryTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  financialSummaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  financialSummaryPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 7,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  financialSummaryPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  telemetryFooter: {
+    marginTop: 6,
+    paddingTop: 5,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  telemetryText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
   },
   failedTag: {
     fontSize: 11,
@@ -542,11 +1023,18 @@ const styles = StyleSheet.create({
   typingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    paddingVertical: 12,
   },
   typingText: {
     fontSize: 13,
-    color: '#6B7280',
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  typingSubtext: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
   },
   errorBox: {
     flexDirection: 'row',

@@ -114,27 +114,21 @@ export default function PatientBillingView({
 
   return (
     <View style={styles.container} testID="patient-billing-view">
-      {/* Search Bar */}
-      {searchVisible ? (
-        <View style={styles.searchCard} testID="patient-billing-search-box">
-          <Search size={18} color="#9CA3AF" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search statement #, provider, or service..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={onChangeSearchQuery}
-            testID="patient-billing-search-input"
-          />
-          {searchQuery.length > 0 ? (
-            <Pressable
-              onPress={() => onChangeSearchQuery('')}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search query"
-            >
-              <X size={18} color="#9CA3AF" />
-            </Pressable>
-          ) : null}
+      {/* Active Search Filter Pill (when filtered outside the search modal) */}
+      {!searchVisible && searchQuery.trim().length > 0 ? (
+        <View style={styles.searchCard} testID="patient-billing-search-active-pill">
+          <Search size={16} color="#EA580C" />
+          <Text style={[styles.searchInput, { fontWeight: '600' }]}>
+            Filtered by: "{searchQuery.trim()}"
+          </Text>
+          <Pressable
+            onPress={() => onChangeSearchQuery('')}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search query"
+            testID="patient-billing-clear-inline-search-btn"
+          >
+            <X size={18} color="#64748B" />
+          </Pressable>
         </View>
       ) : null}
 

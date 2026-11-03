@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
@@ -77,7 +78,7 @@ export function useKeyboardOverlapPadding(cardRef: React.RefObject<View | null>)
   return padding;
 }
 
-export default function BillingModalShell({
+export function BillingModalShell({
   visible,
   onClose,
   title,
@@ -94,6 +95,8 @@ export default function BillingModalShell({
 }: BillingModalShellProps) {
   const cardRef = useRef<View>(null);
   const keyboardPadding = useKeyboardOverlapPadding(cardRef);
+  const { width: windowWidth } = useWindowDimensions();
+  const isCompactMobile = windowWidth > 0 && windowWidth < 480;
 
   const handleBackdrop = useCallback(() => {
     Keyboard.dismiss();
@@ -104,7 +107,7 @@ export default function BillingModalShell({
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, isCompactMobile && styles.backdropMobile]}>
         <Pressable
           style={StyleSheet.absoluteFillObject}
           onPress={handleBackdrop}
@@ -114,15 +117,33 @@ export default function BillingModalShell({
         />
         <View
           ref={cardRef}
-          style={[styles.modalContainer, size === 'tall' ? styles.sizeTall : styles.sizeAuto]}
+          style={[
+            styles.modalContainer,
+            isCompactMobile && styles.modalContainerMobile,
+            size === 'tall'
+              ? isCompactMobile
+                ? styles.sizeTallMobile
+                : styles.sizeTall
+              : styles.sizeAuto,
+          ]}
           testID={testID}
         >
-          <View style={styles.header}>
+          <View style={[styles.header, isCompactMobile && styles.headerMobile]}>
             <View style={styles.headerTitleContainer}>
-              <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={2}>
+              <Text
+                style={[styles.headerTitle, isCompactMobile && styles.headerTitleMobile]}
+                accessibilityRole="header"
+                numberOfLines={2}
+              >
                 {title}
               </Text>
-              {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
+              {subtitle ? (
+                <Text
+                  style={[styles.headerSubtitle, isCompactMobile && styles.headerSubtitleMobile]}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
               <Pressable
                 testID={closeTestID}
                 style={styles.closeIconButton}
@@ -189,6 +210,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  backdropMobile: {
+    padding: 10,
+  },
   modalContainer: {
     maxWidth: 460,
     width: '100%',
@@ -197,10 +221,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
   },
+  modalContainerMobile: {
+    padding: 14,
+    borderRadius: 20,
+  },
   sizeTall: {
     height: '78%',
     maxHeight: 640,
     minHeight: 440,
+  },
+  sizeTallMobile: {
+    height: '86%',
+    maxHeight: 740,
+    minHeight: 420,
   },
   sizeAuto: {
     maxHeight: '85%',
@@ -211,6 +244,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     flexShrink: 0,
+  },
+  headerMobile: {
+    marginBottom: 8,
+    paddingBottom: 8,
   },
   headerTitleContainer: {
     position: 'relative',
@@ -225,12 +262,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
+  headerTitleMobile: {
+    fontSize: 17,
+    marginBottom: 2,
+  },
   headerSubtitle: {
     fontSize: 13,
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 8,
+  },
+  headerSubtitleMobile: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   closeIconButton: {
     position: 'absolute',
@@ -259,3 +304,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
 });
+
+export default BillingModalShell;
+

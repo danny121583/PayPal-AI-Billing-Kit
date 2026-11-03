@@ -140,8 +140,16 @@ We do **not** claim all 46 official tools execute unconditionally in Sandbox. Li
 | :---: | :---: | :---: | :---: |
 | ![Paid PDF Receipt](./docs/screenshots/11-pdf-receipt-live-card-paid.png) | ![Refunded PDF Receipt](./docs/screenshots/12-pdf-receipt-live-card-refunded.png) | ![Partial Refund PDF Receipt](./docs/screenshots/13-pdf-receipt-partial-refund.png) | ![Sample Demo PDF Receipt](./docs/screenshots/14-pdf-receipt-sample-demo-1003.png) |
 
-### 8. Responsive Mobile Layouts (`430x932` Viewport)
-| Mobile Provider Dashboard (`Dr. Sarah Jenkins`) | Mobile Customer Dashboard (`Alex Rivera`) |
+### 8. Responsive Mobile Layouts, Global Search, Browser Checkout & Notification Deep-Linking (`320px`–`430px` Viewports)
+| Compact Mobile Provider Dashboard (`390x844`) | Global Billing Search Modal (`Invoices, Customers, Payments, Refunds`) |
+| :---: | :---: |
+| ![Compact Mobile Header](./docs/screenshots/mobile-polish/04-after-mobile-header-390px.png) | ![Mobile Global Search](./docs/screenshots/mobile-polish/05-after-mobile-global-search.png) |
+
+| Billing Notifications Deep-Linking (`Back to Notifications`) | Billing AI `2s` Processing Hold & Structured Markdown Summary | PayPal Browser Checkout Panel (`appSwitchEligible=false`) |
+| :---: | :---: | :---: |
+| ![Notification Opened Statement](./docs/screenshots/mobile-polish/07-after-mobile-notification-opened-statement.png) | ![Mobile AI Formatted Response](./docs/screenshots/mobile-polish/09-after-mobile-ai-formatted-response.png) | ![PayPal Browser Checkout Panel](./docs/screenshots/mobile-polish/10-after-mobile-paypal-browser-checkout-panel.png) |
+
+| Mobile Provider Dashboard (`430x932`) | Mobile Customer Dashboard (`430x932`) |
 | :---: | :---: |
 | ![Mobile Provider Dashboard](./docs/screenshots/15-mobile-provider-dashboard.png) | ![Mobile Customer Dashboard](./docs/screenshots/16-mobile-customer-dashboard.png) |
 

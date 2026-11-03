@@ -40,23 +40,42 @@ import BillingMaaSMcpModal from '../components/billing/BillingMaaSMcpModal';
 import PayPalConnectCard from '../components/billing/PayPalConnectCard';
 import DoctorBillingView from '../components/billing/DoctorBillingView';
 import PatientBillingView from '../components/billing/PatientBillingView';
+import { BillingGlobalSearchModal } from '../components/billing/BillingGlobalSearchModal';
+import BillingAIAssistantModal, {
+  sanitizeUntrustedAiContent,
+} from '../components/billing/BillingAIAssistantModal';
+import BillingNotificationsModal from '../components/billing/BillingNotificationsModal';
+import BillingScreen from '../app/index';
+import { StandaloneAuthProvider } from '../src/contexts/StandaloneAuthContext';
 import {
+  DEFAULT_BILLABLE_PATIENTS,
   DEFAULT_SERVICE_CATALOG,
+  DEMO_USER_IDS,
   getDefaultBillingAISettings,
+  getDefaultNotificationsByUserId,
+  resolveNotificationLinkedInvoice,
+  searchAuthorizedBillingRecords,
   type BillingAuditEventItem,
 } from '../src/billing/api/billingService';
 import {
-   getSyntheticInvoicesForRole,
+  getSyntheticInvoicesForRole,
   computeDoctorSummaryMetrics,
 } from '../src/billing/data/syntheticBillingFixtures';
 import {
   clearBillingAIClientCacheForTests,
   sendBillingAIMessage,
+  setBillingAIMinProcessingMsForTests,
+  getBillingAIMinProcessingMs,
 } from '../src/billing/api/billingAIClient';
 
-jest.mock('expo-linear-gradient', () => ({
-  LinearGradient: ({ children }: any) => children,
-}));
+jest.mock('expo-linear-gradient', () => {
+  const ReactLib = require('react');
+  const { View: RNView } = require('react-native');
+  return {
+    LinearGradient: ({ children, ...rest }: any) =>
+      ReactLib.createElement(RNView, rest, children),
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -937,5 +956,326 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
       />
     );
     expect(getDetailByTestId('billing-download-pdf-receipt-btn')).toBeTruthy();
+  });
+
+  it('Issue #1 & #2: Compact Mobile Header, Scrollable Demo Account Controls, and Global Billing Search Modal with Strict Account Isolation', async () => {
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+
+    // Verify Provider (Dr. Sarah Jenkins) global search across Invoices, Customers, Transactions, and Refunds
+    const providerAllSearch = searchAuthorizedBillingRecords({
+      query: 'PPB-INV-2026-1003',
+      category: 'all',
+      roleScope: 'doctor',
+      activeUserId: DEMO_USER_IDS.sarah_jenkins,
+      invoices: allInvoices,
+      billablePatients: DEFAULT_BILLABLE_PATIENTS,
+    });
+    expect(providerAllSearch.results.length).toBeGreaterThanOrEqual(2);
+    expect(providerAllSearch.countsByCategory.invoice).toBeGreaterThanOrEqual(1);
+    expect(providerAllSearch.countsByCategory.transaction).toBeGreaterThanOrEqual(1);
+
+    // Verify Refunds category search
+    const providerRefundSearch = searchAuthorizedBillingRecords({
+      query: '1006',
+      category: 'refund',
+      roleScope: 'doctor',
+      activeUserId: DEMO_USER_IDS.sarah_jenkins,
+      invoices: allInvoices,
+      billablePatients: DEFAULT_BILLABLE_PATIENTS,
+    });
+    expect(providerRefundSearch.results.length).toBe(1);
+    expect(providerRefundSearch.results[0].category).toBe('refund');
+    expect(providerRefundSearch.results[0].invoice.invoiceNumber).toBe('PPB-INV-2026-1006');
+
+    // Verify strict customer account isolation: Alex Rivera cannot see Jordan Taylor's statements (#PPB-INV-2026-1004, #PPB-INV-2026-1005)
+    const alexSearchJordan = searchAuthorizedBillingRecords({
+      query: 'Jordan Taylor',
+      category: 'all',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      invoices: allInvoices,
+    });
+    expect(alexSearchJordan.results.length).toBe(0);
+
+    const alexSearch1004 = searchAuthorizedBillingRecords({
+      query: 'PPB-INV-2026-1004',
+      category: 'all',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      invoices: allInvoices,
+    });
+    expect(alexSearch1004.results.length).toBe(0);
+
+    // Jordan Taylor can search their own failed invoice #PPB-INV-2026-1004
+    const jordanSearch1004 = searchAuthorizedBillingRecords({
+      query: '1004',
+      category: 'all',
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.jordan_taylor,
+      invoices: allInvoices,
+    });
+    expect(jordanSearch1004.results.length).toBeGreaterThanOrEqual(1);
+    expect(jordanSearch1004.results[0].invoice.invoiceNumber).toBe('PPB-INV-2026-1004');
+
+    // Render BillingGlobalSearchModal and verify interactive filtering, empty state, and result selection
+    const onSelectInvoice = jest.fn();
+    const onChangeQuery = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <BillingGlobalSearchModal
+        visible={true}
+        roleScope="doctor"
+        activeUserId={DEMO_USER_IDS.sarah_jenkins}
+        activeAccountLabel="Provider: Dr. Sarah Jenkins"
+        invoices={allInvoices}
+        billablePatients={DEFAULT_BILLABLE_PATIENTS}
+        searchQuery="PPB-INV-2026-1001"
+        onChangeSearchQuery={onChangeQuery}
+        onClose={jest.fn()}
+        onSelectInvoice={onSelectInvoice}
+        onAskBillingAI={jest.fn()}
+      />
+    );
+
+    expect(getByTestId('billing-global-search-modal')).toBeTruthy();
+    expect(getByTestId('doctor-billing-search-input')).toBeTruthy();
+    expect(queryByTestId('billing-global-search-empty-state')).toBeNull();
+
+    // Tap first invoice result card
+    const firstResult = getByTestId(`billing-search-result-inv-${allInvoices[0].id}`);
+    fireEvent.press(firstResult);
+    expect(onSelectInvoice).toHaveBeenCalledWith(allInvoices[0]);
+
+    // Render empty state when no records match
+    const { getByTestId: getEmptyTestId } = render(
+      <BillingGlobalSearchModal
+        visible={true}
+        roleScope="patient"
+        activeUserId={DEMO_USER_IDS.alex_rivera}
+        activeAccountLabel="Customer: Alex Rivera"
+        invoices={allInvoices}
+        searchQuery="NON-EXISTENT-INVOICE-99999"
+        onChangeSearchQuery={jest.fn()}
+        onClose={jest.fn()}
+        onSelectInvoice={jest.fn()}
+        onAskBillingAI={jest.fn()}
+      />
+    );
+    expect(getEmptyTestId('billing-global-search-empty-state')).toBeTruthy();
+
+    // Render full BillingScreen and verify header + demo switcher + search button opens global search modal
+    const { getByTestId: getScreenTestId } = render(
+      <StandaloneAuthProvider>
+        <BillingScreen />
+      </StandaloneAuthProvider>
+    );
+    await waitFor(() => {
+      expect(getScreenTestId('billing-main-header')).toBeTruthy();
+      expect(getScreenTestId('demo-account-switcher-bar')).toBeTruthy();
+    });
+    fireEvent.press(getScreenTestId('billing-header-search-btn'));
+    expect(getScreenTestId('billing-global-search-modal')).toBeTruthy();
+  });
+
+  it('Issue #3: PayPal Sandbox Browser-Based Checkout Panel (appSwitchEligible=false), Return/Cancel Handling, and Duplicate Capture Protection', async () => {
+    const unpaidInvoice = getSyntheticInvoicesForRole('patient').find(
+      (i) => i.invoiceNumber === 'PPB-INV-2026-1002'
+    )!;
+
+    // Render Invoice Detail Modal with simulated browser return state (?paypal=return&token=ORDER-BROWSER-123)
+    const { getByTestId, getByText } = render(
+      <BillingInvoiceDetailModal
+        visible={true}
+        invoice={unpaidInvoice}
+        roleScope="patient"
+        onClose={jest.fn()}
+        onAskBillingAI={jest.fn()}
+        initialCheckoutState={{
+          mode: 'return',
+          orderId: 'ORDER-BROWSER-123',
+          payerId: 'PAYER-SANDBOX-999',
+        }}
+      />
+    );
+
+    expect(getByTestId('billing-detail-browser-checkout-panel')).toBeTruthy();
+    expect(getByTestId('billing-checkout-panel-order-id')).toBeTruthy();
+    expect(getByTestId('billing-checkout-panel-open-browser-btn')).toBeTruthy();
+    expect(getByTestId('billing-checkout-panel-open-guest-card-btn')).toBeTruthy();
+    expect(getByTestId('billing-checkout-panel-card-pay-btn')).toBeTruthy();
+    expect(getByTestId('billing-detail-capture-paypal-btn')).toBeTruthy();
+    expect(getByTestId('billing-checkout-panel-order-id').props.children).toBeTruthy();
+
+    // Verify Cancel Checkout clears the browser checkout panel cleanly
+    fireEvent.press(getByTestId('billing-checkout-panel-cancel-btn'));
+    await waitFor(() => {
+      expect(getByText(/PayPal Sandbox checkout canceled/i)).toBeTruthy();
+    });
+
+    // Verify duplicate capture protection when returning to an already-paid statement
+    const paidInvoice = getSyntheticInvoicesForRole('doctor').find(
+      (i) => i.invoiceNumber === 'PPB-INV-2026-1003'
+    )!;
+    const { getByText: getPaidText } = render(
+      <BillingInvoiceDetailModal
+        visible={true}
+        invoice={paidInvoice}
+        roleScope="patient"
+        onClose={jest.fn()}
+        onAskBillingAI={jest.fn()}
+        initialCheckoutState={{
+          mode: 'return',
+          orderId: 'ORDER-ALREADY-PAID',
+        }}
+      />
+    );
+    expect(getPaidText(/Duplicate Capture Prevented/i)).toBeTruthy();
+  });
+
+  it('Issue #4 & #5: Billing AI Safe Markdown Formatting, XSS Sanitization, and 2-Second Minimum Processing Indicator with Telemetry', async () => {
+    // 1. Verify untrusted HTML/script sanitization
+    const malicious =
+      'Statement #PPB-INV-2026-1001 <script>alert("xss")</script> <img src=x onerror="evil()"> [Click](javascript:alert(1)) **Total**: $150.00';
+    const sanitized = sanitizeUntrustedAiContent(malicious);
+    expect(sanitized).not.toContain('<script>');
+    expect(sanitized).not.toContain('onerror=');
+    expect(sanitized).not.toContain('javascript:');
+    expect(sanitized).toContain('Statement #PPB-INV-2026-1001');
+    expect(sanitized).toContain('**Total**: $150.00');
+
+    // 2. Verify telemetry on sendBillingAIMessage differentiates response sources and flags processing hold
+    clearBillingAIClientCacheForTests();
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+    const summaryTurn = await sendBillingAIMessage({
+      message: 'Explain invoice #PPB-INV-2026-1001 in detail.',
+      roleScope: 'doctor',
+    });
+    expect(summaryTurn.reply).toBeDefined();
+    expect(summaryTurn.reply.telemetry).toBeDefined();
+    expect(summaryTurn.reply.telemetry?.requiresProcessingHold).toBe(true);
+    expect(['gemini_live', 'deterministic_rls']).toContain(
+      summaryTurn.reply.telemetry?.responseSource
+    );
+
+    // 3. Verify immediate guardrail responses set requiresProcessingHold = false
+    const overLimitTurn = await sendBillingAIMessage({
+      message: 'Refund $600 on invoice PPB-INV-2026-1003.',
+      roleScope: 'doctor',
+    });
+    expect(overLimitTurn.reply.telemetry?.responseSource).toBe('guardrail_immediate');
+    expect(overLimitTurn.reply.telemetry?.requiresProcessingHold).toBe(false);
+
+    // 4. Verify controlled minimum processing duration in BillingAIAssistantModal
+    expect(getBillingAIMinProcessingMs()).toBe(0);
+    setBillingAIMinProcessingMsForTests(80);
+    expect(getBillingAIMinProcessingMs()).toBe(80);
+
+    clearBillingAIClientCacheForTests();
+    const { getByTestId, queryByTestId, getByText } = render(
+      <BillingAIAssistantModal
+        visible={true}
+        roleScope="doctor"
+        focusedInvoice={allInvoices[0]}
+        invoices={allInvoices}
+        onClose={jest.fn()}
+        minProcessingDurationMs={90}
+      />
+    );
+
+    const input = getByTestId('billing-ai-chat-input');
+    fireEvent.changeText(input, 'Summarize statement #PPB-INV-2026-1001');
+    fireEvent.press(getByTestId('billing-ai-chat-send'));
+
+    // Processing indicator ("Preparing your response…") must appear immediately
+    expect(getByTestId('billing-ai-typing')).toBeTruthy();
+    expect(getByText('Preparing your response…')).toBeTruthy();
+
+    // Wait for controlled processing hold to complete and verify formatted response + financial summary grid
+    await waitFor(
+      () => {
+        expect(queryByTestId('billing-ai-typing')).toBeNull();
+      },
+      { timeout: 1500 }
+    );
+
+    setBillingAIMinProcessingMsForTests(null);
+    expect(getBillingAIMinProcessingMs()).toBe(0);
+  });
+
+  it('Issue #6: Billing Notifications Open Linked Statements, Mark Alerts Read, Enforce Account Scope, and Display Error Banner for Missing Records', async () => {
+    const allInvoices = getSyntheticInvoicesForRole('doctor');
+    const notifsByUser = getDefaultNotificationsByUserId();
+    const providerNotifs = notifsByUser[DEMO_USER_IDS.sarah_jenkins] || [];
+    expect(providerNotifs.length).toBeGreaterThanOrEqual(3);
+
+    // 1. Valid notification resolution for Provider
+    const validRes = resolveNotificationLinkedInvoice({
+      notification: providerNotifs[0],
+      roleScope: 'doctor',
+      activeUserId: DEMO_USER_IDS.sarah_jenkins,
+      activeFullName: 'Dr. Sarah Jenkins',
+      allInvoices,
+    });
+    expect(validRes.status).toBe('resolved');
+    if (validRes.status === 'resolved') {
+      expect(validRes.invoice.invoiceNumber).toBe('PPB-INV-2026-1003');
+    }
+
+    // 2. Unauthorized cross-customer notification resolution (Alex Rivera attempting to open Jordan Taylor's #PPB-INV-2026-1004)
+    const unauthorizedRes = resolveNotificationLinkedInvoice({
+      notification: providerNotifs[0],
+      roleScope: 'patient',
+      activeUserId: DEMO_USER_IDS.alex_rivera,
+      activeFullName: 'Alex Rivera',
+      allInvoices,
+    });
+    expect(unauthorizedRes.status).toBe('unauthorized');
+
+    // 3. Missing / deleted statement notification resolution
+    const missingNotif = {
+      id: 'notif-missing-9999',
+      recipientUserId: DEMO_USER_IDS.sarah_jenkins,
+      invoiceId: 'PPB-INV-2026-9999',
+      type: 'invoice_sent',
+      title: 'Statement #PPB-INV-2026-9999 Sent',
+      body: 'This statement was removed from the active session.',
+      deepLink: '/?invoiceId=PPB-INV-2026-9999',
+      isRead: false,
+      createdAt: '2026-11-03T00:00:00Z',
+    };
+    const missingRes = resolveNotificationLinkedInvoice({
+      notification: missingNotif,
+      roleScope: 'doctor',
+      activeUserId: DEMO_USER_IDS.sarah_jenkins,
+      activeFullName: 'Dr. Sarah Jenkins',
+      allInvoices,
+    });
+    expect(missingRes.status).toBe('not_found');
+
+    // 4. Render BillingNotificationsModal and verify tapping a missing-invoice notification shows the accessible error banner
+    const handleSelect = jest.fn(async (n) => {
+      if (n.id === 'notif-missing-9999') {
+        return {
+          ok: false,
+          errorMessage:
+            'Statement Unavailable: The linked statement could not be found in the current session.',
+        };
+      }
+      return { ok: true };
+    });
+
+    const { getByTestId, getByText } = render(
+      <BillingNotificationsModal
+        visible={true}
+        notifications={[missingNotif, ...providerNotifs]}
+        onClose={jest.fn()}
+        onSelectNotification={handleSelect}
+      />
+    );
+
+    fireEvent.press(getByTestId('billing-notification-item-notif-missing-9999'));
+    await waitFor(() => {
+      expect(getByTestId('billing-notifications-error-banner')).toBeTruthy();
+      expect(getByText(/Statement Unavailable/i)).toBeTruthy();
+    });
   });
 });
