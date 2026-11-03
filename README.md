@@ -18,7 +18,7 @@
 | **Vercel MCP Mirror** | `https://paypal-ai-billing-kit.vercel.app/api/mcp` | Mirror JSON-RPC 2.0 MCP endpoint |
 | **OpenAPI 3.1.0 Spec** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/openapi.json` | Machine-readable OpenAPI 3.1.0 schema for ChatGPT Custom GPT Actions |
 | **Interactive MCP Docs** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/docs/mcp` | Human-readable MCP documentation and curl examples |
-| **Downloadable PDF Receipt API** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1003.pdf` | Binary PDF 1.4 receipt download (`Content-Type: application/pdf`) |
+| **Downloadable PDF Receipt API (Sample Link)** | `https://paypal-ai-billing-mcp.apd1034.workers.dev/api/receipts/PPB-INV-2026-1003.pdf` | Sample PDF 1.4 receipt (`#PPB-INV-2026-1003`) for instant viewing; every PayPal Sandbox transaction dynamically generates its own unique receipt via `/api/receipts/:invoice_number.pdf` (`Content-Type: application/pdf`) |
 
 ---
 
@@ -43,7 +43,7 @@
 3. **Real End-to-End PayPal Sandbox Payments & Refunds:**
    - Creates real PayPal Sandbox Orders (`POST /v2/checkout/orders`), enforces genuine buyer approval on `sandbox.paypal.com`, captures payments (`POST /v2/checkout/orders/{id}/capture`), and executes partial or full refunds (`POST /v2/payments/captures/{id}/refund`).
 4. **Professional Merchant-Branded PDF 1.4 Receipts:**
-   - Generates merchant-first downloadable PDF receipts (`GET /api/receipts/:invoice_number.pdf`) and base64-encoded PDFs inside `get_payment_receipt` and `generate_receipt_pdf` featuring **Jenkins Wellness & Telehealth Practice** (`Provider: Dr. Sarah Jenkins`), distinct state titles (`Payment Receipt — Paid`, `Payment & Refund Receipt — Refunded`, `Payment Receipt — Partially Refunded`, `Sample Demo Receipt — Not a Real PayPal Payment`), PayPal Order/Capture/Refund IDs, card brand & last 4 digits, `"Payment processed through PayPal"` attribution, and `"This receipt was generated electronically. Please retain it for your records."` footer.
+   - Dynamically generates a unique, merchant-first downloadable PDF receipt (`GET /api/receipts/:invoice_number.pdf`) and base64-encoded PDF inside `get_payment_receipt` and `generate_receipt_pdf` for every paid or refunded statement (`#PPB-INV-2026-1003.pdf` is provided above as a sample PDF for quick viewing, while all live PayPal Sandbox transactions generate their own unique receipt with their real PayPal Order, Capture, and Refund IDs). Features **Jenkins Wellness & Telehealth Practice** (`Provider: Dr. Sarah Jenkins`), distinct state titles (`Payment Receipt — Paid`, `Payment & Refund Receipt — Refunded`, `Payment Receipt — Partially Refunded`, `Sample Demo Receipt — Not a Real PayPal Payment`), card brand & last 4 digits, `"Payment processed through PayPal"` attribution, and `"This receipt was generated electronically. Please retain it for your records."` footer.
 
 ---
 
