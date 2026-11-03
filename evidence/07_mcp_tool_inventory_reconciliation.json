@@ -1,0 +1,760 @@
+{
+  "generated_at": "2026-11-03T03:00:48.196Z",
+  "canonical_registry_path": "packages/paypal-billing-kit/src/mcpRegistry.ts",
+  "summary": {
+    "total_tools": 30,
+    "baseline_v1_6_tools": 26,
+    "v1_7_sandbox_card_and_pdf_tools": 4,
+    "by_source": {
+      "native_app": 21,
+      "official_paypal_mcp": 1,
+      "paypal_rest_adapter": 8
+    },
+    "by_permission_tier": {
+      "read_only": 18,
+      "proposal_only": 3,
+      "confirmed_write": 9
+    },
+    "verification_checks_passed": 38,
+    "verification_checks_failed": 0
+  },
+  "discrepancy_root_cause_analysis": {
+    "chatgpt_live_discovery_count": 30,
+    "previous_ag_report_count": 26,
+    "causes": [
+      "1. Four real PayPal Sandbox direct-card & PDF receipt tools (`paypal_check_card_eligibility`, `execute_sandbox_card_payment`, `generate_receipt_pdf`, `run_sandbox_card_lifecycle_test`) were added in v1.7.0 (expanding the catalog from 26 to 30 tools), but `worker/src/index.ts` initialize instructions, `/docs/mcp` HTML headers, and `mcpRegistry.ts` `discover_billing_capabilities` description still contained hardcoded \"26 tools\" strings from v1.6.0.",
+      "2. `supabase/functions/billing-maas-mcp/index.ts` `initialize` instructions and OpenAPI summary still contained a hardcoded \"15 billing tools\" string from v1.3.0, and `discover_billing_capabilities` omitted `execute_sandbox_card_payment` and `run_sandbox_card_lifecycle_test` from `paypalRestAdapterTools` (reporting 23/1/6 instead of 21/1/8).",
+      "3. `scripts/verify-maas-mcp.mjs` previously invoked only 26 of the 30 tools and saved its output to `evidence/01_mcp_agent_interface_26_checks.txt`.",
+      "4. Non-existent tool names (`get_billing_summary`, `list_invoices`, `list_customer_accounts`, `list_service_catalog`, `get_guardrail_policy`, `approve_billing_proposal`, `generate_invoice_pdf_receipt`) have 0 occurrences in the repository or git history; they appeared only in an early synthetic task-log preview before `scripts/verify-maas-mcp.mjs` wrote its real output."
+    ]
+  },
+  "endpoints": {
+    "cloudflare": {
+      "url": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
+      "http_status_get": 200,
+      "http_status_initialize": 200,
+      "http_status_tools_list": 200,
+      "protocol_version": "2025-06-18",
+      "server_info": {
+        "name": "paypal-ai-billing-kit-mcp",
+        "title": "PayPal AI Billing Kit MCP",
+        "version": "2.0.0"
+      },
+      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 30 billing tools (21 Native Application tools + 1 Official PayPal MCP Discovery tool + 8 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
+      "tools_count": 30,
+      "unique_tools_count": 30,
+      "duplicates": [],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "schema_mismatches": []
+    },
+    "supabase": {
+      "url": "https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp",
+      "http_status_get": 200,
+      "http_status_initialize": 200,
+      "http_status_tools_list": 200,
+      "protocol_version": "2025-06-18",
+      "server_info": {
+        "name": "paypal-ai-billing-kit-mcp",
+        "title": "PayPal AI Billing Kit MCP",
+        "version": "2.0.0"
+      },
+      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 30 billing tools (21 Native Application tools + 1 Official PayPal MCP Discovery tool + 8 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
+      "tools_count": 30,
+      "unique_tools_count": 30,
+      "duplicates": [],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "schema_mismatches": []
+    },
+    "vercel": {
+      "url": "https://paypal-ai-billing-kit.vercel.app/api/mcp",
+      "http_status_get": 200,
+      "http_status_initialize": 200,
+      "http_status_tools_list": 200,
+      "protocol_version": "2025-06-18",
+      "server_info": {
+        "name": "paypal-ai-billing-kit-mcp",
+        "title": "PayPal AI Billing Kit MCP",
+        "version": "2.0.0"
+      },
+      "instructions": "Standalone PayPal AI Billing Kit Unified MCP Server. Provides 30 billing tools (21 Native Application tools + 1 Official PayPal MCP Discovery tool + 8 PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.",
+      "tools_count": 30,
+      "unique_tools_count": 30,
+      "duplicates": [],
+      "missing_tools": [],
+      "unexpected_tools": [],
+      "schema_mismatches": []
+    }
+  },
+  "tools": [
+    {
+      "index": 1,
+      "name": "discover_billing_capabilities",
+      "title": "Discover Billing Capabilities",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 2,
+      "name": "list_demo_customers",
+      "title": "List Demo Customers & Personas",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:",
+      "required_params": [],
+      "parameter_names": [],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 3,
+      "name": "search_invoices",
+      "title": "Search Billing Invoices",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:customer_id:string,customer_name:string,demo_session_id:string,query:string,status:string[all,draft,overdue,paid,refunded,sent,void]",
+      "required_params": [],
+      "parameter_names": [
+        "query",
+        "status",
+        "customer_name",
+        "customer_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 4,
+      "name": "get_invoice_details",
+      "title": "Get Invoice Details & Breakdown",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:demo_session_id:string,invoice_id:string,invoice_number:string",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "invoice_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 5,
+      "name": "create_invoice_proposal",
+      "title": "Propose New Invoice Creation",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:amount_minor,customer_name,service_code|props:amount_minor:integer,customer_name:string,demo_session_id:string,due_date:string,due_in_days:integer,send_immediately:boolean,service_code:string",
+      "required_params": [
+        "customer_name",
+        "service_code",
+        "amount_minor"
+      ],
+      "parameter_names": [
+        "customer_name",
+        "service_code",
+        "amount_minor",
+        "due_date",
+        "due_in_days",
+        "send_immediately",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 6,
+      "name": "create_approved_invoice",
+      "title": "Create Approved Demo Invoice",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:actor_role:string[customer,doctor,patient,provider],amount_minor:integer,customer_name:string,demo_session_id:string,due_date:string,explicit_human_approval:boolean,proposal_id:string,send_immediately:boolean,service_code:string,user_instruction:string",
+      "required_params": [],
+      "parameter_names": [
+        "proposal_id",
+        "user_instruction",
+        "actor_role",
+        "customer_name",
+        "service_code",
+        "amount_minor",
+        "due_date",
+        "send_immediately",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 7,
+      "name": "explain_outstanding_balances",
+      "title": "Explain Outstanding Balances",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:customer_name:string,demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "customer_name",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 8,
+      "name": "get_transaction_history",
+      "title": "Get Transaction History",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,invoice_number:string",
+      "required_params": [],
+      "parameter_names": [
+        "invoice_number",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 9,
+      "name": "prepare_payment_proposal",
+      "title": "Prepare Payment Proposal",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:customer_name:string,demo_session_id:string,invoice_id:string,invoice_number:string",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "invoice_id",
+        "customer_name",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 10,
+      "name": "void_unpaid_invoice",
+      "title": "Void Unpaid Invoice",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:actor_role:string[customer,doctor,patient,provider],demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,invoice_number:string,reason:string,user_instruction:string",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "invoice_id",
+        "reason",
+        "user_instruction",
+        "actor_role",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 11,
+      "name": "prepare_refund_proposal",
+      "title": "Prepare Refund Proposal",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:amount_minor:integer,demo_session_id:string,invoice_id:string,invoice_number:string,reason:string,refund_amount_minor:integer",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "invoice_id",
+        "amount_minor",
+        "refund_amount_minor",
+        "reason",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 12,
+      "name": "get_financial_audit_history",
+      "title": "Get Financial Audit Trail",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,limit:integer",
+      "required_params": [],
+      "parameter_names": [
+        "limit",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 13,
+      "name": "get_paypal_sandbox_status",
+      "title": "Check PayPal Sandbox Status",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:",
+      "required_params": [],
+      "parameter_names": [],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 14,
+      "name": "get_business_metrics",
+      "title": "Get Practice & Customer Financial KPIs",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 15,
+      "name": "reset_demo_session",
+      "title": "Reset Demo Session Statements",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 16,
+      "name": "create_paypal_checkout_order",
+      "title": "Create PayPal Sandbox Checkout Order",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:actor_role:string[customer,doctor,patient,provider],demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,invoice_number:string,proposal_id:string,user_instruction:string",
+      "required_params": [],
+      "parameter_names": [
+        "proposal_id",
+        "user_instruction",
+        "actor_role",
+        "invoice_number",
+        "invoice_id",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 17,
+      "name": "capture_paypal_checkout_order",
+      "title": "Capture Approved PayPal Order or Settle Demo Invoice",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:allow_demo_settlement_fallback:boolean,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,invoice_number:string,order_id:string",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "invoice_id",
+        "order_id",
+        "allow_demo_settlement_fallback",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 18,
+      "name": "get_payment_receipt",
+      "title": "Get Payment Receipt & Confirmation",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:demo_session_id:string,invoice_id:string,invoice_number:string",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "invoice_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 19,
+      "name": "execute_approved_refund",
+      "title": "Execute Approved Refund",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:actor_role:string[customer,doctor,patient,provider],amount_minor:integer,demo_session_id:string,explicit_human_approval:boolean,invoice_id:string,invoice_number:string,proposal_id:string,refund_amount_minor:integer,user_instruction:string",
+      "required_params": [],
+      "parameter_names": [
+        "proposal_id",
+        "user_instruction",
+        "actor_role",
+        "invoice_number",
+        "invoice_id",
+        "amount_minor",
+        "refund_amount_minor",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 20,
+      "name": "execute_conversational_instruction",
+      "title": "Execute Conversational Billing Instruction",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:instruction|props:actor_role:string[customer,doctor,patient,provider],demo_session_id:string,instruction:string,prior_execution_intent:boolean",
+      "required_params": [
+        "instruction"
+      ],
+      "parameter_names": [
+        "instruction",
+        "actor_role",
+        "prior_execution_intent",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 21,
+      "name": "paypal_discover_official_mcp",
+      "title": "Discover Official PayPal MCP Server Capabilities",
+      "source": "official_paypal_mcp",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 22,
+      "name": "paypal_get_order",
+      "title": "PayPal Sandbox: Get Order Details (Orders v2)",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:order_id|props:demo_session_id:string,order_id:string",
+      "required_params": [
+        "order_id"
+      ],
+      "parameter_names": [
+        "order_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 23,
+      "name": "paypal_get_refund",
+      "title": "PayPal Sandbox: Get Refund Details (Captures v2)",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:refund_id|props:demo_session_id:string,refund_id:string",
+      "required_params": [
+        "refund_id"
+      ],
+      "parameter_names": [
+        "refund_id",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 24,
+      "name": "paypal_list_invoices",
+      "title": "PayPal Sandbox: List Merchant Invoices (Invoicing v2)",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,page:integer,page_size:integer",
+      "required_params": [],
+      "parameter_names": [
+        "page",
+        "page_size",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 25,
+      "name": "paypal_generate_invoice_number",
+      "title": "PayPal Sandbox: Generate Next Invoice Number",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 26,
+      "name": "paypal_list_disputes",
+      "title": "PayPal Sandbox: List Customer Disputes",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string,page_size:integer",
+      "required_params": [],
+      "parameter_names": [
+        "page_size",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 27,
+      "name": "paypal_check_card_eligibility",
+      "title": "PayPal Sandbox: Check Direct Card Payment Eligibility",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:demo_session_id:string",
+      "required_params": [],
+      "parameter_names": [
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 28,
+      "name": "execute_sandbox_card_payment",
+      "title": "Execute Authorized PayPal Sandbox Card Payment",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:card_profile:string[amex_sandbox,decline_expired,decline_insufficient_funds,decline_refused,mastercard_sandbox,visa_sandbox],demo_session_id:string,explicit_human_approval:boolean,intent:string[AUTHORIZE,CAPTURE],invoice_number:string,proposal_id:string,user_instruction:string",
+      "required_params": [],
+      "parameter_names": [
+        "proposal_id",
+        "user_instruction",
+        "invoice_number",
+        "card_profile",
+        "intent",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 29,
+      "name": "generate_receipt_pdf",
+      "title": "Generate & Validate PDF Payment Receipt",
+      "source": "native_application",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:invoice_number|props:demo_session_id:string,invoice_number:string",
+      "required_params": [
+        "invoice_number"
+      ],
+      "parameter_names": [
+        "invoice_number",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    },
+    {
+      "index": 30,
+      "name": "run_sandbox_card_lifecycle_test",
+      "title": "Run Full PayPal Sandbox Card Lifecycle Integration Test",
+      "source": "paypal_rest_adapter",
+      "requires_auth_or_approval": false,
+      "schema_fingerprint": "type:object|req:|props:amount_minor:integer,card_profile:string[amex_sandbox,mastercard_sandbox,visa_sandbox],demo_session_id:string,explicit_human_approval:boolean,include_refund:boolean",
+      "required_params": [],
+      "parameter_names": [
+        "amount_minor",
+        "card_profile",
+        "include_refund",
+        "explicit_human_approval",
+        "demo_session_id"
+      ],
+      "availability": {
+        "chatgpt": true,
+        "cloudflare_gateway": true,
+        "supabase_mcp": true,
+        "vercel_mcp_proxy": true,
+        "ui_mcp_modal": true
+      }
+    }
+  ]
+}

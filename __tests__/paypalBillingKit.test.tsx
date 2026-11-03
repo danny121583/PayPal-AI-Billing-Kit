@@ -28,6 +28,7 @@ import {
   computeGeminiUsageMetrics,
   UNIFIED_MCP_TOOL_REGISTRY,
   UNIFIED_MCP_REGISTRY_SUMMARY,
+  computeToolSchemaFingerprint,
 } from '../packages/paypal-billing-kit/src';
 import BillingAISettingsModal, {
   formatAuditEventLabel,
@@ -610,6 +611,28 @@ describe('Standalone PayPal AI Billing Kit — Section 4 UI Corrections', () => 
     expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp).toBe(1);
     expect(UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter).toBe(8);
     expect(UNIFIED_MCP_TOOL_REGISTRY.length).toBe(30);
+
+    const uniqueNames = new Set(UNIFIED_MCP_TOOL_REGISTRY.map((t) => t.name));
+    expect(uniqueNames.size).toBe(30);
+
+    const nonExistentLegacyNames = [
+      'get_billing_summary',
+      'list_invoices',
+      'list_customer_accounts',
+      'list_service_catalog',
+      'get_guardrail_policy',
+      'approve_billing_proposal',
+      'generate_invoice_pdf_receipt',
+    ];
+    for (const badName of nonExistentLegacyNames) {
+      expect(uniqueNames.has(badName)).toBe(false);
+    }
+
+    for (const tool of UNIFIED_MCP_TOOL_REGISTRY) {
+      expect(tool.inputSchema?.type).toBe('object');
+      expect(typeof tool.annotations?.title).toBe('string');
+      expect(computeToolSchemaFingerprint(tool.inputSchema)).toMatch(/^type:object\|req:.*\|props:/);
+    }
 
     // Anti-spoofing conversational authorization checks
     const spoofedRole = evaluateConversationalAuthorization({

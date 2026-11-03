@@ -1212,7 +1212,8 @@ function evaluateConversationalInstructionServer(params: {
 interface MCPToolDef {
   name: string;
   description: string;
-  permissionTier: 'read_only' | 'proposal_only' | 'confirmed_demo_write';
+  permissionTier: "read_only" | "proposal_only" | "confirmed_demo_write";
+  source: "native_application" | "official_paypal_mcp" | "paypal_rest_adapter";
   annotations: {
     title: string;
     readOnlyHint: boolean;
@@ -1225,942 +1226,1058 @@ interface MCPToolDef {
 
 const MCP_TOOLS: MCPToolDef[] = [
   {
-    name: 'discover_billing_capabilities',
-    description:
-      'Discover all PayPal AI Billing Kit MCP Agent Interface capabilities, guardrails ($500 single-action / $2,500 daily limits), demo personas, service catalog codes, and permission tiers.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Discover Billing Capabilities',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
+    "name": "discover_billing_capabilities",
+    "description": "[READ_ONLY] Discover the Unified MCP Gateway catalog (30 tools across Native Application (21), Official PayPal MCP Discovery (1), and PayPal Sandbox REST-Backed Adapters (8)), $500/$2,500 guardrails, demo personas, and ADMIN-* service codes.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Discover Billing Capabilities",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
     },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated visitor/agent demo session ID (default: mcp-public-demo).',
-        },
-      },
-    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated visitor/agent demo session ID (default: maas-public-demo)."
+        }
+      }
+    }
   },
   {
-    name: 'list_demo_customers',
-    description:
-      'List fictional Provider and Customer demo accounts (Dr. Sarah Jenkins, Alex Rivera, Jordan Taylor) and their active billing authorization status.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'List Demo Customers & Personas',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
+    "name": "list_demo_customers",
+    "description": "[READ_ONLY] List the Provider (Merchant) account (Dr. Sarah Jenkins) and linked Customer (Buyer) accounts (Alex Rivera, Jordan Taylor) with active billing authorization status.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "List Demo Customers & Personas",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
     },
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
   },
   {
-    name: 'search_invoices',
-    description:
-      'Search and filter billing statements by status (sent, overdue, paid, draft, void, refunded), customer name/ID, or query text within an isolated demo session.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Search Billing Invoices',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
+    "name": "search_invoices",
+    "description": "[READ_ONLY] Search and filter billing statements by status (all, sent, overdue, paid, draft, void, refunded), customer name/ID, or free-text query within an isolated demo session.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Search Billing Invoices",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
     },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Free-text search matching invoice number, customer name, or service description.',
-        },
-        status: {
-          type: 'string',
-          enum: ['all', 'sent', 'overdue', 'paid', 'draft', 'void', 'refunded'],
-          description: 'Optional status filter.',
-        },
-        customer_name: {
-          type: 'string',
-          description: 'Optional customer name filter (e.g., "Alex Rivera" or "Jordan Taylor").',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_invoice_details',
-    description:
-      'Retrieve comprehensive line items, service dates, issued/due/paid timestamps, original vs. remaining balance, payment attempts, settlement verification status, and a natural-language explanation for a specific invoice (by invoice_number like PPB-INV-2026-1003 or UUID).',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Get Invoice Details & Explanation',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Invoice number (e.g., "PPB-INV-2026-1003" or "1003").',
-        },
-        invoice_id: {
-          type: 'string',
-          description: 'Invoice UUID if known.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'create_invoice_proposal',
-    description:
-      'Prepare a human-in-the-loop administrative invoice proposal for an authorized customer (Alex Rivera or Jordan Taylor). Enforces the $500.00 single-action and $2,500.00 daily Billing AI guardrails and stores a pending proposal card.',
-    permissionTier: 'proposal_only',
-    annotations: {
-      title: 'Create Invoice Proposal (Guardrail-Checked)',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['customer_name', 'service_code'],
-      properties: {
-        customer_name: {
-          type: 'string',
-          description: 'Authorized customer name ("Alex Rivera" or "Jordan Taylor").',
-        },
-        service_code: {
-          type: 'string',
-          description:
-            'Catalog service code (ADMIN-TELEHEALTH, ADMIN-FOLLOWUP, ADMIN-OFFICE, ADMIN-FORMS, ADMIN-RECORDS, ADMIN-COPAY, ADMIN-CAREPLAN, ADMIN-PRIORAUTH).',
-        },
-        amount_minor: {
-          type: 'integer',
-          description: 'Amount in USD cents (e.g. 3500 for $35.00). Max 50000 ($500.00) for AI proposals.',
-        },
-        due_date: {
-          type: 'string',
-          description: 'Optional ISO due date (YYYY-MM-DD). Defaults to 14 days from today.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'create_approved_invoice',
-    description:
-      'Execute an approved invoice creation within the isolated demo session. Either provide a pending `proposal_id` or pass customer_name, service_code, amount_minor, and `explicit_human_approval: true`.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Create Approved Demo Invoice',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        proposal_id: {
-          type: 'string',
-          description: 'UUID of a pending create_invoice proposal to approve and execute.',
-        },
-        user_instruction: {
-          type: 'string',
-          description:
-            'Optional explicit natural-language user instruction authorizing invoice creation (e.g., "Create an invoice for Alex for $150.").',
-        },
-        actor_role: {
-          type: 'string',
-          enum: ['doctor', 'patient', 'provider', 'customer'],
-          description: 'Active user role (must be doctor/provider to create invoices).',
-        },
-        customer_name: {
-          type: 'string',
-          description: 'Authorized customer name ("Alex Rivera" or "Jordan Taylor") if creating directly.',
-        },
-        service_code: {
-          type: 'string',
-          description: 'Service code (e.g., ADMIN-FORMS, ADMIN-TELEHEALTH).',
-        },
-        amount_minor: {
-          type: 'integer',
-          description: 'Unit amount in USD cents (e.g., 3500 for $35.00). Max 50000 ($500.00).',
-        },
-        send_immediately: {
-          type: 'boolean',
-          description: 'Whether to mark the invoice as sent immediately (default: true).',
-        },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Must be true to confirm human approval of this billing write.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'explain_outstanding_balances',
-    description:
-      'Explain outstanding balances, overdue statements, and upcoming due dates for the Provider practice or for a specific Customer (Alex Rivera or Jordan Taylor).',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Explain Outstanding Balances',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        customer_name: {
-          type: 'string',
-          description: 'Optional customer name ("Alex Rivera" or "Jordan Taylor") to scope the balance explanation.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_transaction_history',
-    description:
-      'Retrieve recorded settlements, refunds, and payment attempts (including failed attempts and failure diagnostics), clearly distinguishing seeded sample demo records from live PayPal Sandbox captures.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Get Transaction & Payment Attempt History',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Optional invoice number filter.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'prepare_payment_proposal',
-    description:
-      'Prepare a customer payment checkout proposal for an unpaid invoice. Never charges funds autonomously; returns the 5-stage PayPal Sandbox human authorization workflow and creates a pending payment_checkout proposal.',
-    permissionTier: 'proposal_only',
-    annotations: {
-      title: 'Prepare Customer Payment Proposal',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['invoice_number'],
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Unpaid invoice number (e.g., "PPB-INV-2026-1001" or "PPB-INV-2026-1002").',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'void_unpaid_invoice',
-    description:
-      'Void an eligible unpaid (draft, sent, or overdue) invoice in the isolated demo session. Enforces Payment-State Protection: paid or refunded invoices are strictly blocked from voiding.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Void Eligible Unpaid Invoice',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['invoice_number'],
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Invoice number to void (e.g., "PPB-INV-2026-1005" or a newly created session invoice).',
-        },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Set true to execute the void immediately in the demo session; if false/omitted, creates a pending void_invoice proposal.',
-        },
-        user_instruction: {
-          type: 'string',
-          description:
-            'Optional explicit natural-language user instruction authorizing the void (e.g., "Void invoice 1004.").',
-        },
-        actor_role: {
-          type: 'string',
-          enum: ['doctor', 'patient', 'provider', 'customer'],
-          description: 'Active user role (must be doctor/provider to void invoices).',
-        },
-        reason: {
-          type: 'string',
-          description: 'Optional administrative reason for voiding.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'prepare_refund_proposal',
-    description:
-      'Prepare a provider refund proposal for a paid invoice (e.g., #PPB-INV-2026-1003). Validates that the invoice has captured funds before creating the refund proposal.',
-    permissionTier: 'proposal_only',
-    annotations: {
-      title: 'Prepare Refund Proposal',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['invoice_number'],
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Paid invoice number (e.g., "PPB-INV-2026-1003").',
-        },
-        amount_minor: {
-          type: 'integer',
-          description: 'Optional partial refund amount in USD cents (defaults to full paid balance).',
-        },
-        reason: {
-          type: 'string',
-          description: 'Administrative refund reason.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_financial_audit_history',
-    description:
-      'Read the immutable, append-only financial audit trail (billing_audit_events) showing invoice creations, voids, AI proposals, guardrail checks, and settlements.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Get Financial Audit History',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: {
-          type: 'integer',
-          description: 'Max audit events to return (1-50, default 20).',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_paypal_sandbox_status',
-    description:
-      'Check PayPal Sandbox merchant and payer connection status, sandbox environment enforcement, and whether live PayPal Sandbox REST API credentials are configured on the server.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Get PayPal Sandbox Connection Status',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'get_business_metrics',
-    description:
-      'Calculate comprehensive Provider practice and Customer KPI metrics (outstanding balance, pending, overdue, paid total, refunded total, failed attempts, and collection rate) for the demo session.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Get Business & Practice Billing Metrics',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'reset_demo_session',
-    description:
-      'Reset an isolated demo session (`demo_session_id`), clearing session-specific test invoices, proposals, and overrides while restoring the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Reset Isolated Demo Session',
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier to reset (default: maas-public-demo).',
-        },
-      },
-    },
-  },
-  {
-    name: 'create_paypal_checkout_order',
-    description:
-      'Create a protected PayPal Sandbox checkout order (`POST /v2/checkout/orders`) for an unpaid statement or approved `payment_checkout` proposal (`proposal_id`). Requires `explicit_human_approval: true`. Returns the PayPal Order ID and buyer approval URL when live Sandbox credentials are configured, or explicit Sandbox readiness status.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Create PayPal Sandbox Checkout Order',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        proposal_id: {
-          type: 'string',
-          description: 'Optional UUID of a pending payment_checkout proposal prepared by prepare_payment_proposal.',
-        },
-        user_instruction: {
-          type: 'string',
-          description:
-            'Optional explicit natural-language user instruction authorizing payment checkout initiation (e.g., "Pay invoice 1002.").',
-        },
-        actor_role: {
-          type: 'string',
-          enum: ['doctor', 'patient', 'provider', 'customer'],
-          description: 'Active user role.',
-        },
-        invoice_number: {
-          type: 'string',
-          description: 'Unpaid invoice number (e.g., "PPB-INV-2026-1001" or "PPB-INV-2026-1004").',
-        },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Must be true to confirm human approval before creating a PayPal checkout order.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'capture_paypal_checkout_order',
-    description:
-      'Capture an approved PayPal Sandbox checkout order (`order_id`) after buyer approval, or execute an explicitly labeled Demo Settlement (`allow_demo_settlement_fallback: true`) in an isolated demo session (`demo_session_id`). Updates the ledger and issues a receipt.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Capture Approved PayPal Order or Settle Demo Invoice',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['invoice_number'],
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Invoice number being settled (e.g., "PPB-INV-2026-1001" or "PPB-INV-2026-1004").',
-        },
-        order_id: {
-          type: 'string',
-          description: 'PayPal Sandbox Order ID returned by create_paypal_checkout_order after buyer approval.',
-        },
-        allow_demo_settlement_fallback: {
-          type: 'boolean',
-          description: 'When true and live PayPal Sandbox buyer capture is not provided, settles the invoice in the isolated demo session clearly marked as a Sample Demo Record (never fabricated as a live PayPal capture).',
-        },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Must be true to confirm human approval of settlement.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_payment_receipt',
-    description:
-      'Retrieve the structured payment receipt and PayPal confirmation metadata for a paid or refunded statement (`invoice_number`), clearly distinguishing verified PayPal Sandbox captures from sample demo settlements.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Get Payment Receipt & Confirmation',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['invoice_number'],
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Paid or refunded invoice number (e.g., "PPB-INV-2026-1003").',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'execute_approved_refund',
-    description:
-      'Execute an approved provider refund for a paid statement (`invoice_number` or `proposal_id` from `prepare_refund_proposal`) with `explicit_human_approval: true`. Issues a PayPal Captures v2 refund when a verified PayPal capture exists, or records a demo session refund in the isolated `demo_session_id`.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Execute Approved Refund',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        proposal_id: {
-          type: 'string',
-          description: 'UUID of a pending refund proposal created by prepare_refund_proposal.',
-        },
-        user_instruction: {
-          type: 'string',
-          description:
-            'Optional explicit natural-language user instruction authorizing this refund (e.g., "Refund the $125 payment on invoice 1003").',
-        },
-        actor_role: {
-          type: 'string',
-          enum: ['doctor', 'patient', 'provider', 'customer'],
-          description: 'Authenticated role executing the instruction (must be doctor/provider for refunds).',
-        },
-        invoice_number: {
-          type: 'string',
-          description: 'Paid invoice number to refund (e.g., "PPB-INV-2026-1003").',
-        },
-        amount_minor: {
-          type: 'integer',
-          description: 'Optional refund amount in USD cents (defaults to full paid balance).',
-        },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Must be true to confirm human approval before executing the refund.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'execute_conversational_instruction',
-    description:
-      'Context-aware Conversational Authorization router: evaluates a natural-language user instruction ("Create an invoice for Alex for $150.", "Void invoice 1004.", "Refund the $50 payment.", "Pay invoice 1002.", "Reset the demo.", "Yes, go ahead.", "Are you able to issue refunds?", "Can you pay invoice 1002?", "What would happen if I refunded it?") and executes explicit authorized commands within role and $500/$2,500 guardrails while explaining capability or hypothetical questions without mutating state.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Execute Conversational Billing Instruction',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['instruction'],
-      properties: {
-        instruction: {
-          type: 'string',
-          description: 'Exact natural-language user instruction or question.',
-        },
-        actor_role: {
-          type: 'string',
-          enum: ['doctor', 'patient', 'provider', 'customer'],
-          description: 'Active user role (default: doctor/provider).',
-        },
-        prior_execution_intent: {
-          type: 'boolean',
-          description: 'True only if prior conversation turns already established execution intent.',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_discover_official_mcp',
-    description:
-      '[OFFICIAL_PAYPAL_MCP] Connect server-side to PayPal’s official Sandbox MCP server (https://mcp.sandbox.paypal.com/sse and /.well-known/oauth-authorization-server, plus probe /http) using the merchant Sandbox OAuth token, returning live serverInfo (PayPal MCP Agent v1.0.0), the 46 upstream official PayPal MCP tools, and transport status.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Discover Official PayPal MCP Server Capabilities',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_get_order',
-    description:
-      '[PAYPAL_REST_ADAPTER] Official PayPal `get_order` capability: retrieve live order details directly from PayPal Sandbox Orders v2 API (`GET /v2/checkout/orders/{order_id}`), returning order status, intent, payer, purchase units, and capture IDs.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'PayPal Sandbox: Get Order Details (Orders v2)',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['order_id'],
-      properties: {
-        order_id: {
-          type: 'string',
-          description: 'PayPal Sandbox Order ID (e.g., "7FA47897KM5938009").',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_get_refund',
-    description:
-      '[PAYPAL_REST_ADAPTER] Official PayPal `get_refund` capability: retrieve live refund details directly from PayPal Sandbox Captures v2 API (`GET /v2/payments/refunds/{refund_id}`), returning refund status, amount, note_to_payer, and seller payable breakdown.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'PayPal Sandbox: Get Refund Details (Captures v2)',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      required: ['refund_id'],
-      properties: {
-        refund_id: {
-          type: 'string',
-          description: 'PayPal Sandbox Refund ID (e.g., "2EM77813GU330222M").',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_list_invoices',
-    description:
-      '[PAYPAL_REST_ADAPTER] Official PayPal `list_invoices` capability: query PayPal Sandbox Invoicing v2 API (`GET /v2/invoicing/invoices`) alongside synchronized application statements.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'PayPal Sandbox: List Merchant Invoices (Invoicing v2)',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        page: {
-          type: 'integer',
-          description: 'Page number (default: 1).',
-        },
-        page_size: {
-          type: 'integer',
-          description: 'Page size (default: 10).',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_generate_invoice_number',
-    description:
-      '[PAYPAL_REST_ADAPTER] Official PayPal `generate_invoice_number` capability: call PayPal Sandbox Invoicing v2 API (`POST /v2/invoicing/generate-next-invoice-number`) to allocate the next official PayPal merchant invoice number.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'PayPal Sandbox: Generate Next Invoice Number',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_list_disputes',
-    description:
-      '[PAYPAL_REST_ADAPTER] Official PayPal `list_disputes` capability: query PayPal Sandbox Customer Disputes API (`GET /v1/customer/disputes`) to inspect open merchant disputes.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'PayPal Sandbox: List Customer Disputes',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        page_size: {
-          type: 'integer',
-          description: 'Number of disputes to return (1-50, default 10).',
-        },
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'paypal_check_card_eligibility',
-    description:
-      '[PAYPAL_REST_ADAPTER] Check PayPal Sandbox merchant eligibility for Orders v2 direct card payments (`payment_source.card`), granted OAuth 2.0 scopes (`payments/payment/authcapture`, `client-payments-eligibility`), supported PayPal Sandbox test card profiles (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`), and security controls.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'PayPal Sandbox: Check Direct Card Payment Eligibility',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        demo_session_id: {
-          type: 'string',
-          description: 'Optional isolated demo session identifier.',
-        },
-      },
-    },
-  },
-  {
-    name: 'execute_sandbox_card_payment',
-    description:
-      'Execute an authorized server-side PayPal Sandbox direct card payment (`POST /v2/checkout/orders` with `payment_source.card`) using an allowlisted PayPal Sandbox test card profile (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`). Rejects caller-supplied raw PAN/CVV, verifies capture directly against PayPal Orders v2, and records 8-state payment-attempt classification (`captured`, `authorized`, `payment_declined`, `processing_error`).',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Execute Authorized PayPal Sandbox Card Payment',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        proposal_id: {
-          type: 'string',
-          description: 'Optional UUID of a pending payment_checkout proposal prepared by prepare_payment_proposal.',
-        },
-        user_instruction: {
-          type: 'string',
-          description: 'Optional explicit natural-language user instruction authorizing payment (e.g., "Pay invoice 1002.").',
-        },
-        invoice_number: {
-          type: 'string',
-          description: 'Unpaid invoice number (e.g., "PPB-INV-2026-1001" or a session invoice).',
-        },
-        card_profile: {
-          type: 'string',
-          enum: [
-            'visa_sandbox',
-            'mastercard_sandbox',
-            'amex_sandbox',
-            'decline_refused',
-            'decline_expired',
-            'decline_insufficient_funds',
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Free-text search matching invoice number, customer name, or service description."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "all",
+            "sent",
+            "overdue",
+            "paid",
+            "draft",
+            "void",
+            "refunded"
           ],
-          description: 'Allowlisted server-side PayPal Sandbox test card profile (default: visa_sandbox).',
+          "description": "Optional status filter."
         },
-        intent: {
-          type: 'string',
-          enum: ['CAPTURE', 'AUTHORIZE'],
-          description: 'PayPal Orders v2 intent (default: CAPTURE).',
+        "customer_name": {
+          "type": "string",
+          "description": "Optional customer name filter (e.g., \"Alex Rivera\" or \"Jordan Taylor\")."
         },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Must be true to confirm human approval before executing the Sandbox card payment.',
+        "customer_id": {
+          "type": "string",
+          "description": "Optional customer UUID or name filter."
         },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
-        },
-      },
-    },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
   },
   {
-    name: 'generate_receipt_pdf',
-    description:
-      'Generate and validate a downloadable PDF payment receipt (`%PDF-1.4`) for a paid or refunded statement (`invoice_number`), returning base64 PDF content, direct download URL, byte length, and provenance/refund metadata. Rejects unpaid statements.',
-    permissionTier: 'read_only',
-    annotations: {
-      title: 'Generate & Validate PDF Payment Receipt',
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
+    "name": "get_invoice_details",
+    "description": "[READ_ONLY] Retrieve full line items, service dates, payment attempts (including 8-state attempt classification and failure diagnostics), and plain-English explanation for a specific invoice.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Get Invoice Details & Breakdown",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
     },
-    inputSchema: {
-      type: 'object',
-      required: ['invoice_number'],
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'Paid or refunded invoice number (e.g., "PPB-INV-2026-1003" or "PPB-INV-2026-1057").',
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Invoice number (e.g., \"PPB-INV-2026-1003\" or \"1003\")."
         },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID if known."
         },
-      },
-    },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
   },
   {
-    name: 'run_sandbox_card_lifecycle_test',
-    description:
-      'Execute a complete, isolated PayPal Sandbox integration lifecycle test (1. Create Test Invoice -> 2. Execute Sandbox Card Order & Capture -> 3. Direct PayPal Order Lookup -> 4. Receipt & PDF Verification -> 5. Live PayPal Refund -> 6. Direct PayPal Refund Lookup -> 7. Audit & Metrics Reconciliation). Sandbox-only and rate-limited.',
-    permissionTier: 'confirmed_demo_write',
-    annotations: {
-      title: 'Run Full PayPal Sandbox Card Lifecycle Integration Test',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
+    "name": "create_invoice_proposal",
+    "description": "[PROPOSAL_ONLY] Prepare an AI-drafted invoice proposal checked against the $500 single-action and $2,500 daily guardrails and return a session-bound proposal_id.",
+    "permissionTier": "proposal_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Propose New Invoice Creation",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
     },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        amount_minor: {
-          type: 'integer',
-          description: 'Optional test invoice amount in USD cents (default: 3500 for $35.00, max: 10000 for $100.00).',
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "customer_name",
+        "service_code",
+        "amount_minor"
+      ],
+      "properties": {
+        "customer_name": {
+          "type": "string",
+          "description": "Authorized customer name (\"Alex Rivera\" or \"Jordan Taylor\")."
         },
-        card_profile: {
-          type: 'string',
-          enum: ['visa_sandbox', 'mastercard_sandbox', 'amex_sandbox'],
-          description: 'Allowlisted PayPal Sandbox test card profile (default: visa_sandbox).',
+        "service_code": {
+          "type": "string",
+          "description": "Administrative service code (e.g., ADMIN-FORMS, ADMIN-TELEHEALTH)."
         },
-        include_refund: {
-          type: 'boolean',
-          description: 'Whether to also execute and verify a live PayPal Sandbox refund after capture (default: true).',
+        "amount_minor": {
+          "type": "integer",
+          "description": "Unit amount in USD cents (e.g., 3500 for $35.00). Max 50000 ($500.00)."
         },
-        explicit_human_approval: {
-          type: 'boolean',
-          description: 'Must be true to authorize the automated Sandbox integration test.',
+        "due_date": {
+          "type": "string",
+          "description": "Optional ISO due date (YYYY-MM-DD). Defaults to 14 days from today."
         },
-        demo_session_id: {
-          type: 'string',
-          description: 'Isolated demo session identifier.',
+        "due_in_days": {
+          "type": "integer",
+          "description": "Optional days until invoice is due (default: 14)."
         },
-      },
-    },
+        "send_immediately": {
+          "type": "boolean",
+          "description": "Whether invoice should be sent immediately upon approval (default: true)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
   },
+  {
+    "name": "create_approved_invoice",
+    "description": "[CONFIRMED_WRITE] Create an invoice inside the isolated demo session using either a verified proposal_id + explicit_human_approval: true OR an unambiguous provider user_instruction.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Create Approved Demo Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "description": "One-time session-bound proposal_id returned by create_invoice_proposal."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit natural-language user instruction authorizing invoice creation (e.g., \"Create an invoice for Alex for $150.\")."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "patient",
+            "provider",
+            "customer"
+          ],
+          "description": "Active user role (must be doctor/provider to create invoices)."
+        },
+        "customer_name": {
+          "type": "string",
+          "description": "Authorized customer name (\"Alex Rivera\" or \"Jordan Taylor\") if creating via user_instruction."
+        },
+        "service_code": {
+          "type": "string",
+          "description": "Service code (e.g., ADMIN-FORMS, ADMIN-TELEHEALTH)."
+        },
+        "amount_minor": {
+          "type": "integer",
+          "description": "Unit amount in USD cents (Max 50000)."
+        },
+        "due_date": {
+          "type": "string",
+          "description": "Optional ISO due date (YYYY-MM-DD)."
+        },
+        "send_immediately": {
+          "type": "boolean",
+          "description": "Whether to mark the invoice as sent immediately (default: true)."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to confirm human approval of this billing write."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "explain_outstanding_balances",
+    "description": "[READ_ONLY] Generate a natural-language breakdown of outstanding, overdue, and paid statement balances for the practice or a specific customer.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Explain Outstanding Balances",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "customer_name": {
+          "type": "string",
+          "description": "Optional customer name (\"Alex Rivera\" or \"Jordan Taylor\") to filter by."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_transaction_history",
+    "description": "[READ_ONLY] Retrieve settlement captures, refunds, and payment attempts with explicit verification provenance (paypal_sandbox_verified vs sample_demo_settlement_not_live_paypal).",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Get Transaction History",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Optional invoice number filter."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "prepare_payment_proposal",
+    "description": "[PROPOSAL_ONLY] Prepare a payment checkout proposal for an unpaid or failed statement and return a session-bound proposal_id.",
+    "permissionTier": "proposal_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Prepare Payment Proposal",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Unpaid invoice number to pay (e.g., \"PPB-INV-2026-1001\" or \"PPB-INV-2026-1002\")."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "customer_name": {
+          "type": "string",
+          "description": "Optional name of the paying customer."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "void_unpaid_invoice",
+    "description": "[CONFIRMED_WRITE] Void an unpaid Draft, Sent, or Overdue statement in the isolated demo session (enforces Payment-State Protection blocking void on paid or refunded invoices).",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Void Unpaid Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Invoice number to void (e.g., \"PPB-INV-2026-1005\" or a newly created session invoice)."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Administrative reason for voiding."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit natural-language user instruction authorizing the void (e.g., \"Void invoice 1004.\")."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "patient",
+            "provider",
+            "customer"
+          ],
+          "description": "Active user role (must be doctor/provider to void invoices)."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to confirm human approval."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "prepare_refund_proposal",
+    "description": "[PROPOSAL_ONLY] Prepare a provider refund proposal for a paid statement after verifying captured funds and return a session-bound proposal_id.",
+    "permissionTier": "proposal_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Prepare Refund Proposal",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Paid invoice number to refund (e.g., \"PPB-INV-2026-1003\")."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "amount_minor": {
+          "type": "integer",
+          "description": "Optional partial refund amount in USD cents (defaults to full paid balance)."
+        },
+        "refund_amount_minor": {
+          "type": "integer",
+          "description": "Alias for amount_minor: refund amount in USD cents (defaults to full paid balance)."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Administrative refund reason."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_financial_audit_history",
+    "description": "[READ_ONLY] Read the session-isolated, immutable, append-only financial audit trail (billing_audit_events).",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Get Financial Audit Trail",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum events to retrieve (default: 20, max: 50)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_paypal_sandbox_status",
+    "description": "[READ_ONLY] Check PayPal Sandbox merchant/buyer connection states, live OAuth 2.0 token reachability, App ID, and Unified MCP Gateway status.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Check PayPal Sandbox Status",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_business_metrics",
+    "description": "[READ_ONLY] Calculate Provider practice and Customer KPI metrics (total outstanding, overdue, paid, refunded, failed payment attempts, and collection rate).",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Get Practice & Customer Financial KPIs",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "reset_demo_session",
+    "description": "[CONFIRMED_WRITE] Reset an isolated demo_session_id, clearing session-specific test invoices, proposals, and overrides while restoring the 6 canonical seed statements (#PPB-INV-2026-1001 through #PPB-INV-2026-1006).",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Reset Demo Session Statements",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier to reset."
+        }
+      }
+    }
+  },
+  {
+    "name": "create_paypal_checkout_order",
+    "description": "[CONFIRMED_WRITE] Create a real PayPal Sandbox checkout order (POST /v2/checkout/orders) from a verified payment proposal_id or explicit customer user_instruction, returning the PayPal Order ID and buyer approvalUrl.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Create PayPal Sandbox Checkout Order",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional session-bound proposal_id prepared by prepare_payment_proposal."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit natural-language user instruction authorizing payment checkout initiation (e.g., \"Pay invoice 1002.\")."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "patient",
+            "provider",
+            "customer"
+          ],
+          "description": "Active user role."
+        },
+        "invoice_number": {
+          "type": "string",
+          "description": "Unpaid invoice number (e.g., \"PPB-INV-2026-1001\" or \"PPB-INV-2026-1004\")."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to confirm human approval before creating a PayPal checkout order."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "capture_paypal_checkout_order",
+    "description": "[CONFIRMED_WRITE] Capture a buyer-approved PayPal Sandbox order (POST /v2/checkout/orders/{id}/capture) and verify settlement, or record an explicitly labeled demo settlement override when allow_demo_settlement_fallback is true.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Capture Approved PayPal Order or Settle Demo Invoice",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Invoice number being settled (e.g., \"PPB-INV-2026-1001\" or \"PPB-INV-2026-1004\")."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "order_id": {
+          "type": "string",
+          "description": "PayPal Sandbox Order ID returned by create_paypal_checkout_order after buyer approval."
+        },
+        "allow_demo_settlement_fallback": {
+          "type": "boolean",
+          "description": "When true and live PayPal Sandbox buyer capture is not provided, settles the invoice in the isolated demo session clearly marked as a Sample Demo Record."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to confirm human approval of settlement."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_payment_receipt",
+    "description": "[READ_ONLY] Retrieve a structured merchant-branded payment receipt AND downloadable PDF 1.4 receipt (pdf_download_url & pdf_base64) for a paid or refunded statement, including verified PayPal Capture ID and provenance.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Get Payment Receipt & Confirmation",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Paid or refunded invoice number (e.g., \"PPB-INV-2026-1003\")."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "execute_approved_refund",
+    "description": "[CONFIRMED_WRITE] Execute an authorized refund for a paid statement via PayPal Captures v2 (POST /v2/payments/captures/{id}/refund) using a verified refund proposal_id or unambiguous provider user_instruction.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Execute Approved Refund",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "description": "UUID or session-bound proposal_id of a pending refund proposal created by prepare_refund_proposal."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit natural-language user instruction authorizing this refund (e.g., \"Refund the $125 payment on invoice 1003\")."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "patient",
+            "provider",
+            "customer"
+          ],
+          "description": "Active user role (must be doctor/provider to issue refunds)."
+        },
+        "invoice_number": {
+          "type": "string",
+          "description": "Paid invoice number to refund (e.g., \"PPB-INV-2026-1003\")."
+        },
+        "invoice_id": {
+          "type": "string",
+          "description": "Optional invoice UUID."
+        },
+        "amount_minor": {
+          "type": "integer",
+          "description": "Optional refund amount in USD cents (defaults to full paid balance)."
+        },
+        "refund_amount_minor": {
+          "type": "integer",
+          "description": "Alias for amount_minor: refund amount in USD cents."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to confirm human approval before executing the refund."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "execute_conversational_instruction",
+    "description": "[CONFIRMED_WRITE] Context-aware Conversational Authorization router: evaluates a natural-language user instruction (\"Create an invoice for Alex for $150.\", \"Void invoice 1004.\", \"Refund the $50 payment.\", \"Pay invoice 1002.\", \"Reset the demo.\", \"Yes, go ahead.\", \"Are you able to issue refunds?\", \"Can you pay invoice 1002?\", \"What would happen if I refunded it?\") and executes explicit authorized commands within role and $500/$2,500 guardrails while explaining capability or hypothetical questions without mutating state.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "native_application",
+    "annotations": {
+      "title": "Execute Conversational Billing Instruction",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "instruction"
+      ],
+      "properties": {
+        "instruction": {
+          "type": "string",
+          "description": "Exact natural-language user instruction or question."
+        },
+        "actor_role": {
+          "type": "string",
+          "enum": [
+            "doctor",
+            "patient",
+            "provider",
+            "customer"
+          ],
+          "description": "Active user role (default: doctor/provider)."
+        },
+        "prior_execution_intent": {
+          "type": "boolean",
+          "description": "True only if prior conversation turns already established execution intent."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_discover_official_mcp",
+    "description": "[OFFICIAL_PAYPAL_MCP] Connect server-side to PayPal’s official Sandbox MCP server (https://mcp.sandbox.paypal.com/sse and /.well-known/oauth-authorization-server, plus probe /http) using the merchant Sandbox OAuth token, returning live serverInfo (PayPal MCP Agent v1.0.0), the 46 upstream official PayPal MCP tools, and transport status.",
+    "permissionTier": "read_only",
+    "source": "official_paypal_mcp",
+    "annotations": {
+      "title": "Discover Official PayPal MCP Server Capabilities",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_get_order",
+    "description": "[PAYPAL_REST_ADAPTER] Official PayPal `get_order` capability: retrieve live order details directly from PayPal Sandbox Orders v2 API (`GET /v2/checkout/orders/{order_id}`), returning order status, intent, payer, purchase units, and capture IDs.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal Sandbox: Get Order Details (Orders v2)",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "order_id"
+      ],
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "description": "PayPal Sandbox Order ID (e.g., \"7FA47897KM5938009\")."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_get_refund",
+    "description": "[PAYPAL_REST_ADAPTER] Official PayPal `get_refund` capability: retrieve live refund details directly from PayPal Sandbox Captures v2 API (`GET /v2/payments/refunds/{refund_id}`), returning refund status, amount, note_to_payer, and seller payable breakdown.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal Sandbox: Get Refund Details (Captures v2)",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "refund_id"
+      ],
+      "properties": {
+        "refund_id": {
+          "type": "string",
+          "description": "PayPal Sandbox Refund ID (e.g., \"2EM77813GU330222M\")."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_list_invoices",
+    "description": "[PAYPAL_REST_ADAPTER] Official PayPal `list_invoices` capability: query PayPal Sandbox Invoicing v2 API (`GET /v2/invoicing/invoices`) alongside synchronized application statements.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal Sandbox: List Merchant Invoices (Invoicing v2)",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "description": "Page number (default: 1)."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Page size (default: 10)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_generate_invoice_number",
+    "description": "[PAYPAL_REST_ADAPTER] Official PayPal `generate_invoice_number` capability: call PayPal Sandbox Invoicing v2 API (`POST /v2/invoicing/generate-next-invoice-number`) to allocate the next official PayPal merchant invoice number.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal Sandbox: Generate Next Invoice Number",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_list_disputes",
+    "description": "[PAYPAL_REST_ADAPTER] Official PayPal `list_disputes` capability: query PayPal Sandbox Customer Disputes API (`GET /v1/customer/disputes`) to inspect open merchant disputes.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal Sandbox: List Customer Disputes",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page_size": {
+          "type": "integer",
+          "description": "Number of disputes to return (1-50, default 10)."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "paypal_check_card_eligibility",
+    "description": "[PAYPAL_REST_ADAPTER] Check PayPal Sandbox merchant eligibility for Orders v2 direct card payments (`payment_source.card`), granted OAuth 2.0 scopes, supported PayPal Sandbox test card profiles (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`), and security controls.",
+    "permissionTier": "read_only",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "PayPal Sandbox: Check Direct Card Payment Eligibility",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "demo_session_id": {
+          "type": "string",
+          "description": "Optional isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "execute_sandbox_card_payment",
+    "description": "[CONFIRMED_WRITE] Execute an authorized server-side PayPal Sandbox direct card payment (`POST /v2/checkout/orders` with `payment_source.card`) using an allowlisted PayPal Sandbox test card profile (`visa_sandbox`, `mastercard_sandbox`, `amex_sandbox`, `decline_refused`, `decline_expired`, `decline_insufficient_funds`). Rejects caller-supplied raw PAN/CVV and verifies capture directly against PayPal Orders v2.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "Execute Authorized PayPal Sandbox Card Payment",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "description": "Optional UUID of a pending payment_checkout proposal prepared by prepare_payment_proposal."
+        },
+        "user_instruction": {
+          "type": "string",
+          "description": "Optional explicit natural-language user instruction authorizing payment (e.g., \"Pay invoice 1002.\")."
+        },
+        "invoice_number": {
+          "type": "string",
+          "description": "Unpaid invoice number (e.g., \"PPB-INV-2026-1001\" or a session invoice)."
+        },
+        "card_profile": {
+          "type": "string",
+          "enum": [
+            "visa_sandbox",
+            "mastercard_sandbox",
+            "amex_sandbox",
+            "decline_refused",
+            "decline_expired",
+            "decline_insufficient_funds"
+          ],
+          "description": "Allowlisted server-side PayPal Sandbox test card profile (default: visa_sandbox)."
+        },
+        "intent": {
+          "type": "string",
+          "enum": [
+            "CAPTURE",
+            "AUTHORIZE"
+          ],
+          "description": "PayPal Orders v2 intent (default: CAPTURE)."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to confirm human approval before executing the Sandbox card payment."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "generate_receipt_pdf",
+    "description": "[READ_ONLY] Generate and validate a downloadable merchant-branded PDF payment receipt (`%PDF-1.4`) for a paid or refunded statement (`invoice_number`), returning base64 PDF content, direct download URL, byte length, and provenance/refund metadata. Rejects unpaid statements.",
+    "permissionTier": "read_only",
+    "source": "native_application",
+    "annotations": {
+      "title": "Generate & Validate PDF Payment Receipt",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "invoice_number"
+      ],
+      "properties": {
+        "invoice_number": {
+          "type": "string",
+          "description": "Paid or refunded invoice number (e.g., \"PPB-INV-2026-1003\" or \"PPB-INV-2026-1057\")."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  },
+  {
+    "name": "run_sandbox_card_lifecycle_test",
+    "description": "[CONFIRMED_WRITE] Execute a complete, isolated PayPal Sandbox integration lifecycle test (1. Create Test Invoice -> 2. Execute Sandbox Card Order & Capture -> 3. Direct PayPal Order Lookup -> 4. Receipt & PDF Verification -> 5. Live PayPal Refund -> 6. Direct PayPal Refund Lookup -> 7. Audit & Metrics Reconciliation). Sandbox-only and rate-limited.",
+    "permissionTier": "confirmed_demo_write",
+    "source": "paypal_rest_adapter",
+    "annotations": {
+      "title": "Run Full PayPal Sandbox Card Lifecycle Integration Test",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "amount_minor": {
+          "type": "integer",
+          "description": "Optional test invoice amount in USD cents (default: 3500 for $35.00, max: 10000 for $100.00)."
+        },
+        "card_profile": {
+          "type": "string",
+          "enum": [
+            "visa_sandbox",
+            "mastercard_sandbox",
+            "amex_sandbox"
+          ],
+          "description": "Allowlisted PayPal Sandbox test card profile (default: visa_sandbox)."
+        },
+        "include_refund": {
+          "type": "boolean",
+          "description": "Whether to also execute and verify a live PayPal Sandbox refund after capture (default: true)."
+        },
+        "explicit_human_approval": {
+          "type": "boolean",
+          "description": "Must be true to authorize the automated Sandbox integration test."
+        },
+        "demo_session_id": {
+          "type": "string",
+          "description": "Isolated demo session identifier."
+        }
+      }
+    }
+  }
 ];
 
 async function fetchSessionInvoices(admin: any, demoSessionId: string) {
@@ -2428,6 +2545,8 @@ async function executeTool(
         'paypal_generate_invoice_number',
         'paypal_list_disputes',
         'paypal_check_card_eligibility',
+        'execute_sandbox_card_payment',
+        'run_sandbox_card_lifecycle_test',
       ];
 
       return {
@@ -2502,14 +2621,20 @@ async function executeTool(
         })),
         baseline_tools_count: 26,
         tools_count: MCP_TOOLS.length,
+        by_source: {
+          native_app: MCP_TOOLS.filter((t) => t.source === 'native_application').length,
+          official_paypal_mcp: MCP_TOOLS.filter((t) => t.source === 'official_paypal_mcp').length,
+          paypal_rest_adapter: MCP_TOOLS.filter((t) => t.source === 'paypal_rest_adapter').length,
+        },
+        by_tier: {
+          read_only: MCP_TOOLS.filter((t) => t.permissionTier === 'read_only').length,
+          proposal_only: MCP_TOOLS.filter((t) => t.permissionTier === 'proposal_only').length,
+          confirmed_demo_write: MCP_TOOLS.filter((t) => t.permissionTier === 'confirmed_demo_write').length,
+        },
         tools: MCP_TOOLS.map((t) => ({
           name: t.name,
           permission_tier: t.permissionTier,
-          source: officialPayPalTools.includes(t.name)
-            ? 'official_paypal_mcp'
-            : paypalRestAdapterTools.includes(t.name)
-              ? 'paypal_rest_adapter'
-              : 'native_application',
+          source: t.source,
           description: t.description,
         })),
       };
@@ -2535,13 +2660,17 @@ async function executeTool(
       const invoices = await fetchSessionInvoices(admin, demoSessionId);
       const q = String(args?.query || '').trim().toLowerCase();
       const statusFilter = String(args?.status || 'all').trim().toLowerCase();
-      const custFilter = String(args?.customer_name || '').trim().toLowerCase();
+      const custFilter = String(args?.customer_name || args?.customer_id || '').trim().toLowerCase();
 
       const filtered = invoices.filter((inv: any) => {
         if (statusFilter && statusFilter !== 'all' && inv.status.toLowerCase() !== statusFilter) {
           return false;
         }
-        if (custFilter && !inv.customer_name.toLowerCase().includes(custFilter)) {
+        if (
+          custFilter &&
+          !inv.customer_name.toLowerCase().includes(custFilter) &&
+          !String(inv.customer_id || '').toLowerCase().includes(custFilter)
+        ) {
           return false;
         }
         if (q) {
@@ -3346,7 +3475,9 @@ async function executeTool(
         };
       }
 
-      const refundMinor = Number(args?.amount_minor || target.amount_paid_minor || target.total_minor);
+      const refundMinor = Number(
+        args?.amount_minor || args?.refund_amount_minor || target.amount_paid_minor || target.total_minor
+      );
       if (refundMinor <= 0 || refundMinor > target.amount_paid_minor) {
         return {
           ok: false,
@@ -4342,8 +4473,8 @@ async function executeTool(
         };
       }
 
-      let rawNum = String(args?.invoice_number || '').trim().replace(/^#/, '');
-      let requestedAmountMinor = Number(args?.amount_minor || 0);
+      let rawNum = String(args?.invoice_number || args?.invoice_id || '').trim().replace(/^#/, '');
+      let requestedAmountMinor = Number(args?.amount_minor || args?.refund_amount_minor || 0);
       let rawProposalId = String(args?.proposal_id || '').trim();
 
       if (!rawProposalId && userInstruction) {
@@ -5750,8 +5881,7 @@ function buildOpenApiSpec(baseUrl: string) {
         },
         post: {
           operationId: 'invokeBillingMcpTool',
-          summary:
-            'Invoke any of the 15 PayPal AI Billing Kit tools via REST `{ tool, arguments, demo_session_id }` or MCP JSON-RPC 2.0 `{ jsonrpc: "2.0", method: "tools/call", params: { name, arguments } }`',
+          summary: `Invoke any of the ${MCP_TOOLS.length} PayPal AI Billing Kit tools via REST \`{ tool, arguments, demo_session_id }\` or MCP JSON-RPC 2.0 \`{ jsonrpc: "2.0", method: "tools/call", params: { name, arguments } }\``,
           requestBody: {
             required: true,
             content: {
@@ -5927,7 +6057,10 @@ Deno.serve(async (req: Request) => {
       const params = body.params || {};
 
       if (method === 'initialize') {
-        const clientVersion = String(params.protocolVersion || '2025-03-26');
+        const clientVersion = String(params.protocolVersion || '2025-06-18');
+        const nativeCount = MCP_TOOLS.filter((t) => t.source === 'native_application').length;
+        const officialCount = MCP_TOOLS.filter((t) => t.source === 'official_paypal_mcp').length;
+        const adapterCount = MCP_TOOLS.filter((t) => t.source === 'paypal_rest_adapter').length;
         return new Response(
           JSON.stringify({
             jsonrpc: '2.0',
@@ -5935,14 +6068,17 @@ Deno.serve(async (req: Request) => {
             result: {
               protocolVersion: clientVersion,
               capabilities: {
-                tools: { listChanged: false },
+                tools: { listChanged: true },
+                resources: { subscribe: false, listChanged: false },
+                prompts: { listChanged: false },
+                logging: {},
               },
               serverInfo: {
                 name: 'paypal-ai-billing-kit-mcp',
+                title: 'PayPal AI Billing Kit MCP',
                 version: '2.0.0',
               },
-              instructions:
-                'PayPal AI Billing Kit MCP Server. Provides 15 billing tools across Read-Only, Proposal-Only, and Confirmed Demo Write tiers with $500 single-action / $2,500 daily guardrails and isolated demo_session_id state.',
+              instructions: `Standalone PayPal AI Billing Kit Unified MCP Server. Provides ${MCP_TOOLS.length} billing tools (${nativeCount} Native Application tools + ${officialCount} Official PayPal MCP Discovery tool + ${adapterCount} PayPal Sandbox REST-backed tools) across read_only, proposal_only, and confirmed_demo_write permission tiers in isolated demo sessions.`,
             },
           }),
           {
@@ -5982,9 +6118,14 @@ Deno.serve(async (req: Request) => {
             result: {
               tools: MCP_TOOLS.map((t) => ({
                 name: t.name,
+                title: t.annotations.title,
                 description: `[${t.permissionTier.toUpperCase()}] ${t.description}`,
                 annotations: t.annotations,
                 inputSchema: t.inputSchema,
+                _meta: {
+                  permissionTier: t.permissionTier,
+                  source: t.source,
+                },
               })),
             },
           }),

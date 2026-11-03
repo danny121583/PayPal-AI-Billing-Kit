@@ -105,7 +105,7 @@ export default function BillingMaaSMcpModal({
       visible={visible}
       onClose={onClose}
       title="Unified MCP Agent Interface"
-      subtitle={`Connect AI agents to ${UNIFIED_MCP_REGISTRY_SUMMARY.totalTools} unified application & PayPal Sandbox tools (26 baseline + 4 Sandbox card & PDF tools) through Model Context Protocol (MCP).`}
+      subtitle={`Connect AI agents to ${UNIFIED_MCP_REGISTRY_SUMMARY.totalTools} unified application & PayPal Sandbox tools (${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.native_app} Native Application + ${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.official_paypal_mcp} Official PayPal MCP + ${UNIFIED_MCP_REGISTRY_SUMMARY.bySource.paypal_rest_adapter} PayPal REST Adapters) through Model Context Protocol (MCP).`}
       testID="billing-maas-mcp-modal"
       closeTestID="billing-maas-mcp-close-btn"
       closeAccessibilityLabel="Close MCP Agent Interface modal"
