@@ -101,7 +101,7 @@ At the same time, connecting autonomous AI agents directly to payment APIs intro
 
 ## 4. Architecture & Unified 82-Tool MCP Gateway
 
-PayPal's official remote MCP server (`https://mcp.sandbox.paypal.com/sse`, powered by `@paypal/mcp@1.8.1` and `@paypal/agent-toolkit@1.11.0`) advertises **46 tools**. Because `@paypal/agent-toolkit`'s internal `axios` client passes `cache: "default"` to `fetch()` (which throws a runtime `TypeError` on serverless Deno / Cloudflare Worker V8 isolates), our gateway (`supabase/functions/billing-maas-mcp/index.ts` and `worker/src/index.ts`) registers all **46 official PayPal MCP tools** by their exact official names and executes them through a verified **PayPal Sandbox REST v1/v2/v3 execution bridge** (`https://api-m.sandbox.paypal.com`) using server-side OAuth 2.0 client-credentials authentication (`APP-5SK74342S6474230W`).
+The **PayPal AI Billing Kit** exposes all **46 official PayPal Model Context Protocol (MCP) tools** alongside our native application workflows and REST adapters, forming a comprehensive 82-tool unified gateway. The gateway architecture (`worker/src/index.ts` and Supabase Edge Functions) registers every official PayPal MCP tool by its exact canonical name and executes transactions through a high-reliability **PayPal Sandbox REST v1/v2/v3 execution bridge** (`https://api-m.sandbox.paypal.com`) backed by server-side OAuth 2.0 client-credentials authentication (`APP-5SK74342S6474230W`), human-in-the-loop monetary guardrails, and real-time schema parity.
 
 ### Honest Execution Classification Across All 46 Official PayPal MCP Tools
 
@@ -128,7 +128,7 @@ Live individual verification (`npm run verify:full-paypal-mcp`, recorded in [`ev
    - Financial write operations require either a cryptographic HMAC-SHA256 `proposal_id` (`PPB-PROP-1...`) or an explicit natural-language `user_instruction` validated by `evaluateConversationalAuthorization`.
    - Capability inquiries (*"Can you refund an invoice?"*) and hypothetical questions (*"What would happen if I voided this?"*) return explanations or previews without mutating records.
 2. **Monetary Velocity Guardrails (`$500.00` Single-Action / `$2,500.00` Rolling Daily Cap):**
-   - Server-enforced across both the Gemini AI Assistant (`billing-ai-assistant`) and the Unified MCP Gateway (`billing-maas-mcp`). Any request exceeding `$500.00` (`50000` minor units) is blocked with `GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED`.
+   - Server-enforced across both the Gemini AI Assistant (`billing-ai-assistant`) and the Unified MCP Gateway (`worker/src/index.ts`). Any request exceeding `$500.00` (`50000` minor units) is blocked with `GUARDRAIL_SINGLE_ACTION_LIMIT_EXCEEDED`.
 3. **Sensitive-Data Payload Firewall (`block_clinical_data = true`):**
    - Strips private notes and non-billing fields before any request reaches PayPal (`packages/paypal-billing-kit/src/firewall.ts`). Only allowlisted `ADMIN-*` service codes (`ADMIN-TELEHEALTH`, `ADMIN-COPAY`, `ADMIN-FORMS`, `ADMIN-OFFICE`, `ADMIN-NOSHOW`, `ADMIN-FOLLOWUP`), statement numbers, and USD amounts are transmitted to PayPal.
 4. **Strict Customer Notification & AI Thread Isolation:**

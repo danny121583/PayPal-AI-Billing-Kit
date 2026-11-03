@@ -4,6 +4,20 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
 
 ---
 
+## [`v1.9.3`] — 2026-11-03
+
+### Added, Improved & Fixed (Vercel Production Deployment, Public Documentation Polish & 46-Tool PayPal MCP Verification)
+- **Vercel Production Build Resolution (`.vercelignore`, `vercel.json`):**
+  - Resolved the Vercel deployment error (`The Output Directory "dist" is empty.`) by configuring `.vercelignore` to upload the prebuilt Expo web production bundle (`dist/`) while strictly excluding local-only hackathon demonstration videos, voiceover scripts, and screen recordings (`local-demo/`, `docs/videos/`).
+- **Public Documentation Polish (`README.md`, `CHANGELOG.md`):**
+  - Refined public documentation to remove internal development terminology, accurately documenting the **PayPal MCP Gateway** architecture (`worker/src/index.ts` and Supabase Edge Functions), OAuth 2.0 client-credentials authentication (`APP-5SK74342S6474230W`), human-in-the-loop monetary guardrails (`$500.00` single-action / `$2,500.00` daily cap), and live REST execution bridge.
+- **46-Tool Official PayPal MCP Live Verification (`scripts/verify-full-paypal-mcp.mjs`):**
+  - Successfully verified all 46 official PayPal MCP tools against live PayPal Sandbox APIs (`35` fully executed via REST adapter, `5` verified domain states requiring buyer approval or active dispute, `4` OAuth-scope restricted on default sandbox app, `1` upstream sandbox limitation, `1` unsupported in sandbox mode).
+- **Comprehensive Production Smoke Testing (`https://paypal-ai-billing-kit.vercel.app`):**
+  - Verified 19/19 Playwright end-to-end browser flows, 20/20 customer notification isolation tests, 20/20 local UI/AI correctness tests, 8/8 repository hygiene checks, and 0 secrets across the codebase.
+
+---
+
 ## [`v1.9.2`] — 2026-11-03
 
 ### Added, Improved & Fixed (Issues #7–#15, Multi-Statement Proposals, Unified PayPal Settlement, Database Notification Ownership & Repository Hygiene)
@@ -60,7 +74,7 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
 ## [`v1.9.0`] — 2026-11-02
 
 ### Added
-- **Full 82-Tool Unified MCP Gateway (`packages/paypal-billing-kit/src/mcpRegistry.ts`, `supabase/functions/billing-maas-mcp/index.ts`, `worker/src/index.ts`):**
+- **Full 82-Tool Unified MCP Gateway (`packages/paypal-billing-kit/src/mcpRegistry.ts`, `worker/src/index.ts`):**
   - Expanded the unified Model Context Protocol (MCP) gateway from `30` tools to **`82` callable tools** across all three live endpoints (`https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp`, `https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp`, and `https://paypal-ai-billing-kit.vercel.app/api/mcp`) and OpenAPI 3.1.0 (`/api/openapi.json`).
   - Integrated all **46 Official PayPal MCP tools** by their exact official names alongside `paypal_discover_official_mcp` (`47` total `official_paypal_mcp` tools).
   - Added **6 new PayPal Sandbox REST-to-MCP Adapter tools** (`update_plan`, `paypal_authorize_order`, `paypal_list_webhooks`, `paypal_list_webhook_event_types`, `paypal_list_invoice_templates`, `paypal_create_vault_setup_token`) to the existing 8 REST adapters (`14` total `paypal_rest_adapter` tools).

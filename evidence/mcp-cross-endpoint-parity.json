@@ -1,5 +1,5 @@
 {
-  "verifiedAt": "2026-11-03T04:34:36.889Z",
+  "verifiedAt": "2026-11-03T13:55:20.780Z",
   "endpointsTested": {
     "localRegistry": "packages/paypal-billing-kit/src/mcpRegistry.ts",
     "cloudflareMcp": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",

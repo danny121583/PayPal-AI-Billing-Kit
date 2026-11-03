@@ -1,6 +1,6 @@
 {
-  "verifiedAt": "2026-11-03T04:34:36.889Z",
-  "verificationSessionId": "full-paypal-mcp-verify-1793680372557",
+  "verifiedAt": "2026-11-03T13:55:20.780Z",
+  "verificationSessionId": "full-paypal-mcp-verify-1793713962221",
   "gatewayEndpoint": "https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp",
   "totalUnifiedMcpTools": 82,
   "officialPayPalMcpToolsCount": 46,
@@ -14,18 +14,18 @@
     "FAIL": 0
   },
   "disposableSandboxResourcesCreatedAndVerified": {
-    "draftDeletedInvoiceId": "INV2-BLNB-L6XD-97ZG-FTF8",
-    "lifecycleInvoiceId": "INV2-DD65-NKPU-NZCH-K4M5",
-    "cancelledSentInvoiceId": "INV2-L75J-YZKB-ESX4-QVFF",
-    "activatedAndCancelledRecurringSeriesId": "RI-6WD56284LM8498941",
-    "deletedRecurringSeriesId": "RI-77B144324A3007607",
-    "catalogProductId": "PROD-4PU81400UB636660U",
-    "subscriptionPlanId": "P-4GE08190NN7048127NLUWH7Q",
-    "subscriptionId": "I-FT10M035P7LG",
-    "checkoutOrderId": "3FG350118V794661P",
-    "liveCardCaptureOrderId": "8TY35081NK8416356",
-    "liveCardCaptureId": "79110818DY805061J",
-    "liveSandboxRefundId": "8C666541S71463443"
+    "draftDeletedInvoiceId": "INV2-BRUA-Z92J-9HZY-9LKK",
+    "lifecycleInvoiceId": "INV2-E73H-SQJC-R5UL-PD75",
+    "cancelledSentInvoiceId": "INV2-M4Y6-SX7M-5AWL-R9JC",
+    "activatedAndCancelledRecurringSeriesId": "RI-2F444821C8023025V",
+    "deletedRecurringSeriesId": "RI-71296789G87203500",
+    "catalogProductId": "PROD-56J10849M59288126",
+    "subscriptionPlanId": "P-8W434636K5155463NNLU6OPA",
+    "subscriptionId": "I-DX1SXB1H4613",
+    "checkoutOrderId": "1LB67935AB9740109",
+    "liveCardCaptureOrderId": "7NN02018UR7568413",
+    "liveCardCaptureId": "6S340043EU501823G",
+    "liveSandboxRefundId": "6J859858GV9020031"
   },
   "results": [
     {
@@ -37,10 +37,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 1045,
+      "latencyMs": 1378,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5",
-      "notes": "Created draft invoice INV2-DD65-NKPU-NZCH-K4M5 (DRAFT) and blocked $650.00 guardrail violation."
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75",
+      "notes": "Created draft invoice INV2-E73H-SQJC-R5UL-PD75 (DRAFT) and blocked $650.00 guardrail violation."
     },
     {
       "index": 2,
@@ -51,10 +51,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 927,
+      "latencyMs": 1160,
       "negativeValidationPassed": true,
-      "paypalResourceId": "RI-6WD56284LM8498941",
-      "notes": "Created recurring series RI-6WD56284LM8498941 (DRAFT)."
+      "paypalResourceId": "RI-2F444821C8023025V",
+      "notes": "Created recurring series RI-2F444821C8023025V (DRAFT)."
     },
     {
       "index": 3,
@@ -65,10 +65,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 1336,
+      "latencyMs": 2750,
       "negativeValidationPassed": true,
-      "paypalResourceId": "RI-6WD56284LM8498941",
-      "notes": "Activated recurring series RI-6WD56284LM8498941 (HTTP 204)."
+      "paypalResourceId": "RI-2F444821C8023025V",
+      "notes": "Activated recurring series RI-2F444821C8023025V (HTTP 204)."
     },
     {
       "index": 4,
@@ -79,10 +79,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 670,
+      "latencyMs": 1736,
       "negativeValidationPassed": true,
-      "paypalResourceId": "RI-6WD56284LM8498941",
-      "notes": "Retrieved recurring series RI-6WD56284LM8498941."
+      "paypalResourceId": "RI-2F444821C8023025V",
+      "notes": "Retrieved recurring series RI-2F444821C8023025V."
     },
     {
       "index": 5,
@@ -93,10 +93,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 1020,
+      "latencyMs": 1003,
       "negativeValidationPassed": true,
-      "paypalResourceId": "RI-6WD56284LM8498941",
-      "notes": "Cancelled active recurring series RI-6WD56284LM8498941 (HTTP 204)."
+      "paypalResourceId": "RI-2F444821C8023025V",
+      "notes": "Cancelled active recurring series RI-2F444821C8023025V (HTTP 204)."
     },
     {
       "index": 6,
@@ -107,10 +107,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 1044,
+      "latencyMs": 1282,
       "negativeValidationPassed": true,
-      "paypalResourceId": "RI-77B144324A3007607",
-      "notes": "Deleted draft recurring series RI-77B144324A3007607 (HTTP 204)."
+      "paypalResourceId": "RI-71296789G87203500",
+      "notes": "Deleted draft recurring series RI-71296789G87203500 (HTTP 204)."
     },
     {
       "index": 7,
@@ -121,10 +121,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 848,
+      "latencyMs": 1244,
       "negativeValidationPassed": true,
-      "paypalResourceId": "total_items:7",
-      "notes": "Listed 5 PayPal Sandbox invoices (total_items=7)."
+      "paypalResourceId": "total_items:9",
+      "notes": "Listed 5 PayPal Sandbox invoices (total_items=9)."
     },
     {
       "index": 8,
@@ -135,10 +135,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 835,
+      "latencyMs": 747,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5",
-      "notes": "Fetched PayPal Sandbox invoice INV2-DD65-NKPU-NZCH-K4M5 (status=DRAFT)."
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75",
+      "notes": "Fetched PayPal Sandbox invoice INV2-E73H-SQJC-R5UL-PD75 (status=DRAFT)."
     },
     {
       "index": 9,
@@ -149,10 +149,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1395,
+      "latencyMs": 1330,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5",
-      "notes": "Sent invoice INV2-DD65-NKPU-NZCH-K4M5 via PayPal Invoicing v2."
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75",
+      "notes": "Sent invoice INV2-E73H-SQJC-R5UL-PD75 via PayPal Invoicing v2."
     },
     {
       "index": 10,
@@ -163,10 +163,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 1120,
+      "latencyMs": 3335,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5",
-      "notes": "Sent payment reminder for invoice INV2-DD65-NKPU-NZCH-K4M5."
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75",
+      "notes": "Sent payment reminder for invoice INV2-E73H-SQJC-R5UL-PD75."
     },
     {
       "index": 11,
@@ -177,10 +177,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 1740,
+      "latencyMs": 1166,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-L75J-YZKB-ESX4-QVFF",
-      "notes": "Cancelled sent invoice INV2-L75J-YZKB-ESX4-QVFF."
+      "paypalResourceId": "INV2-M4Y6-SX7M-5AWL-R9JC",
+      "notes": "Cancelled sent invoice INV2-M4Y6-SX7M-5AWL-R9JC."
     },
     {
       "index": 12,
@@ -191,10 +191,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 693,
+      "latencyMs": 1329,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-BLNB-L6XD-97ZG-FTF8",
-      "notes": "Deleted draft invoice INV2-BLNB-L6XD-97ZG-FTF8."
+      "paypalResourceId": "INV2-BRUA-Z92J-9HZY-9LKK",
+      "notes": "Deleted draft invoice INV2-BRUA-Z92J-9HZY-9LKK."
     },
     {
       "index": 13,
@@ -205,7 +205,7 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 611,
+      "latencyMs": 1674,
       "negativeValidationPassed": true,
       "paypalResourceId": "RC-2LR91305P7402012X",
       "notes": "Initialized merchant invoice auto-reminders (RC-2LR91305P7402012X)."
@@ -219,7 +219,7 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 525,
+      "latencyMs": 1263,
       "negativeValidationPassed": true,
       "paypalResourceId": "RC-2LR91305P7402012X",
       "notes": "Updated auto-reminder configuration RC-2LR91305P7402012X (HTTP 200)."
@@ -233,7 +233,7 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 664,
+      "latencyMs": 1347,
       "negativeValidationPassed": true,
       "paypalResourceId": "invoices_searched",
       "notes": "Searched PayPal Invoicing v2 and verified filter mismatch protection."
@@ -247,10 +247,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1328,
+      "latencyMs": 1254,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5,RI-6WD56284LM8498941",
-      "notes": "Updated both invoice INV2-DD65-NKPU-NZCH-K4M5 and recurring series RI-6WD56284LM8498941."
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75,RI-2F444821C8023025V",
+      "notes": "Updated both invoice INV2-E73H-SQJC-R5UL-PD75 and recurring series RI-2F444821C8023025V."
     },
     {
       "index": 17,
@@ -261,10 +261,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 869,
+      "latencyMs": 795,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-L75J-YZKB-ESX4-QVFF",
-      "notes": "Cancelled automatic reminders for invoice INV2-L75J-YZKB-ESX4-QVFF (HTTP 204)."
+      "paypalResourceId": "INV2-M4Y6-SX7M-5AWL-R9JC",
+      "notes": "Cancelled automatic reminders for invoice INV2-M4Y6-SX7M-5AWL-R9JC (HTTP 204)."
     },
     {
       "index": 18,
@@ -275,10 +275,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 738,
+      "latencyMs": 1248,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5",
-      "notes": "Generated QR code for invoice INV2-DD65-NKPU-NZCH-K4M5 (payload length=996)."
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75",
+      "notes": "Generated QR code for invoice INV2-E73H-SQJC-R5UL-PD75 (payload length=996)."
     },
     {
       "index": 19,
@@ -289,10 +289,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1615,
+      "latencyMs": 2556,
       "negativeValidationPassed": true,
-      "paypalResourceId": "0006",
-      "notes": "Generated next PayPal Sandbox invoice number 0006."
+      "paypalResourceId": "0009",
+      "notes": "Generated next PayPal Sandbox invoice number 0009."
     },
     {
       "index": 20,
@@ -303,10 +303,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 950,
+      "latencyMs": 2286,
       "negativeValidationPassed": true,
-      "paypalResourceId": "EXTR-4X2020603N302413U",
-      "notes": "Recorded payment EXTR-4X2020603N302413U on invoice INV2-DD65-NKPU-NZCH-K4M5."
+      "paypalResourceId": "EXTR-7VP90539M5426973B",
+      "notes": "Recorded payment EXTR-7VP90539M5426973B on invoice INV2-E73H-SQJC-R5UL-PD75."
     },
     {
       "index": 21,
@@ -317,10 +317,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1069,
+      "latencyMs": 2079,
       "negativeValidationPassed": true,
-      "paypalResourceId": "EXTR-2NP09283ST2274104",
-      "notes": "Recorded refund EXTR-2NP09283ST2274104 on invoice INV2-DD65-NKPU-NZCH-K4M5."
+      "paypalResourceId": "EXTR-0LW53174TW802852E",
+      "notes": "Recorded refund EXTR-0LW53174TW802852E on invoice INV2-E73H-SQJC-R5UL-PD75."
     },
     {
       "index": 22,
@@ -330,10 +330,10 @@
       "equivalentRestEndpoint": "/v2/invoicing/invoices/{invoice_id}/conditional-rules",
       "unauthorizedWriteBlocked": true,
       "classification": "BLOCKED_UPSTREAM",
-      "httpStatus": 422,
-      "latencyMs": 902,
+      "httpStatus": 500,
+      "latencyMs": 1571,
       "negativeValidationPassed": true,
-      "paypalResourceId": "INV2-DD65-NKPU-NZCH-K4M5",
+      "paypalResourceId": "INV2-E73H-SQJC-R5UL-PD75",
       "notes": "Unauthorized write blocked & schema validated; PayPal Sandbox /v2/invoicing/invoices/{id}/conditional-rules returns HTTP 500 INTERNAL_SERVER_ERROR upstream."
     },
     {
@@ -345,10 +345,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 876,
+      "latencyMs": 4820,
       "negativeValidationPassed": true,
-      "paypalResourceId": "PROD-4PU81400UB636660U",
-      "notes": "Created Catalog Product PROD-4PU81400UB636660U."
+      "paypalResourceId": "PROD-56J10849M59288126",
+      "notes": "Created Catalog Product PROD-56J10849M59288126."
     },
     {
       "index": 24,
@@ -359,10 +359,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 879,
+      "latencyMs": 1008,
       "negativeValidationPassed": true,
-      "paypalResourceId": "products:3",
-      "notes": "Listed Catalog Products (total_items=3)."
+      "paypalResourceId": "products:4",
+      "notes": "Listed Catalog Products (total_items=4)."
     },
     {
       "index": 25,
@@ -373,10 +373,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 204,
-      "latencyMs": 787,
+      "latencyMs": 878,
       "negativeValidationPassed": true,
-      "paypalResourceId": "PROD-4PU81400UB636660U",
-      "notes": "Updated product PROD-4PU81400UB636660U via JSON Patch (HTTP 204)."
+      "paypalResourceId": "PROD-56J10849M59288126",
+      "notes": "Updated product PROD-56J10849M59288126 via JSON Patch (HTTP 204)."
     },
     {
       "index": 26,
@@ -387,10 +387,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 736,
+      "latencyMs": 1036,
       "negativeValidationPassed": true,
-      "paypalResourceId": "PROD-4PU81400UB636660U",
-      "notes": "Verified updated product PROD-4PU81400UB636660U details."
+      "paypalResourceId": "PROD-56J10849M59288126",
+      "notes": "Verified updated product PROD-56J10849M59288126 details."
     },
     {
       "index": 27,
@@ -401,10 +401,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 1129,
+      "latencyMs": 3630,
       "negativeValidationPassed": true,
-      "paypalResourceId": "P-4GE08190NN7048127NLUWH7Q",
-      "notes": "Created Subscription Plan P-4GE08190NN7048127NLUWH7Q (ACTIVE)."
+      "paypalResourceId": "P-8W434636K5155463NNLU6OPA",
+      "notes": "Created Subscription Plan P-8W434636K5155463NNLU6OPA (ACTIVE)."
     },
     {
       "index": 28,
@@ -415,10 +415,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 625,
+      "latencyMs": 1104,
       "negativeValidationPassed": true,
       "paypalResourceId": "plans:1",
-      "notes": "Listed Subscription Plans for PROD-4PU81400UB636660U (total_items=1)."
+      "notes": "Listed Subscription Plans for PROD-56J10849M59288126 (total_items=1)."
     },
     {
       "index": 29,
@@ -429,10 +429,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 640,
+      "latencyMs": 2176,
       "negativeValidationPassed": true,
-      "paypalResourceId": "P-4GE08190NN7048127NLUWH7Q",
-      "notes": "Retrieved Subscription Plan P-4GE08190NN7048127NLUWH7Q details."
+      "paypalResourceId": "P-8W434636K5155463NNLU6OPA",
+      "notes": "Retrieved Subscription Plan P-8W434636K5155463NNLU6OPA details."
     },
     {
       "index": 30,
@@ -443,10 +443,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 1879,
+      "latencyMs": 3959,
       "negativeValidationPassed": true,
-      "paypalResourceId": "I-FT10M035P7LG",
-      "notes": "Created Subscription I-FT10M035P7LG (APPROVAL_PENDING)."
+      "paypalResourceId": "I-DX1SXB1H4613",
+      "notes": "Created Subscription I-DX1SXB1H4613 (APPROVAL_PENDING)."
     },
     {
       "index": 31,
@@ -457,10 +457,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1024,
+      "latencyMs": 913,
       "negativeValidationPassed": true,
-      "paypalResourceId": "I-FT10M035P7LG",
-      "notes": "Retrieved Subscription I-FT10M035P7LG (status=APPROVAL_PENDING)."
+      "paypalResourceId": "I-DX1SXB1H4613",
+      "notes": "Retrieved Subscription I-DX1SXB1H4613 (status=APPROVAL_PENDING)."
     },
     {
       "index": 32,
@@ -471,10 +471,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_NEGATIVE_AUTHORIZATION",
       "httpStatus": 404,
-      "latencyMs": 1228,
+      "latencyMs": 1391,
       "negativeValidationPassed": true,
-      "paypalResourceId": "I-FT10M035P7LG",
-      "notes": "Verified live PayPal Sandbox response on unapproved subscription I-FT10M035P7LG (Subscription I-FT10M035P7LG is currently in APPROVAL_PENDING state on PayPal Sandbox. PayPal Subscriptions v1 only permits cancelling ACTIVE or SUSPENDED subscriptions after buyer approval.)."
+      "paypalResourceId": "I-DX1SXB1H4613",
+      "notes": "Verified live PayPal Sandbox response on unapproved subscription I-DX1SXB1H4613 (Subscription I-DX1SXB1H4613 is currently in APPROVAL_PENDING state on PayPal Sandbox. PayPal Subscriptions v1 only permits cancelling ACTIVE or SUSPENDED subscriptions after buyer approval.)."
     },
     {
       "index": 33,
@@ -485,10 +485,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_NEGATIVE_AUTHORIZATION",
       "httpStatus": 404,
-      "latencyMs": 1228,
+      "latencyMs": 1632,
       "negativeValidationPassed": true,
-      "paypalResourceId": "I-FT10M035P7LG",
-      "notes": "Verified live PayPal Sandbox PATCH on unapproved subscription I-FT10M035P7LG (Subscription I-FT10M035P7LG is currently in APPROVAL_PENDING state on PayPal Sandbox. PayPal Subscriptions v1 only permits patching ACTIVE or SUSPENDED subscriptions after buyer approval.)."
+      "paypalResourceId": "I-DX1SXB1H4613",
+      "notes": "Verified live PayPal Sandbox PATCH on unapproved subscription I-DX1SXB1H4613 (Subscription I-DX1SXB1H4613 is currently in APPROVAL_PENDING state on PayPal Sandbox. PayPal Subscriptions v1 only permits patching ACTIVE or SUSPENDED subscriptions after buyer approval.)."
     },
     {
       "index": 34,
@@ -499,9 +499,9 @@
       "unauthorizedWriteBlocked": true,
       "classification": "BLOCKED_OAUTH_SCOPE",
       "httpStatus": 403,
-      "latencyMs": 811,
+      "latencyMs": 1127,
       "negativeValidationPassed": true,
-      "paypalResourceId": "79110818DY805061J",
+      "paypalResourceId": "6S340043EU501823G",
       "notes": "PayPal Shipping Trackers API (/v1/shipping/trackers-batch) requires OAuth scope \"https://uri.paypal.com/services/shipping/trackers/readwrite\", which is not enabled on this Sandbox Default Application."
     },
     {
@@ -513,10 +513,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "BLOCKED_OAUTH_SCOPE",
       "httpStatus": 403,
-      "latencyMs": 2225,
+      "latencyMs": 1282,
       "negativeValidationPassed": true,
-      "paypalResourceId": "79110818DY805061J",
-      "notes": "Extracted capture_id 79110818DY805061J from order 8TY35081NK8416356; PayPal Shipping Trackers API (/v1/shipping/trackers) requires OAuth scope \"https://uri.paypal.com/services/shipping/trackers/readwrite\", which is not enabled on this Sandbox Default Application."
+      "paypalResourceId": "6S340043EU501823G",
+      "notes": "Extracted capture_id 6S340043EU501823G from order 7NN02018UR7568413; PayPal Shipping Trackers API (/v1/shipping/trackers) requires OAuth scope \"https://uri.paypal.com/services/shipping/trackers/readwrite\", which is not enabled on this Sandbox Default Application."
     },
     {
       "index": 36,
@@ -527,9 +527,9 @@
       "unauthorizedWriteBlocked": true,
       "classification": "BLOCKED_OAUTH_SCOPE",
       "httpStatus": 403,
-      "latencyMs": 1126,
+      "latencyMs": 835,
       "negativeValidationPassed": true,
-      "paypalResourceId": "79110818DY805061J",
+      "paypalResourceId": "6S340043EU501823G",
       "notes": "PayPal Shipping Trackers API (/v1/shipping/trackers/{id}) requires OAuth scope \"https://uri.paypal.com/services/shipping/trackers/readwrite\", which is not enabled on this Sandbox Default Application."
     },
     {
@@ -541,10 +541,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 1593,
+      "latencyMs": 1433,
       "negativeValidationPassed": true,
-      "paypalResourceId": "3FG350118V794661P",
-      "notes": "Created PayPal Checkout Order 3FG350118V794661P (CREATED) and blocked $600.00 guardrail excess."
+      "paypalResourceId": "1LB67935AB9740109",
+      "notes": "Created PayPal Checkout Order 1LB67935AB9740109 (CREATED) and blocked $600.00 guardrail excess."
     },
     {
       "index": 38,
@@ -555,10 +555,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1336,
+      "latencyMs": 1640,
       "negativeValidationPassed": true,
-      "paypalResourceId": "8TY35081NK8416356",
-      "notes": "Retrieved live PayPal Order 8TY35081NK8416356 (status=COMPLETED)."
+      "paypalResourceId": "7NN02018UR7568413",
+      "notes": "Retrieved live PayPal Order 7NN02018UR7568413 (status=COMPLETED)."
     },
     {
       "index": 39,
@@ -569,10 +569,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_NEGATIVE_AUTHORIZATION",
       "httpStatus": 422,
-      "latencyMs": 1741,
+      "latencyMs": 1133,
       "negativeValidationPassed": true,
-      "paypalResourceId": "3FG350118V794661P",
-      "notes": "Verified PayPal buyer approval enforcement on unapproved order 3FG350118V794661P (ORDER_NOT_APPROVED: Payer has not yet approved the Order for payment. Please redirect the payer to the 'rel':'approve' url returned as part of the HATEOAS links within the Create Order call or provide a valid payment_source in the request.)."
+      "paypalResourceId": "1LB67935AB9740109",
+      "notes": "Verified PayPal buyer approval enforcement on unapproved order 1LB67935AB9740109 (ORDER_NOT_APPROVED: Payer has not yet approved the Order for payment. Please redirect the payer to the 'rel':'approve' url returned as part of the HATEOAS links within the Create Order call or provide a valid payment_source in the request.)."
     },
     {
       "index": 40,
@@ -583,7 +583,7 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 628,
+      "latencyMs": 1353,
       "negativeValidationPassed": true,
       "paypalResourceId": "disputes:0",
       "notes": "Listed PayPal Customer Disputes (count=0)."
@@ -597,7 +597,7 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_NEGATIVE_AUTHORIZATION",
       "httpStatus": 404,
-      "latencyMs": 1166,
+      "latencyMs": 705,
       "negativeValidationPassed": true,
       "paypalResourceId": "PP-D-NONEXISTENT",
       "notes": "Verified live PayPal Disputes v1 lookup (0 active disputes in Sandbox; 404 RESOURCE_NOT_FOUND on unknown dispute_id)."
@@ -611,7 +611,7 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_NEGATIVE_AUTHORIZATION",
       "httpStatus": 404,
-      "latencyMs": 1024,
+      "latencyMs": 943,
       "negativeValidationPassed": true,
       "paypalResourceId": "PP-D-NONEXISTENT",
       "notes": "Verified unauthorized write rejection, required parameter validation, and live PayPal Disputes v1 response (HTTP 404)."
@@ -625,7 +625,7 @@
       "unauthorizedWriteBlocked": null,
       "classification": "BLOCKED_OAUTH_SCOPE",
       "httpStatus": 403,
-      "latencyMs": 1024,
+      "latencyMs": 861,
       "negativeValidationPassed": true,
       "paypalResourceId": "synced_tx:0",
       "notes": "PayPal Transaction Search API (/v1/reporting/transactions) returned HTTP 403 because OAuth scope \"https://uri.paypal.com/services/reporting/search/read\" is not enabled on the Sandbox Default Application. Synchronized session transactions are included in synchronized_session_transactions."
@@ -639,10 +639,10 @@
       "unauthorizedWriteBlocked": true,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 201,
-      "latencyMs": 2262,
+      "latencyMs": 1862,
       "negativeValidationPassed": true,
-      "paypalResourceId": "8C666541S71463443",
-      "notes": "Executed live PayPal Sandbox refund 8C666541S71463443 (COMPLETED) on capture 79110818DY805061J."
+      "paypalResourceId": "6J859858GV9020031",
+      "notes": "Executed live PayPal Sandbox refund 6J859858GV9020031 (COMPLETED) on capture 6S340043EU501823G."
     },
     {
       "index": 45,
@@ -653,10 +653,10 @@
       "unauthorizedWriteBlocked": null,
       "classification": "PASS_REST_ADAPTER",
       "httpStatus": 200,
-      "latencyMs": 1048,
+      "latencyMs": 1061,
       "negativeValidationPassed": true,
-      "paypalResourceId": "8C666541S71463443",
-      "notes": "Verified live PayPal Sandbox refund 8C666541S71463443 (status=COMPLETED)."
+      "paypalResourceId": "6J859858GV9020031",
+      "notes": "Verified live PayPal Sandbox refund 6J859858GV9020031 (status=COMPLETED)."
     },
     {
       "index": 46,
@@ -667,7 +667,7 @@
       "unauthorizedWriteBlocked": null,
       "classification": "UNSUPPORTED_BY_SANDBOX",
       "httpStatus": 403,
-      "latencyMs": 1120,
+      "latencyMs": 917,
       "negativeValidationPassed": true,
       "paypalResourceId": "merchant_insights_sandbox_guard",
       "notes": "get_merchant_insights is not supported in PayPal Sandbox mode (explicitly blocked in @paypal/agent-toolkit: \"get_merchant_insights is not supported in sandbox mode\" and returns HTTP 403 on api-m.sandbox.paypal.com). Use get_business_metrics for session revenue analytics."
