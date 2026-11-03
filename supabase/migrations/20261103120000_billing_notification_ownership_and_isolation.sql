@@ -375,15 +375,48 @@ begin
   delete from public.billing_demo_session_overrides where demo_session_id = v_sess;
   get diagnostics v_del_overrides = row_count;
 
-  delete from public.billing_invoices where demo_session_id = v_sess and source <> 'seed';
-  get diagnostics v_del_invoices = row_count;
-
   delete from public.billing_ai_sessions where demo_session_id = v_sess;
   get diagnostics v_del_sessions = row_count;
 
   delete from public.billing_ai_proposals where demo_session_id = v_sess;
   delete from public.billing_notifications where demo_session_id = v_sess;
   delete from public.billing_audit_events where demo_session_id = v_sess and actor_kind <> 'paypal';
+
+  -- Remove child rows referencing non-seed session/canonical invoices before deleting those invoices
+  delete from public.billing_refunds
+  where invoice_id in (
+    select id from public.billing_invoices
+    where demo_session_id in (v_sess, 'canonical') and source <> 'seed'
+  );
+  delete from public.billing_transactions
+  where invoice_id in (
+    select id from public.billing_invoices
+    where demo_session_id in (v_sess, 'canonical') and source <> 'seed'
+  );
+  delete from public.billing_payment_attempts
+  where invoice_id in (
+    select id from public.billing_invoices
+    where demo_session_id in (v_sess, 'canonical') and source <> 'seed'
+  );
+  delete from public.billing_invoice_items
+  where invoice_id in (
+    select id from public.billing_invoices
+    where demo_session_id in (v_sess, 'canonical') and source <> 'seed'
+  );
+  delete from public.billing_notifications
+  where invoice_id in (
+    select id from public.billing_invoices
+    where demo_session_id in (v_sess, 'canonical') and source <> 'seed'
+  );
+  delete from public.billing_audit_events
+  where actor_kind <> 'paypal'
+    and invoice_id in (
+      select id from public.billing_invoices
+      where demo_session_id in (v_sess, 'canonical') and source <> 'seed'
+    );
+
+  delete from public.billing_invoices where demo_session_id = v_sess and source <> 'seed';
+  get diagnostics v_del_invoices = row_count;
 
   delete from public.billing_invoices where demo_session_id = 'canonical' and source <> 'seed';
   update public.billing_invoices set status = 'sent', amount_paid_minor = 0, amount_refunded_minor = 0, paid_at = null, voided_at = null

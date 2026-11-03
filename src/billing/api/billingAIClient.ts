@@ -2335,7 +2335,7 @@ async function evaluateBillingAITurn(params: {
 
     const isExplicitPayDirective =
       (!isQuestionAboutPaying &&
-        /\b(?:pay|checkout|settle|retry\s+payment\s+for|retry\s+#)\b/i.test(
+        /\b(?:pay|payment\s+proposal|prepare\s+(?:a\s+)?payment|checkout|settle|retry\s+payment\s+for|retry\s+#)\b/i.test(
           lower
         ) &&
         !/\b(?:paid|payment\s+history|payment\s+attempt|payment\s+due|failed\s+payment)\b/i.test(

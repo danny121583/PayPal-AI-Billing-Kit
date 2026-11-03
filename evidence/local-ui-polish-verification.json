@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-03T11:46:11.707Z",
+  "timestamp": "2026-11-03T12:31:01.077Z",
   "targetUrl": "http://localhost:8081",
   "passed": 20,
   "failed": 0,
@@ -94,14 +94,14 @@
       "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter",
       "ok": true,
       "details": {
-        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex, Welcome! I'm here to assist you with your bill"
+        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex! Welcome to your billing portal. I see your acc"
       }
     },
     {
       "name": "Issue #9: Asking \"why did it fail?\" on OVERDUE #PPB-INV-2026-1002 explains 0 failed payment attempts exist on #1002",
       "ok": true,
       "details": {
-        "investigationPreview": "ment fee) is marked OVERDUE because its payment due date (Oct 29, 2026) has passed without settlement — not because a payment failed. • Recorded Payment Attempts: 0 attempts (no failure reason exists on #PPB-INV-2026-1002). • Remaining Balance Due: $75.00 USD."
+        "investigationPreview": " Alex, Statement #PPB-INV-2026-1002 for $75.00 did not actually fail. There are 0 failed payment attempts recorded for this invoice. It is marked as overdue simply because the due date has passed without a payment being made, rather than a transaction failure."
       }
     },
     {
@@ -109,7 +109,7 @@
       "ok": true,
       "details": {
         "leaked1002Into1003": false,
-        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 Was this statement paid? Yes, statement #PPB-INV-2026-1003 was p"
+        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 Was this statement paid? Hello Alex, Yes, statement #PPB-INV-202"
       }
     },
     {
