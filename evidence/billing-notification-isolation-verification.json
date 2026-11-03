@@ -1,6 +1,6 @@
 {
-  "verifiedAt": "2026-11-03T12:10:01.469Z",
-  "targetUrl": "http://localhost:8081",
+  "verifiedAt": "2026-11-03T12:41:47.602Z",
+  "targetUrl": "https://paypal-ai-billing-kit.vercel.app",
   "totalCases": 20,
   "passedCount": 20,
   "failedCount": 0,
