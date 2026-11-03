@@ -1,6 +1,6 @@
 
 🔌 Running Independent MCP Agent Interface Verification against: https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp
-   Isolated Test Session ID: mcp-verify-mw0gpj5z
+   Isolated Test Session ID: mcp-verify-mw0nb9qp
 
   ✅ PASS: Live Endpoint Discovery [CLOUDFLARE] (https://paypal-ai-billing-mcp.apd1034.workers.dev/mcp): HTTP 200, 82 tools, 0 duplicates, 0 missing, 0 legacy, 100% schema fingerprint parity
   ✅ PASS: Live Endpoint Discovery [SUPABASE] (https://dvzfesfvefggnunkjhom.supabase.co/functions/v1/billing-maas-mcp): HTTP 200, 82 tools, 0 duplicates, 0 missing, 0 legacy, 100% schema fingerprint parity
@@ -19,27 +19,27 @@
   ✅ PASS: Tool 5b (`create_invoice_proposal`): creates pending $35.00 ADMIN-FORMS proposal requiring human approval
   ✅ PASS: Security Guardrail: blocks caller-supplied bypass flags (`bypass_guardrail`), unproposed writes, and unapproved writes
   ✅ PASS: Security Isolation: blocks cross-session header/arg mismatch, cross-session proposal execution, and canonical session mutation
-  ✅ PASS: Tool 6 (`create_approved_invoice`): executes approved proposal -> created #PPB-INV-2026-1122
-  ✅ PASS: Cross-Visitor Isolation: session "mcp-other-mw0gpj5z" sees only 6 canonical statements (zero leak of #PPB-INV-2026-1122)
+  ✅ PASS: Tool 6 (`create_approved_invoice`): executes approved proposal -> created #PPB-INV-2026-1126
+  ✅ PASS: Cross-Visitor Isolation: session "mcp-other-mw0nb9qp" sees only 6 canonical statements (zero leak of #PPB-INV-2026-1126)
   ✅ PASS: Tool 7 (`explain_outstanding_balances`): computes Alex Rivera outstanding balance ($260.00)
   ✅ PASS: Tool 8 (`get_transaction_history`): returns settlements & labels SAMPLE-DEMO-SETTLEMENT-1003 as non-live sample
   ✅ PASS: Tool 9 (`prepare_payment_proposal`): prepares PayPal Sandbox checkout proposal without charging autonomously
-  ✅ PASS: Tool 16 (`create_paypal_checkout_order`): handles checkout order creation for #PPB-INV-2026-1001 (Order 18A41132340088537)
+  ✅ PASS: Tool 16 (`create_paypal_checkout_order`): handles checkout order creation for #PPB-INV-2026-1001 (Order 2DS65955HN990791W)
   ✅ PASS: Tool 17 (`capture_paypal_checkout_order`): settles #PPB-INV-2026-1004 ($50.00 -> $0.00 balance due) in isolated demo session with transparent non-live label
   ✅ PASS: Tool 18 (`get_payment_receipt`): returns structured payment receipts for #PPB-INV-2026-1003 ($125.00) and settled #PPB-INV-2026-1004 ($50.00)
   ✅ PASS: Tool 10a (`void_unpaid_invoice`): enforces Payment-State Protection blocking void on paid #PPB-INV-2026-1003
-  ✅ PASS: Tool 10b (`void_unpaid_invoice`): voids unpaid session invoice #PPB-INV-2026-1122 ($0.00 balance due)
+  ✅ PASS: Tool 10b (`void_unpaid_invoice`): voids unpaid session invoice #PPB-INV-2026-1126 ($0.00 balance due)
   ✅ PASS: Tool 11 (`prepare_refund_proposal`): prepares $125.00 refund proposal for paid #PPB-INV-2026-1003
   ✅ PASS: Tool 19 (`execute_approved_refund`): executes approved $125.00 refund for #PPB-INV-2026-1003 in isolated demo session
   ✅ PASS: Tool 12 (`get_financial_audit_history`): returns 10 append-only financial audit events
   ✅ PASS: Tool 13 (`get_paypal_sandbox_status`): reports PayPal Sandbox status & credential state accurately
   ✅ PASS: Tool 14 (`get_business_metrics`): returns practice KPIs (Outstanding=$225.00)
-  ✅ PASS: Tool 20 (`execute_conversational_instruction`): blocks capability question and executes explicit $35 invoice creation (#PPB-INV-2026-1123)
+  ✅ PASS: Tool 20 (`execute_conversational_instruction`): blocks capability question and executes explicit $35 invoice creation (#PPB-INV-2026-1128)
   ✅ PASS: Tool 21 (`paypal_discover_official_mcp`): verifies live connection to https://mcp.sandbox.paypal.com/sse (46 official PayPal tools discovered)
   ✅ PASS: Tools 22–26 (PayPal REST Adapters): verified live PayPal Order (7FA47897KM5938009), Refund (2EM77813GU330222M), Invoicing v2 number (0009), and Disputes API
   ✅ PASS: Tools 27–30 (`paypal_check_card_eligibility`, `execute_sandbox_card_payment`, `generate_receipt_pdf`, `run_sandbox_card_lifecycle_test`): verified eligibility, approval guardrails, unpaid receipt refusal, and PDF generation (5362 bytes)
   ✅ PASS: Binary PDF 1.4 Receipt Endpoint (`/api/receipts/PPB-INV-2026-1003.pdf`): HTTP 200, application/pdf (4929 bytes, %PDF-1.4)
-  ✅ PASS: Tool 15 (`reset_demo_session`): resets session "mcp-verify-mw0gpj5z" back to exactly 6 canonical seed invoices
+  ✅ PASS: Tool 15 (`reset_demo_session`): resets session "mcp-verify-mw0nb9qp" back to exactly 6 canonical seed invoices
 
 📊 MCP Agent Interface Verification Summary: 38 passed, 0 failed
 

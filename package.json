@@ -1,6 +1,6 @@
 {
   "name": "paypal-ai-billing-kit",
-  "version": "1.9.0",
+  "version": "1.9.2",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

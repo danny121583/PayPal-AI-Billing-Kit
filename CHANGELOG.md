@@ -4,9 +4,9 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
 
 ---
 
-## [`Unreleased`] — Feature Branch (`fix/final-ui-ai-correctness-polish`, Local Development Awaiting Production Merge)
+## [`v1.9.2`] — 2026-11-03
 
-### Added, Improved & Fixed (Issues #7–#15, Multi-Statement Proposals, Unified PayPal Settlement & Repository Hygiene)
+### Added, Improved & Fixed (Issues #7–#15, Multi-Statement Proposals, Unified PayPal Settlement, Database Notification Ownership & Repository Hygiene)
 - **Issue #7 — Responsive Statement Details Modal & Unified PayPal Settlement Flow (`components/billing/BillingModalShell.tsx`, `components/billing/BillingInvoiceDetailModal.tsx`, `src/billing/api/billingService.ts`):**
   - Expanded desktop modal max-width to `680px` (`width: 94%` on mobile) with responsive spacing, consistent button heights (`46px`), and unclipped upper-scroll content.
   - Unified payment action hierarchy into a single primary footer button (**`Pay with PayPal`** for open statements, **`Retry with PayPal`** for failed statements) without duplicate competing payment buttons.
@@ -27,7 +27,8 @@ All notable changes to the **PayPal AI Billing Kit** are documented in this file
   - Replaced the persistent Reset Demo banner with a floating toast (`testID="billing-demo-reset-toast"`) that auto-dismisses after `3,200ms` (with manual `×` dismiss) and resets all canonical statements, AI chats, and customer notifications.
 - **Issue #14 — Billing AI Header `New Chat` Compose Button (`components/billing/BillingModalShell.tsx`, `components/billing/BillingAIAssistantModal.tsx`):**
   - Moved the **`New Chat`** control (`testID="billing-ai-new-chat-btn"`, compose icon) into the upper-left corner of the Billing AI modal header opposite the close button (`[New Chat]   Billing AI   [X]`).
-- **Issue #15 — Strict Customer Notification Isolation & Linked-Statement Ownership (`src/billing/api/billingService.ts`, `src/billing/data/syntheticBillingFixtures.ts`, `components/billing/BillingNotificationsModal.tsx`):**
+- **Issue #15 — Strict Customer Notification Isolation & Database Ownership Migration (`supabase/migrations/20261103120000_billing_notification_ownership_and_isolation.sql`, `src/billing/api/billingService.ts`, `src/billing/data/syntheticBillingFixtures.ts`, `components/billing/BillingNotificationsModal.tsx`):**
+  - Applied Supabase migration `20261103120720_billing_notification_ownership_and_isolation` on project `dvzfesfvefggnunkjhom` enforcing strict `public.billing_notifications` recipient ownership (`public.billing_seed_canonical_notifications`, `public.billing_reset_demo_session`, `public.billing_notify`), removing cross-customer notification pollution, and preserving all immutable `public.billing_audit_events`.
   - Enforced dual-ownership verification (`recipient_profile_id === customerId` AND linked invoice `patient_id === customerId`) and canonical seed UUID-to-invoice-number resolution (`resolveBillingDeepLinkInvoice`) so `Alex Rivera` and `Jordan Taylor` see and open only their own notifications and statements.
 - **Public Repository Cleanup & Updated Public Screenshots (`docs/screenshots/public/`, `scripts/verify-public-repo-hygiene.mjs`):**
   - Separated public documentation screenshots (`docs/screenshots/public/01`–`14`) from local-only presentation videos, voiceover scripts, and recording utilities (`local-demo/`, gitignored) and added `npm run verify:repo-hygiene`.
