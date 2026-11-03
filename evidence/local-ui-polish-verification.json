@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-03T12:42:15.435Z",
+  "timestamp": "2026-11-03T14:04:49.371Z",
   "targetUrl": "https://paypal-ai-billing-kit.vercel.app",
   "passed": 20,
   "failed": 0,
@@ -94,7 +94,7 @@
       "name": "Issue #9: Sending \"hello\" on #PPB-INV-2026-1002 returns a conversational greeting referencing #PPB-INV-2026-1002 without telemetry clutter",
       "ok": true,
       "details": {
-        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex! I see you're currently viewing statement #PPB-"
+        "greetingPreview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1002 hello Hello Alex Rivera! I see you have an active context regard"
       }
     },
     {
@@ -109,7 +109,7 @@
       "ok": true,
       "details": {
         "leaked1002Into1003": false,
-        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 Was this statement paid? Hello Alex, Yes, statement #PPB-INV-202"
+        "conv1003Preview": "Billing AI Your statements, balances, payments & receipts Billing data only — sensitive customer notes are never sent to PayPal. Invoice #PPB-INV-2026-1003 Was this statement paid? Yes, statement #PPB-INV-2026-1003 was p"
       }
     },
     {
